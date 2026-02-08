@@ -123,8 +123,12 @@ const InternoLogin = () => {
             id: signUpData.user.id,
             email: adminEmail,
             nome: "Administrador",
-            setor: "COMEX" as any,
+            setor: null, // Admin doesn't need setor
           });
+          
+          // Setup admin role using RPC
+          await supabase.rpc("setup_admin_role");
+          
           toast.success("Conta admin configurada! Faça login novamente.");
         }
       } else if (signInData.user) {
@@ -133,8 +137,20 @@ const InternoLogin = () => {
           id: signInData.user.id,
           email: adminEmail,
           nome: "Administrador",
-          setor: "COMEX" as any,
+          setor: null,
         });
+        
+        // Ensure admin role exists
+        const { data: existingRole } = await supabase
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", signInData.user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        
+        if (!existingRole) {
+          await supabase.rpc("setup_admin_role");
+        }
       }
       
       setLoading(false);

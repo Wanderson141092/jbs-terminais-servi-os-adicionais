@@ -27,23 +27,13 @@ const InternoLogin = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        // Check domain for non-admin users
-        const userEmail = session.user.email || "";
-        if (!userEmail.endsWith("@jbsterminais.com.br") && userEmail !== "admin@jbsterminais.internal") {
-          toast.error("Acesso restrito ao domínio @jbsterminais.com.br");
-          supabase.auth.signOut();
-          return;
-        }
         navigate("/interno/dashboard");
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        const userEmail = session.user.email || "";
-        if (userEmail.endsWith("@jbsterminais.com.br") || userEmail === "admin@jbsterminais.internal") {
-          navigate("/interno/dashboard");
-        }
+        navigate("/interno/dashboard");
       }
     });
 
@@ -99,41 +89,57 @@ const InternoLogin = () => {
     const adminUser = email.toLowerCase().trim();
     const adminPass = password;
 
-    // Admin default credentials
+    // Admin default credentials: Admin / Admin
     if (adminUser === "admin" && adminPass === "Admin") {
       setLoading(true);
-      // Sign in with special admin account
-      const { error } = await supabase.auth.signInWithPassword({
-        email: "admin@jbsterminais.internal",
-        password: "Admin123!@#",
+      
+      // Use a proper email format for Supabase auth
+      const adminEmail = "admin@jbsterminais.com.br";
+      const adminPassword = "Admin123!@#Secure";
+      
+      // Try to sign in first
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: adminEmail,
+        password: adminPassword,
       });
 
-      if (error) {
-        // Try to create admin user if not exists
+      if (signInError) {
+        // If sign in fails, try to create admin account
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: "admin@jbsterminais.internal",
-          password: "Admin123!@#",
+          email: adminEmail,
+          password: adminPassword,
         });
 
         if (signUpError) {
-          toast.error("Erro ao acessar conta admin: " + signUpError.message);
+          // Account might exist but wrong password - inform user
+          toast.error("Conta admin não configurada. Contate o suporte.");
           setLoading(false);
           return;
         }
 
         if (signUpData.user) {
-          await supabase.from("profiles").insert({
+          // Create admin profile
+          await supabase.from("profiles").upsert({
             id: signUpData.user.id,
-            email: "admin@jbsterminais.internal",
+            email: adminEmail,
             nome: "Administrador",
-            setor: "COMEX" as any, // Admin has full access
+            setor: "COMEX" as any,
           });
-          toast.success("Conta admin criada com sucesso!");
+          toast.success("Conta admin configurada! Faça login novamente.");
         }
+      } else if (signInData.user) {
+        // Ensure profile exists
+        await supabase.from("profiles").upsert({
+          id: signInData.user.id,
+          email: adminEmail,
+          nome: "Administrador",
+          setor: "COMEX" as any,
+        });
       }
+      
       setLoading(false);
     } else {
-      toast.error("Credenciais de admin inválidas.");
+      toast.error("Credenciais inválidas. Use: Admin / Admin");
     }
   };
 

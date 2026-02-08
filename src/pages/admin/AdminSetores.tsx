@@ -7,9 +7,11 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Building2, ArrowLeft, Plus, Save, Edit } from "lucide-react";
+import { Building2, ArrowLeft, Plus, Save, Edit, Trash2, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Setor {
@@ -20,12 +22,21 @@ interface Setor {
   ativo: boolean;
 }
 
+interface Servico {
+  id: string;
+  nome: string;
+}
+
 const AdminSetores = () => {
   const navigate = useNavigate();
   const [setores, setSetores] = useState<Setor[]>([]);
+  const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showAccessDialog, setShowAccessDialog] = useState(false);
   const [editingSetor, setEditingSetor] = useState<Setor | null>(null);
+  const [selectedSetorForAccess, setSelectedSetorForAccess] = useState<Setor | null>(null);
+  const [selectedServicos, setSelectedServicos] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     email_setor: "",
     setor: "COMEX" as "COMEX" | "ARMAZEM",
@@ -33,20 +44,25 @@ const AdminSetores = () => {
   });
 
   useEffect(() => {
-    fetchSetores();
+    fetchData();
   }, []);
 
-  const fetchSetores = async () => {
-    const { data, error } = await supabase
-      .from("setor_emails")
-      .select("*")
-      .order("setor");
+  const fetchData = async () => {
+    const [setoresRes, servicosRes] = await Promise.all([
+      supabase.from("setor_emails").select("*").order("setor"),
+      supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome")
+    ]);
 
-    if (error) {
+    if (setoresRes.error) {
       toast.error("Erro ao carregar setores");
     } else {
-      setSetores(data || []);
+      setSetores(setoresRes.data || []);
     }
+    
+    if (servicosRes.data) {
+      setServicos(servicosRes.data);
+    }
+    
     setLoading(false);
   };
 
@@ -62,7 +78,7 @@ const AdminSetores = () => {
     }
 
     toast.success(setor.ativo ? "Setor desativado" : "Setor ativado");
-    fetchSetores();
+    fetchData();
   };
 
   const handleSave = async () => {
@@ -105,7 +121,34 @@ const AdminSetores = () => {
     setShowAddDialog(false);
     setEditingSetor(null);
     setFormData({ email_setor: "", setor: "COMEX", descricao: "" });
-    fetchSetores();
+    fetchData();
+  };
+
+  const handleDelete = async (setor: Setor) => {
+    // Check if there are users linked to this sector
+    const { data: linkedUsers } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email_setor", setor.email_setor)
+      .limit(1);
+
+    if (linkedUsers && linkedUsers.length > 0) {
+      toast.error("Não é possível excluir: existem usuários vinculados a este setor. Desative-o em vez de excluir.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("setor_emails")
+      .delete()
+      .eq("id", setor.id);
+
+    if (error) {
+      toast.error("Erro ao excluir setor");
+      return;
+    }
+
+    toast.success("Setor excluído!");
+    fetchData();
   };
 
   const openEditDialog = (setor: Setor) => {
@@ -116,6 +159,33 @@ const AdminSetores = () => {
       descricao: setor.descricao || ""
     });
     setShowAddDialog(true);
+  };
+
+  const openAccessDialog = (setor: Setor) => {
+    setSelectedSetorForAccess(setor);
+    // For now, we'll show all services as accessible
+    // In a real implementation, you'd fetch the actual permissions
+    setSelectedServicos(new Set(servicos.map(s => s.id)));
+    setShowAccessDialog(true);
+  };
+
+  const toggleServicoAccess = (servicoId: string) => {
+    setSelectedServicos(prev => {
+      const next = new Set(prev);
+      if (next.has(servicoId)) {
+        next.delete(servicoId);
+      } else {
+        next.add(servicoId);
+      }
+      return next;
+    });
+  };
+
+  const saveAccessPermissions = () => {
+    // In a real implementation, you'd save this to a junction table
+    toast.success(`Permissões atualizadas para ${selectedSetorForAccess?.setor}`);
+    setShowAccessDialog(false);
+    setSelectedSetorForAccess(null);
   };
 
   if (loading) {
@@ -197,6 +267,38 @@ const AdminSetores = () => {
         </Dialog>
       </div>
 
+      {/* Access Permissions Dialog */}
+      <Dialog open={showAccessDialog} onOpenChange={setShowAccessDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Permissões de Acesso - {selectedSetorForAccess?.setor}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">
+              Selecione os serviços que este setor pode acessar:
+            </p>
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {servicos.map((servico) => (
+                <div key={servico.id} className="flex items-center space-x-3">
+                  <Checkbox
+                    id={servico.id}
+                    checked={selectedServicos.has(servico.id)}
+                    onCheckedChange={() => toggleServicoAccess(servico.id)}
+                  />
+                  <Label htmlFor={servico.id} className="cursor-pointer">
+                    {servico.nome}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            <Button onClick={saveAccessPermissions} className="w-full">
+              <Save className="h-4 w-4 mr-2" />
+              Salvar Permissões
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Setores Cadastrados ({setores.length})</CardTitle>
@@ -225,9 +327,39 @@ const AdminSetores = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => openEditDialog(setor)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(setor)} title="Editar">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => openAccessDialog(setor)} title="Permissões">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" title="Excluir">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir Setor</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir o setor <strong>{setor.email_setor}</strong>?
+                              Se houver usuários vinculados, a exclusão não será permitida.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(setor)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

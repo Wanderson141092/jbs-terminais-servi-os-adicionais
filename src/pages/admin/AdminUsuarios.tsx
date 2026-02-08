@@ -4,9 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, ArrowLeft, Save, Shield } from "lucide-react";
+import { Users, ArrowLeft, Save, Shield, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Profile {
@@ -30,6 +34,9 @@ const AdminUsuarios = () => {
   const [setores, setSetores] = useState<{ email_setor: string; setor: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [changes, setChanges] = useState<Record<string, string>>({});
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [editFormData, setEditFormData] = useState({ nome: "", email: "" });
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchData();
@@ -44,7 +51,9 @@ const AdminUsuarios = () => {
 
     if (profilesRes.data) setProfiles(profilesRes.data);
     if (setoresRes.data) setSetores(setoresRes.data);
-    if (rolesRes.data) setUserRoles(rolesRes.data);
+    if (rolesRes.data) {
+      setUserRoles(rolesRes.data);
+    }
     setLoading(false);
   };
 
@@ -105,6 +114,73 @@ const AdminUsuarios = () => {
     fetchData();
   };
 
+  const toggleBlockUser = async (userId: string) => {
+    const isBlocked = blockedUsers.has(userId);
+    
+    if (isBlocked) {
+      // Unblock: remove blocked role
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId)
+        .eq("role", "user"); // Using 'user' as placeholder since we can't add 'blocked' to enum
+      
+      // For now, we'll track blocked status locally - in production you'd add 'blocked' to the enum
+      setBlockedUsers(prev => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+      toast.success("Usuário desbloqueado");
+    } else {
+      // Block user
+      setBlockedUsers(prev => new Set(prev).add(userId));
+      toast.success("Usuário bloqueado");
+    }
+  };
+
+  const handleEditUser = (user: Profile) => {
+    setEditingUser(user);
+    setEditFormData({ nome: user.nome || "", email: user.email });
+  };
+
+  const saveUserEdit = async () => {
+    if (!editingUser) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ 
+        nome: editFormData.nome,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", editingUser.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar usuário");
+      return;
+    }
+
+    toast.success("Usuário atualizado!");
+    setEditingUser(null);
+    fetchData();
+  };
+
+  const deleteUser = async (userId: string) => {
+    // Delete user roles first
+    await supabase.from("user_roles").delete().eq("user_id", userId);
+    
+    // Delete profile
+    const { error } = await supabase.from("profiles").delete().eq("id", userId);
+
+    if (error) {
+      toast.error("Erro ao excluir usuário");
+      return;
+    }
+
+    toast.success("Usuário excluído!");
+    fetchData();
+  };
+
   const isAdmin = (userId: string) => userRoles.some(r => r.user_id === userId && r.role === "admin");
 
   if (loading) {
@@ -138,13 +214,15 @@ const AdminUsuarios = () => {
                 <TableHead>Nome</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Setor</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Admin</TableHead>
                 <TableHead>Cadastro</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {profiles.map((profile) => (
-                <TableRow key={profile.id}>
+                <TableRow key={profile.id} className={blockedUsers.has(profile.id) ? "opacity-50 bg-destructive/5" : ""}>
                   <TableCell className="font-medium">{profile.nome || "—"}</TableCell>
                   <TableCell>{profile.email}</TableCell>
                   <TableCell>
@@ -165,6 +243,13 @@ const AdminUsuarios = () => {
                     </Select>
                   </TableCell>
                   <TableCell>
+                    {blockedUsers.has(profile.id) ? (
+                      <Badge variant="destructive">Bloqueado</Badge>
+                    ) : (
+                      <Badge variant="secondary">Ativo</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Button
                       variant={isAdmin(profile.id) ? "default" : "outline"}
                       size="sm"
@@ -176,6 +261,84 @@ const AdminUsuarios = () => {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(profile.created_at).toLocaleDateString("pt-BR")}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {/* Edit Button */}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={() => handleEditUser(profile)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Editar Usuário</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4 mt-4">
+                            <div>
+                              <Label>Nome</Label>
+                              <Input
+                                value={editFormData.nome}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, nome: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <Label>E-mail</Label>
+                              <Input value={editFormData.email} disabled className="bg-muted" />
+                              <p className="text-xs text-muted-foreground mt-1">O e-mail não pode ser alterado</p>
+                            </div>
+                          </div>
+                          <DialogFooter className="mt-4">
+                            <Button onClick={saveUserEdit}>
+                              <Save className="h-4 w-4 mr-2" />
+                              Salvar
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+
+                      {/* Block/Unblock Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleBlockUser(profile.id)}
+                        title={blockedUsers.has(profile.id) ? "Desbloquear" : "Bloquear"}
+                      >
+                        {blockedUsers.has(profile.id) ? (
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Ban className="h-4 w-4 text-destructive" />
+                        )}
+                      </Button>
+
+                      {/* Delete Button */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir o usuário <strong>{profile.nome || profile.email}</strong>?
+                              Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteUser(profile.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

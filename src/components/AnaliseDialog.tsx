@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [statusVistoria, setStatusVistoria] = useState(solicitacao.status_vistoria || "");
   const [loading, setLoading] = useState(false);
   const [adminSelectedSetor, setAdminSelectedSetor] = useState<"COMEX" | "ARMAZEM" | null>(null);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAttachments = async () => {
+      const { data } = await supabase
+        .from("deferimento_documents")
+        .select("*")
+        .eq("solicitacao_id", solicitacao.id);
+      setAttachments(data || []);
+    };
+    fetchAttachments();
+  }, [solicitacao.id]);
 
   const setor = isAdmin ? adminSelectedSetor : profile.setor;
   const isComex = setor === "COMEX";
@@ -347,6 +360,36 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </div>
               </>
             )}
+
+            {/* Anexos */}
+            <Separator />
+            <div className="space-y-3">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Anexos e Documentos
+              </p>
+              {attachments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum anexo disponível</p>
+              ) : (
+                <div className="grid gap-2">
+                  {attachments.map((att) => (
+                    <div key={att.id} className="flex items-center justify-between p-2 border rounded">
+                      <span className="text-sm">{att.file_name}</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
@@ -416,6 +459,24 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Preview de Anexo */}
+      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Visualização do Documento</DialogTitle>
+          </DialogHeader>
+          {previewUrl && (
+            <div className="w-full h-[70vh]">
+              {previewUrl.toLowerCase().endsWith('.pdf') ? (
+                <iframe src={previewUrl} className="w-full h-full" />
+              ) : (
+                <img src={previewUrl} alt="Documento" className="max-w-full max-h-full mx-auto" />
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

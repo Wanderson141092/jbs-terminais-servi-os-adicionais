@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { ExternalLink, Search, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -18,17 +18,54 @@ const Index = () => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      let query = supabase.from("solicitacoes").select("*");
+      let data = null;
+      let error = null;
 
-      if (tipo === "protocolo") {
-        query = query.eq("protocolo", valor);
-      } else if (tipo === "lpco") {
-        query = query.eq("lpco", valor);
+      if (tipo === "todos") {
+        // Busca em todos os campos
+        const resultProtocolo = await supabase
+          .from("solicitacoes")
+          .select("*")
+          .eq("protocolo", valor)
+          .maybeSingle();
+        
+        if (resultProtocolo.data) {
+          data = resultProtocolo.data;
+        } else {
+          const resultLpco = await supabase
+            .from("solicitacoes")
+            .select("*")
+            .eq("lpco", valor)
+            .maybeSingle();
+          
+          if (resultLpco.data) {
+            data = resultLpco.data;
+          } else {
+            const resultConteiner = await supabase
+              .from("solicitacoes")
+              .select("*")
+              .eq("numero_conteiner", valor)
+              .maybeSingle();
+            
+            data = resultConteiner.data;
+            error = resultConteiner.error;
+          }
+        }
       } else {
-        query = query.eq("numero_conteiner", valor);
-      }
+        let query = supabase.from("solicitacoes").select("*");
 
-      const { data, error } = await query.maybeSingle();
+        if (tipo === "protocolo") {
+          query = query.eq("protocolo", valor);
+        } else if (tipo === "lpco") {
+          query = query.eq("lpco", valor);
+        } else {
+          query = query.eq("numero_conteiner", valor);
+        }
+
+        const result = await query.maybeSingle();
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
       setResultado(data);
@@ -59,61 +96,44 @@ const Index = () => {
             <p className="text-muted-foreground">Status da solicitação</p>
           </div>
 
-          {/* Action Cards */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* Consultar Card */}
-            <Card className="border-2 border-primary/10 hover:border-primary/30 transition-colors cursor-pointer">
-              <CardHeader className="pb-2">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
-                  <Search className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Consultar Solicitação</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Consulte por protocolo, LPCO ou número do contêiner
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Solicitar/Cancelar Card */}
-            <Dialog>
-              <DialogTrigger asChild>
-                <Card className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer">
-                  <CardHeader className="pb-2">
-                    <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center mb-2">
-                      <FileText className="h-6 w-6 text-secondary" />
-                    </div>
-                    <CardTitle className="text-lg">Solicite ou Cancele aqui</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Acesse o formulário para nova solicitação ou cancelamento
+          {/* Action Card - Solicitar/Cancelar */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Card className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer mb-8">
+                <CardHeader className="pb-2 text-center">
+                  <div className="w-14 h-14 rounded-xl bg-secondary/20 flex items-center justify-center mb-3 mx-auto">
+                    <FileText className="h-7 w-7 text-secondary" />
+                  </div>
+                  <CardTitle className="text-xl text-primary font-bold">Serviço Adicional</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">Solicitar ou Cancelar</p>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Acesse o formulário para nova solicitação ou cancelamento
+                  </p>
+                </CardContent>
+              </Card>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+              <DialogHeader>
+                <DialogTitle>Serviço Adicional - Solicitação ou Cancelamento</DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                {/* Hashdata iframe will go here */}
+                <div className="bg-muted/50 rounded-lg p-8 text-center min-h-[400px] flex items-center justify-center">
+                  <div>
+                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      Integração com formulário Hashdata
                     </p>
-                  </CardContent>
-                </Card>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                <DialogHeader>
-                  <DialogTitle>Formulário de Solicitação / Cancelamento</DialogTitle>
-                </DialogHeader>
-                <div className="py-4">
-                  {/* Hashdata iframe will go here */}
-                  <div className="bg-muted/50 rounded-lg p-8 text-center min-h-[400px] flex items-center justify-center">
-                    <div>
-                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">
-                        Integração com formulário Hashdata
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        O formulário será carregado aqui
-                      </p>
-                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      O formulário será carregado aqui
+                    </p>
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Consultation Section */}
           <div className="space-y-6">

@@ -19,6 +19,8 @@ export type Database = {
           acao: string
           created_at: string
           detalhes: string | null
+          entidade: string | null
+          entidade_id: string | null
           id: string
           solicitacao_id: string
           usuario_id: string
@@ -27,6 +29,8 @@ export type Database = {
           acao: string
           created_at?: string
           detalhes?: string | null
+          entidade?: string | null
+          entidade_id?: string | null
           id?: string
           solicitacao_id: string
           usuario_id: string
@@ -35,6 +39,8 @@ export type Database = {
           acao?: string
           created_at?: string
           detalhes?: string | null
+          entidade?: string | null
+          entidade_id?: string | null
           id?: string
           solicitacao_id?: string
           usuario_id?: string
@@ -80,6 +86,77 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      field_mappings: {
+        Row: {
+          campo_externo: string
+          campo_interno: string
+          created_at: string
+          descricao: string | null
+          id: string
+          integracao_id: string | null
+        }
+        Insert: {
+          campo_externo: string
+          campo_interno: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integracao_id?: string | null
+        }
+        Update: {
+          campo_externo?: string
+          campo_interno?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integracao_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_mappings_integracao_id_fkey"
+            columns: ["integracao_id"]
+            isOneToOne: false
+            referencedRelation: "integracoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integracoes: {
+        Row: {
+          api_key: string | null
+          ativo: boolean
+          config: Json | null
+          created_at: string
+          id: string
+          nome: string
+          tipo: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          api_key?: string | null
+          ativo?: boolean
+          config?: Json | null
+          created_at?: string
+          id?: string
+          nome: string
+          tipo: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          api_key?: string | null
+          ativo?: boolean
+          config?: Json | null
+          created_at?: string
+          id?: string
+          nome?: string
+          tipo?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -157,8 +234,39 @@ export type Database = {
           },
         ]
       }
+      servicos: {
+        Row: {
+          ativo: boolean
+          codigo_prefixo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo_prefixo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo_prefixo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       setor_emails: {
         Row: {
+          ativo: boolean
           created_at: string
           descricao: string | null
           email_setor: string
@@ -166,6 +274,7 @@ export type Database = {
           setor: Database["public"]["Enums"]["setor_tipo"]
         }
         Insert: {
+          ativo?: boolean
           created_at?: string
           descricao?: string | null
           email_setor: string
@@ -173,6 +282,7 @@ export type Database = {
           setor: Database["public"]["Enums"]["setor_tipo"]
         }
         Update: {
+          ativo?: boolean
           created_at?: string
           descricao?: string | null
           email_setor?: string
@@ -256,6 +366,60 @@ export type Database = {
         }
         Relationships: []
       }
+      system_config: {
+        Row: {
+          config_key: string
+          config_type: string
+          config_value: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          config_key: string
+          config_type?: string
+          config_value?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          config_key?: string
+          config_type?: string
+          config_value?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -265,8 +429,16 @@ export type Database = {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["setor_tipo"]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "user"
       setor_tipo: "COMEX" | "ARMAZEM"
       status_solicitacao:
         | "aguardando_confirmacao"
@@ -403,6 +575,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       setor_tipo: ["COMEX", "ARMAZEM"],
       status_solicitacao: [
         "aguardando_confirmacao",

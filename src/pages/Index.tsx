@@ -54,7 +54,7 @@ const Index = () => {
           {/* Header */}
           <div className="text-center mb-8 pb-6 border-b-4 border-secondary">
             <h1 className="text-2xl md:text-3xl font-bold text-primary mb-2">
-              Serviço de Posicionamento
+              Serviços Adicionais
             </h1>
             <p className="text-muted-foreground">Status da solicitação</p>
           </div>
@@ -151,7 +151,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="py-6 text-center">
         <p className="text-xs text-primary-foreground/60">
-          © {new Date().getFullYear()} JBS Terminais — Serviço de Posicionamento de Contêiner
+          © {new Date().getFullYear()} JBS Terminais — Serviços Adicionais
         </p>
       </footer>
     </div>

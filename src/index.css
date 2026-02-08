@@ -98,6 +98,10 @@
     @apply bg-primary text-primary-foreground;
   }
 
+  .jbs-header-logo {
+    @apply bg-white;
+  }
+
   .jbs-btn-primary {
     @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-colors;
   }

@@ -566,14 +566,14 @@ const AdminIntegracoes = () => {
                 <div>
                   <Label>Integração Vinculada (opcional)</Label>
                   <Select
-                    value={mappingFormData.integracao_id}
-                    onValueChange={(value) => setMappingFormData({ ...mappingFormData, integracao_id: value })}
+                    value={mappingFormData.integracao_id || "none"}
+                    onValueChange={(value) => setMappingFormData({ ...mappingFormData, integracao_id: value === "none" ? "" : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Nenhuma" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
+                      <SelectItem value="none">Nenhuma</SelectItem>
                       {integracoes.map(i => (
                         <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>
                       ))}

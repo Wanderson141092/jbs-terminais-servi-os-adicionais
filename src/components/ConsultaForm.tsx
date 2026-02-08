@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ConsultaFormProps {
   onSearch: (tipo: string, valor: string) => void;
@@ -38,8 +39,24 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (valor.trim() && servicoSelecionado) {
-      // Envia o valor bruto - a identificação do tipo será feita no backend/busca
-      onSearch("auto", valor.trim().toUpperCase());
+      const valorUpper = valor.trim().toUpperCase();
+      
+      // Validar formato do contêiner (4ª letra deve ser U)
+      const containerRegex = /^[A-Z]{3}U\d{7}$/;
+      const protocoloRegex = /^JBS[A-Z]\d{6,}$/;
+      const lpcoRegex = /^[A-Z]\d{10}$/;
+      
+      if (containerRegex.test(valorUpper) || protocoloRegex.test(valorUpper) || lpcoRegex.test(valorUpper)) {
+        onSearch(servicoSelecionado, valorUpper);
+      } else {
+        // Tenta identificar o formato para dar feedback
+        if (/^[A-Z]{4}\d{7}$/.test(valorUpper) && valorUpper[3] !== 'U') {
+          toast.error("Formato de contêiner inválido: a 4ª letra deve ser 'U'");
+          return;
+        }
+        // Aceita busca mesmo assim
+        onSearch(servicoSelecionado, valorUpper);
+      }
     }
   };
 
@@ -59,9 +76,9 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
 
   const getPlaceholder = () => {
     if (isPosicionamento) {
-      return "Ex: ABCD1234567, A1234567890, JBSP000001";
+      return "Ex: ABCU1234567, A1234567890, JBSP000001";
     }
-    return "Ex: ABCD1234567, JBSP000001";
+    return "Ex: ABCU1234567, JBSP000001";
   };
 
   return (
@@ -116,8 +133,8 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
       {/* Legenda dos formatos aceitos */}
       <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
         <p><strong>Formatos aceitos:</strong></p>
-        <p>• Contêiner: 4 letras + 7 números (Ex: ABCD1234567)</p>
-        <p>• Protocolo: JBS + letra + números (Ex: JBSP000001)</p>
+        <p>• Contêiner: 3 letras + U + 7 números (Ex: ABCU1234567)</p>
+        <p>• Protocolo: JBS + letra do serviço + números (Ex: JBSP000001)</p>
         {isPosicionamento && (
           <p>• LPCO: 1 letra + 10 números (Ex: A1234567890)</p>
         )}

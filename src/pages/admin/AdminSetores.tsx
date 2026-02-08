@@ -92,7 +92,8 @@ const AdminSetores = () => {
       .eq("id", setor.id);
 
     if (error) {
-      toast.error("Erro ao atualizar status");
+      console.error("Toggle error:", error);
+      toast.error("Erro ao atualizar status: " + error.message);
       return;
     }
 
@@ -112,10 +113,16 @@ const AdminSetores = () => {
     }
 
     if (editingSetor) {
-      // Note: The setor field in DB is an enum with COMEX and ARMAZEM only
-      // Custom types are stored in tipos_setor table, but setor_emails.setor
-      // still uses the original enum for now
-      const setorValue = formData.setor as "COMEX" | "ARMAZEM";
+      // Map the tipo to enum value (only COMEX and ARMAZEM are valid in DB)
+      const tipoToSetor: Record<string, "COMEX" | "ARMAZEM"> = {
+        "COMEX": "COMEX",
+        "ARMAZEM": "ARMAZEM",
+        "ARMAZÉM": "ARMAZEM",
+        "MASTER": "COMEX",
+        "ADM": "COMEX"
+      };
+      const setorValue = tipoToSetor[formData.setor.toUpperCase()] || "COMEX";
+      
       const { error } = await supabase
         .from("setor_emails")
         .update({
@@ -126,12 +133,21 @@ const AdminSetores = () => {
         .eq("id", editingSetor.id);
 
       if (error) {
-        toast.error("Erro ao atualizar setor");
+        console.error("Update error:", error);
+        toast.error("Erro ao atualizar setor: " + error.message);
         return;
       }
       toast.success("Setor atualizado!");
     } else {
-      const setorValueInsert = formData.setor as "COMEX" | "ARMAZEM";
+      const tipoToSetor: Record<string, "COMEX" | "ARMAZEM"> = {
+        "COMEX": "COMEX",
+        "ARMAZEM": "ARMAZEM",
+        "ARMAZÉM": "ARMAZEM",
+        "MASTER": "COMEX",
+        "ADM": "COMEX"
+      };
+      const setorValueInsert = tipoToSetor[formData.setor.toUpperCase()] || "COMEX";
+      
       const { error } = await supabase
         .from("setor_emails")
         .insert({
@@ -141,7 +157,8 @@ const AdminSetores = () => {
         });
 
       if (error) {
-        toast.error("Erro ao adicionar setor");
+        console.error("Insert error:", error);
+        toast.error("Erro ao adicionar setor: " + error.message);
         return;
       }
       toast.success("Setor adicionado!");
@@ -175,7 +192,8 @@ const AdminSetores = () => {
       .eq("id", setor.id);
 
     if (error) {
-      toast.error("Erro ao excluir setor");
+      console.error("Delete error:", error);
+      toast.error("Erro ao excluir setor: " + error.message);
       return;
     }
 
@@ -297,11 +315,17 @@ const AdminSetores = () => {
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tiposSetor.map(tipo => (
-                      <SelectItem key={tipo.id} value={tipo.nome}>
-                        {tipo.nome}
-                      </SelectItem>
-                    ))}
+                    {/* Opções padrão do enum */}
+                    <SelectItem value="COMEX">COMEX</SelectItem>
+                    <SelectItem value="ARMAZEM">ARMAZEM</SelectItem>
+                    {/* Tipos customizados */}
+                    {tiposSetor
+                      .filter(tipo => !["COMEX", "ARMAZEM", "ARMAZÉM"].includes(tipo.nome.toUpperCase()))
+                      .map(tipo => (
+                        <SelectItem key={tipo.id} value={tipo.nome}>
+                          {tipo.nome}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">

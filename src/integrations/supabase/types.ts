@@ -95,6 +95,7 @@ export type Database = {
           descricao: string | null
           id: string
           integracao_id: string | null
+          sistema: string | null
         }
         Insert: {
           campo_externo: string
@@ -103,6 +104,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           integracao_id?: string | null
+          sistema?: string | null
         }
         Update: {
           campo_externo?: string
@@ -111,6 +113,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           integracao_id?: string | null
+          sistema?: string | null
         }
         Relationships: [
           {
@@ -198,6 +201,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bloqueado: boolean
           created_at: string
           email: string
           email_setor: string | null
@@ -207,6 +211,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bloqueado?: boolean
           created_at?: string
           email: string
           email_setor?: string | null
@@ -216,6 +221,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bloqueado?: boolean
           created_at?: string
           email?: string
           email_setor?: string | null
@@ -231,6 +237,92 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "setor_emails"
             referencedColumns: ["email_setor"]
+          },
+        ]
+      }
+      protocol_config: {
+        Row: {
+          created_at: string
+          id: string
+          prefixo: string
+          ultimo_numero: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prefixo?: string
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prefixo?: string
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      regras_servico: {
+        Row: {
+          aplica_dia_anterior: boolean
+          ativo: boolean
+          created_at: string
+          dias_semana: string[]
+          hora_corte: string
+          id: string
+          limite_dia: number | null
+          limite_qua: number | null
+          limite_qui: number | null
+          limite_sab: number | null
+          limite_seg: number | null
+          limite_sex: number | null
+          limite_ter: number | null
+          servico_id: string
+          updated_at: string
+        }
+        Insert: {
+          aplica_dia_anterior?: boolean
+          ativo?: boolean
+          created_at?: string
+          dias_semana?: string[]
+          hora_corte?: string
+          id?: string
+          limite_dia?: number | null
+          limite_qua?: number | null
+          limite_qui?: number | null
+          limite_sab?: number | null
+          limite_seg?: number | null
+          limite_sex?: number | null
+          limite_ter?: number | null
+          servico_id: string
+          updated_at?: string
+        }
+        Update: {
+          aplica_dia_anterior?: boolean
+          ativo?: boolean
+          created_at?: string
+          dias_semana?: string[]
+          hora_corte?: string
+          id?: string
+          limite_dia?: number | null
+          limite_qua?: number | null
+          limite_qui?: number | null
+          limite_sab?: number | null
+          limite_seg?: number | null
+          limite_sex?: number | null
+          limite_ter?: number | null
+          servico_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regras_servico_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: true
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -431,6 +523,45 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tipos_setor: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          pode_aprovar: boolean
+          pode_editar_processo: boolean
+          pode_recusar: boolean
+          pode_visualizar_todos: boolean
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          pode_aprovar?: boolean
+          pode_editar_processo?: boolean
+          pode_recusar?: boolean
+          pode_visualizar_todos?: boolean
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          pode_aprovar?: boolean
+          pode_editar_processo?: boolean
+          pode_recusar?: boolean
+          pode_visualizar_todos?: boolean
           updated_at?: string
         }
         Relationships: []

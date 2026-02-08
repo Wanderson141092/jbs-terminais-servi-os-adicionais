@@ -1,23 +1,21 @@
-import { Ship } from "lucide-react";
+import jbsLogo from "@/assets/jbs-terminais-logo.png";
 
 const ExternalHeader = () => {
   return (
     <header className="jbs-header">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-secondary rounded-lg p-2">
-            <Ship className="h-6 w-6 text-secondary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">JBS Terminais</h1>
-            <p className="text-xs text-primary-foreground/70">Serviço de Posicionamento de Contêiner</p>
-          </div>
+          <img 
+            src={jbsLogo} 
+            alt="JBS Terminais" 
+            className="h-12 w-auto"
+          />
         </div>
         <a
           href="/interno"
-          className="text-xs text-primary-foreground/60 hover:text-primary-foreground/90 transition-colors"
+          className="text-sm text-primary-foreground/80 hover:text-primary-foreground transition-colors font-medium"
         >
-          Acesso Interno
+          Entrar
         </a>
       </div>
     </header>

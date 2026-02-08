@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, AlertTriangle, FileText } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 interface AnaliseDialogProps {
   solicitacao: any;
-  profile: any;
+  profile: { id: string; nome: string; setor: "COMEX" | "ARMAZEM"; email: string };
   userId: string;
   onClose: () => void;
 }
@@ -21,6 +21,7 @@ interface AnaliseDialogProps {
 const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
+  const [showAlteracaoConfirm, setShowAlteracaoConfirm] = useState(false);
   const [statusVistoria, setStatusVistoria] = useState(solicitacao.status_vistoria || "");
   const [loading, setLoading] = useState(false);
 
@@ -28,32 +29,31 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
   const isComex = setor === "COMEX";
   const isArmazem = setor === "ARMAZEM";
 
-  const alreadyDecided = isComex
-    ? solicitacao.comex_aprovado !== null
-    : solicitacao.armazem_aprovado !== null;
+  // Check current approval state for this sector
+  const currentApproval = isComex ? solicitacao.comex_aprovado : solicitacao.armazem_aprovado;
+  const wasRefused = currentApproval === false;
+  const alreadyApproved = currentApproval === true;
 
-  const canDecide = solicitacao.status === "aguardando_confirmacao" && !alreadyDecided;
+  // Can decide if status is aguardando OR if was previously refused (can change)
+  const canDecide = solicitacao.status === "aguardando_confirmacao" && !alreadyApproved;
+  const canChangeRefusal = wasRefused && solicitacao.status !== "recusado";
 
   const handleAprovar = async () => {
-    setLoading(true);
-    const updateData = isComex
-      ? { comex_aprovado: true, comex_usuario_id: userId, comex_data: new Date().toISOString() }
-      : { armazem_aprovado: true, armazem_usuario_id: userId, armazem_data: new Date().toISOString() };
-
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update(updateData)
-      .eq("id", solicitacao.id);
-
-    if (error) {
-      toast.error("Erro ao aprovar: " + error.message);
-    } else {
-      await logAudit("aprovacao", `Aprovado pelo setor ${setor}`);
-      await createNotification(`Solicitação ${solicitacao.protocolo} aprovada pelo ${setor}.`, "aprovacao");
-      toast.success("Solicitação aprovada!");
-      onClose();
+    // If changing from refused to approved, require justification
+    if (wasRefused) {
+      if (!justificativa.trim()) {
+        toast.error("Justificativa obrigatória para alterar de recusado para aprovado.");
+        return;
+      }
+      if (justificativa.trim().length < 10) {
+        toast.error("Justificativa deve ter pelo menos 10 caracteres.");
+        return;
+      }
+      setShowAlteracaoConfirm(true);
+      return;
     }
-    setLoading(false);
+
+    await executeApproval(true);
   };
 
   const handleRecusar = async () => {
@@ -61,14 +61,36 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
       toast.error("Justificativa é obrigatória para recusa.");
       return;
     }
+    if (justificativa.trim().length < 10) {
+      toast.error("Justificativa deve ter pelo menos 10 caracteres.");
+      return;
+    }
     setShowRecusaConfirm(true);
   };
 
-  const confirmRecusa = async () => {
+  const executeApproval = async (aprovado: boolean) => {
     setLoading(true);
-    const updateData = isComex
-      ? { comex_aprovado: false, comex_usuario_id: userId, comex_justificativa: justificativa, comex_data: new Date().toISOString() }
-      : { armazem_aprovado: false, armazem_usuario_id: userId, armazem_justificativa: justificativa, armazem_data: new Date().toISOString() };
+    
+    const updateData: any = {};
+    const logAction = aprovado 
+      ? (wasRefused ? "Alteração para Aprovado" : "Aprovação")
+      : "Recusa";
+
+    if (isComex) {
+      updateData.comex_aprovado = aprovado;
+      updateData.comex_usuario_id = userId;
+      updateData.comex_data = new Date().toISOString();
+      if (!aprovado || wasRefused) {
+        updateData.comex_justificativa = justificativa;
+      }
+    } else {
+      updateData.armazem_aprovado = aprovado;
+      updateData.armazem_usuario_id = userId;
+      updateData.armazem_data = new Date().toISOString();
+      if (!aprovado || wasRefused) {
+        updateData.armazem_justificativa = justificativa;
+      }
+    }
 
     const { error } = await supabase
       .from("solicitacoes")
@@ -76,15 +98,38 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
       .eq("id", solicitacao.id);
 
     if (error) {
-      toast.error("Erro ao recusar: " + error.message);
-    } else {
-      await logAudit("recusa", `Recusado pelo setor ${setor}. Justificativa: ${justificativa}`);
-      await createNotification(`Solicitação ${solicitacao.protocolo} recusada pelo ${setor}. Motivo: ${justificativa}`, "recusa");
-      toast.success("Solicitação recusada.");
-      onClose();
+      toast.error("Erro ao salvar decisão: " + error.message);
+      setLoading(false);
+      return;
     }
+
+    // Log audit
+    const detalhes = justificativa.trim() 
+      ? `${logAction} pelo setor ${setor}. Justificativa: ${justificativa}`
+      : `${logAction} pelo setor ${setor}`;
+
+    await logAudit(logAction.toLowerCase(), detalhes);
+
+    // Create notification
+    const notifMsg = aprovado
+      ? `Solicitação ${solicitacao.protocolo} aprovada pelo setor ${setor}`
+      : `Solicitação ${solicitacao.protocolo} recusada pelo setor ${setor}: ${justificativa}`;
+
+    await createNotification(notifMsg, aprovado ? "aprovacao" : "recusa");
+
+    toast.success(aprovado ? "Aprovação registrada!" : "Recusa registrada!");
     setLoading(false);
+    onClose();
+  };
+
+  const confirmRecusa = async () => {
     setShowRecusaConfirm(false);
+    await executeApproval(false);
+  };
+
+  const confirmAlteracao = async () => {
+    setShowAlteracaoConfirm(false);
+    await executeApproval(true);
   };
 
   const handleUpdateVistoria = async () => {
@@ -147,17 +192,27 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
               <FileText className="h-5 w-5" />
               Análise — {solicitacao.protocolo}
             </DialogTitle>
+            <DialogDescription>
+              Análise e decisão sobre a solicitação de posicionamento
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><span className="text-muted-foreground">Cliente:</span> <strong>{solicitacao.cliente_nome}</strong></div>
-              <div><span className="text-muted-foreground">E-mail:</span> <strong>{solicitacao.cliente_email}</strong></div>
-              <div><span className="text-muted-foreground">LPCO:</span> <strong>{solicitacao.lpco || "—"}</strong></div>
-              <div><span className="text-muted-foreground">Contêiner:</span> <strong>{solicitacao.numero_conteiner || "—"}</strong></div>
-              <div><span className="text-muted-foreground">Data Posicionamento:</span> <strong>{solicitacao.data_posicionamento || "—"}</strong></div>
-              <div><span className="text-muted-foreground">Tipo de Carga:</span> <strong>{solicitacao.tipo_carga || "—"}</strong></div>
+              <InfoItem icon={<User className="h-4 w-4" />} label="Cliente" value={solicitacao.cliente_nome} />
+              <InfoItem icon={<Package className="h-4 w-4" />} label="Contêiner" value={solicitacao.numero_conteiner || "—"} />
+              <InfoItem icon={<FileText className="h-4 w-4" />} label="LPCO" value={solicitacao.lpco || "—"} />
+              <InfoItem icon={<Calendar className="h-4 w-4" />} label="Data Posicionamento" value={solicitacao.data_posicionamento || "—"} />
+              <InfoItem icon={<Clock className="h-4 w-4" />} label="Tipo Operação" value={solicitacao.tipo_operacao || "Posicionamento"} />
+              <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={solicitacao.tipo_carga || "—"} />
             </div>
+
+            {solicitacao.observacoes && (
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Observações</p>
+                <p className="text-sm">{solicitacao.observacoes}</p>
+              </div>
+            )}
 
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">Status:</span>
@@ -173,39 +228,60 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
                 approved={solicitacao.comex_aprovado}
                 justificativa={solicitacao.comex_justificativa}
                 data={solicitacao.comex_data}
+                isCurrentSetor={isComex}
               />
               <ApprovalCard
                 label="ARMAZÉM"
                 approved={solicitacao.armazem_aprovado}
                 justificativa={solicitacao.armazem_justificativa}
                 data={solicitacao.armazem_data}
+                isCurrentSetor={isArmazem}
               />
             </div>
 
             {/* Approval Actions */}
-            {canDecide && (
+            {(canDecide || canChangeRefusal) && (
               <>
                 <Separator />
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold">Sua decisão ({setor}):</p>
+                  <p className="text-sm font-semibold">
+                    Sua decisão ({setor})
+                    {wasRefused && (
+                      <span className="text-orange-600 ml-2 text-xs">(Alterando decisão anterior)</span>
+                    )}
+                  </p>
                   <div>
-                    <Label className="text-sm">Justificativa (obrigatória para recusa)</Label>
+                    <Label className="text-sm">
+                      {wasRefused 
+                        ? "Justificativa (obrigatória para alterar para aprovado)"
+                        : "Justificativa (obrigatória para recusa)"
+                      }
+                    </Label>
                     <Textarea
                       value={justificativa}
                       onChange={(e) => setJustificativa(e.target.value)}
-                      placeholder="Informe a justificativa..."
+                      placeholder={wasRefused 
+                        ? "Informe o motivo da alteração de recusado para aprovado..."
+                        : "Informe a justificativa..."
+                      }
                       className="mt-1"
                     />
                   </div>
                   <div className="flex gap-3">
-                    <Button onClick={handleAprovar} disabled={loading} className="jbs-btn-secondary flex-1">
+                    <Button 
+                      onClick={handleAprovar} 
+                      disabled={loading} 
+                      className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                    >
                       <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Aprovar
+                      {wasRefused ? "Alterar para Aprovado" : "Aprovar"}
                     </Button>
-                    <Button onClick={handleRecusar} disabled={loading} variant="destructive" className="flex-1">
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Recusar
-                    </Button>
+                    {!wasRefused && (
+                      <Button onClick={handleRecusar} disabled={loading} variant="destructive" className="flex-1">
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Recusar
+                      </Button>
+                    )}
                   </div>
                 </div>
               </>
@@ -234,26 +310,70 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
               </>
             )}
           </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Confirmação de Recusa */}
       <AlertDialog open={showRecusaConfirm} onOpenChange={setShowRecusaConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Confirmar Recusa
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmação de Recusa
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja recusar a solicitação <strong>{solicitacao.protocolo}</strong>?
-              <br /><br />
-              <strong>Justificativa:</strong> {justificativa}
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Esta ação irá <strong>recusar</strong> o pedido de posicionamento e interromper o fluxo do processo.
+              </p>
+              <div className="bg-muted p-3 rounded text-sm">
+                <strong>Protocolo:</strong> {solicitacao.protocolo}<br />
+                <strong>Justificativa:</strong> {justificativa}
+              </div>
+              <p className="text-destructive font-medium">
+                Deseja realmente continuar?
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRecusa} className="bg-destructive text-destructive-foreground">
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRecusa} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Confirmar Recusa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmação de Alteração para Aprovado */}
+      <AlertDialog open={showAlteracaoConfirm} onOpenChange={setShowAlteracaoConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmação de Alteração
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Este pedido foi <strong>anteriormente recusado</strong>. Você está alterando a decisão para <strong>Aprovado</strong>.
+              </p>
+              <div className="bg-muted p-3 rounded text-sm">
+                <strong>Protocolo:</strong> {solicitacao.protocolo}<br />
+                <strong>Justificativa:</strong> {justificativa}
+              </div>
+              <p className="text-orange-600 font-medium">
+                Deseja realmente continuar?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAlteracao} className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
+              Confirmar Aprovação
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -262,16 +382,38 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
   );
 };
 
-const ApprovalCard = ({ label, approved, justificativa, data }: {
+const InfoItem = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
+  <div className="flex items-start gap-2">
+    <span className="text-muted-foreground mt-0.5">{icon}</span>
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium">{value}</p>
+    </div>
+  </div>
+);
+
+const ApprovalCard = ({ label, approved, justificativa, data, isCurrentSetor }: {
   label: string;
   approved: boolean | null;
   justificativa?: string | null;
   data?: string | null;
+  isCurrentSetor: boolean;
 }) => (
-  <div className="rounded-lg border p-3">
-    <p className="text-xs font-semibold text-muted-foreground mb-1">{label}</p>
+  <div className={`rounded-lg border-2 p-3 ${
+    isCurrentSetor ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30"
+  }`}>
+    <div className="flex items-center justify-between mb-2">
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      {isCurrentSetor && (
+        <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded">
+          Seu setor
+        </span>
+      )}
+    </div>
     {approved === null || approved === undefined ? (
-      <p className="text-sm text-muted-foreground">Pendente</p>
+      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Clock className="h-4 w-4" /> Pendente
+      </div>
     ) : approved ? (
       <div className="flex items-center gap-1 text-sm text-secondary">
         <CheckCircle2 className="h-4 w-4" /> Aprovado
@@ -281,7 +423,7 @@ const ApprovalCard = ({ label, approved, justificativa, data }: {
         <div className="flex items-center gap-1 text-sm text-destructive">
           <XCircle className="h-4 w-4" /> Recusado
         </div>
-        {justificativa && <p className="text-xs text-muted-foreground mt-1">{justificativa}</p>}
+        {justificativa && <p className="text-xs text-muted-foreground mt-1 italic">"{justificativa}"</p>}
       </div>
     )}
     {data && <p className="text-[10px] text-muted-foreground mt-1">{new Date(data).toLocaleString("pt-BR")}</p>}

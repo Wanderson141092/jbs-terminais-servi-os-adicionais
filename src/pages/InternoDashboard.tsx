@@ -1,16 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Ship, LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
-  AlertTriangle, Eye, Filter, Search
+  LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
+  Eye, Filter, Search, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
 import StatusBadge, { STATUS_LABELS } from "@/components/StatusBadge";
 import SetorSelector from "@/components/SetorSelector";
 import AnaliseDialog from "@/components/AnaliseDialog";
@@ -18,6 +17,19 @@ import NotificationsPanel from "@/components/NotificationsPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
+import jbsLogo from "@/assets/jbs-terminais-logo.png";
+import { startOfWeek, addDays, format, addWeeks, subWeeks } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+const TIPO_SERVICOS = [
+  "Todos",
+  "Posicionamento",
+  "Mudança de Quadra",
+  "Rolagem de navio",
+  "Agendamento Expresso",
+  "Reprogramação",
+  "Pesagem interna",
+];
 
 const InternoDashboard = () => {
   const navigate = useNavigate();
@@ -27,10 +39,12 @@ const InternoDashboard = () => {
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [tipoServicoFilter, setTipoServicoFilter] = useState("Todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -100,15 +114,19 @@ const InternoDashboard = () => {
     return <SetorSelector userId={user.id} onComplete={fetchProfile} />;
   }
 
+  // Week days for dashboard
+  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeekStart, i));
+
   const filtered = solicitacoes.filter((s) => {
     const matchesStatus = statusFilter === "all" || s.status === statusFilter;
+    const matchesTipo = tipoServicoFilter === "Todos" || s.tipo_operacao === tipoServicoFilter;
     const matchesSearch =
       !searchTerm ||
       s.protocolo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.lpco && s.lpco.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (s.numero_conteiner && s.numero_conteiner.toLowerCase().includes(searchTerm.toLowerCase())) ||
       s.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesTipo && matchesSearch;
   });
 
   const statusCounts = solicitacoes.reduce((acc: Record<string, number>, s) => {
@@ -116,17 +134,27 @@ const InternoDashboard = () => {
     return acc;
   }, {});
 
+  // Group by date for weekly view
+  const getCountForDay = (day: Date, status?: string) => {
+    const dayStr = format(day, "yyyy-MM-dd");
+    return solicitacoes.filter(s => {
+      const matches = s.data_posicionamento === dayStr;
+      if (status) {
+        return matches && s.status === status;
+      }
+      return matches;
+    }).length;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="jbs-header sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-secondary rounded-lg p-1.5">
-              <Ship className="h-5 w-5 text-secondary-foreground" />
-            </div>
+            <img src={jbsLogo} alt="JBS Terminais" className="h-10 w-auto" />
             <div>
-              <h1 className="text-sm font-bold">JBS Terminais — Painel Interno</h1>
+              <h1 className="text-sm font-bold">Painel Interno</h1>
               <p className="text-xs text-primary-foreground/70">
                 {profile?.nome} · {profile?.setor}
               </p>
@@ -167,6 +195,49 @@ const InternoDashboard = () => {
           }} />
         )}
 
+        {/* Weekly Dashboard */}
+        <Card className="mb-6 border-0 shadow-sm">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Visão Semanal</h2>
+              <div className="flex items-center gap-2">
+                <Select value={tipoServicoFilter} onValueChange={setTipoServicoFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Tipo de Serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPO_SERVICOS.map(tipo => (
+                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[100px] text-center">
+                  {format(currentWeekStart, "'Semana de' dd/MM", { locale: ptBR })}
+                </span>
+                <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-3">
+              {weekDays.map((day, i) => (
+                <div key={i} className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground uppercase">
+                    {format(day, "EEEE", { locale: ptBR })}
+                  </p>
+                  <p className="text-lg font-bold">{format(day, "dd/MM")}</p>
+                  <p className="text-2xl font-bold text-primary mt-1">{getCountForDay(day)}</p>
+                  <p className="text-[10px] text-muted-foreground">pedidos</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCard label="Total" value={solicitacoes.length} icon={<ClipboardList className="h-5 w-5" />} />
@@ -180,9 +251,9 @@ const InternoDashboard = () => {
           {Object.entries(STATUS_LABELS).map(([key, label]) => (
             <Badge
               key={key}
-              variant="outline"
+              variant={statusFilter === key ? "default" : "outline"}
               className="cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => setStatusFilter(key)}
+              onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
             >
               {label}: {statusCounts[key] || 0}
             </Badge>
@@ -226,14 +297,14 @@ const InternoDashboard = () => {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Protocolo</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Contêiner</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>COMEX</TableHead>
-                  <TableHead>Armazém</TableHead>
-                  <TableHead>Data</TableHead>
+                <TableRow className="bg-primary text-primary-foreground">
+                  <TableHead className="text-primary-foreground">Protocolo</TableHead>
+                  <TableHead className="text-primary-foreground">Cliente</TableHead>
+                  <TableHead className="text-primary-foreground">Contêiner</TableHead>
+                  <TableHead className="text-primary-foreground">Status</TableHead>
+                  <TableHead className="text-primary-foreground">COMEX</TableHead>
+                  <TableHead className="text-primary-foreground">Armazém</TableHead>
+                  <TableHead className="text-primary-foreground">Data</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>

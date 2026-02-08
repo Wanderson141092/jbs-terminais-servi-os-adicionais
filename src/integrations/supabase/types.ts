@@ -123,6 +123,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          email_setor: string | null
           id: string
           nome: string | null
           setor: Database["public"]["Enums"]["setor_tipo"] | null
@@ -131,6 +132,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          email_setor?: string | null
           id: string
           nome?: string | null
           setor?: Database["public"]["Enums"]["setor_tipo"] | null
@@ -139,10 +141,43 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          email_setor?: string | null
           id?: string
           nome?: string | null
           setor?: Database["public"]["Enums"]["setor_tipo"] | null
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_email_setor_fkey"
+            columns: ["email_setor"]
+            isOneToOne: false
+            referencedRelation: "setor_emails"
+            referencedColumns: ["email_setor"]
+          },
+        ]
+      }
+      setor_emails: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          email_setor: string
+          id: string
+          setor: Database["public"]["Enums"]["setor_tipo"]
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          email_setor: string
+          id?: string
+          setor: Database["public"]["Enums"]["setor_tipo"]
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          email_setor?: string
+          id?: string
+          setor?: Database["public"]["Enums"]["setor_tipo"]
         }
         Relationships: []
       }
@@ -168,6 +203,7 @@ export type Database = {
           status: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria: string | null
           tipo_carga: string | null
+          tipo_operacao: string | null
           updated_at: string
         }
         Insert: {
@@ -191,6 +227,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria?: string | null
           tipo_carga?: string | null
+          tipo_operacao?: string | null
           updated_at?: string
         }
         Update: {
@@ -214,6 +251,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria?: string | null
           tipo_carga?: string | null
+          tipo_operacao?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -291,6 +291,42 @@ export type Database = {
         }
         Relationships: []
       }
+      setor_servicos: {
+        Row: {
+          created_at: string
+          id: string
+          servico_id: string
+          setor_email_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          servico_id: string
+          setor_email_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          servico_id?: string
+          setor_email_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setor_servicos_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setor_servicos_setor_email_id_fkey"
+            columns: ["setor_email_id"]
+            isOneToOne: false
+            referencedRelation: "setor_emails"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       solicitacoes: {
         Row: {
           armazem_aprovado: boolean | null

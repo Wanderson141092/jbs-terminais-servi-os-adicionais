@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,19 +27,27 @@ interface Servico {
   nome: string;
 }
 
+interface TipoSetor {
+  id: string;
+  nome: string;
+  ativo: boolean;
+}
+
 const AdminSetores = () => {
   const navigate = useNavigate();
   const [setores, setSetores] = useState<Setor[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
+  const [tiposSetor, setTiposSetor] = useState<TipoSetor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAccessDialog, setShowAccessDialog] = useState(false);
   const [editingSetor, setEditingSetor] = useState<Setor | null>(null);
   const [selectedSetorForAccess, setSelectedSetorForAccess] = useState<Setor | null>(null);
   const [selectedServicos, setSelectedServicos] = useState<Set<string>>(new Set());
+  const [setorServicosMap, setSetorServicosMap] = useState<Record<string, Set<string>>>({});
   const [formData, setFormData] = useState({
     email_setor: "",
-    setor: "COMEX" as "COMEX" | "ARMAZEM",
+    setor: "",
     descricao: ""
   });
 
@@ -48,9 +56,11 @@ const AdminSetores = () => {
   }, []);
 
   const fetchData = async () => {
-    const [setoresRes, servicosRes] = await Promise.all([
+    const [setoresRes, servicosRes, tiposRes, setorServicosRes] = await Promise.all([
       supabase.from("setor_emails").select("*").order("setor"),
-      supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome")
+      supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
+      supabase.from("tipos_setor").select("id, nome, ativo").eq("ativo", true).order("nome"),
+      supabase.from("setor_servicos").select("setor_email_id, servico_id")
     ]);
 
     if (setoresRes.error) {
@@ -59,8 +69,17 @@ const AdminSetores = () => {
       setSetores(setoresRes.data || []);
     }
     
-    if (servicosRes.data) {
-      setServicos(servicosRes.data);
+    if (servicosRes.data) setServicos(servicosRes.data);
+    if (tiposRes.data) setTiposSetor(tiposRes.data);
+    
+    // Map setor_servicos
+    if (setorServicosRes.data) {
+      const map: Record<string, Set<string>> = {};
+      setorServicosRes.data.forEach(ss => {
+        if (!map[ss.setor_email_id]) map[ss.setor_email_id] = new Set();
+        map[ss.setor_email_id].add(ss.servico_id);
+      });
+      setSetorServicosMap(map);
     }
     
     setLoading(false);
@@ -87,12 +106,21 @@ const AdminSetores = () => {
       return;
     }
 
+    if (!formData.setor) {
+      toast.error("Selecione o tipo de setor");
+      return;
+    }
+
     if (editingSetor) {
+      // Note: The setor field in DB is an enum with COMEX and ARMAZEM only
+      // Custom types are stored in tipos_setor table, but setor_emails.setor
+      // still uses the original enum for now
+      const setorValue = formData.setor as "COMEX" | "ARMAZEM";
       const { error } = await supabase
         .from("setor_emails")
         .update({
           email_setor: formData.email_setor,
-          setor: formData.setor,
+          setor: setorValue,
           descricao: formData.descricao || null
         })
         .eq("id", editingSetor.id);
@@ -103,11 +131,12 @@ const AdminSetores = () => {
       }
       toast.success("Setor atualizado!");
     } else {
+      const setorValueInsert = formData.setor as "COMEX" | "ARMAZEM";
       const { error } = await supabase
         .from("setor_emails")
         .insert({
           email_setor: formData.email_setor,
-          setor: formData.setor,
+          setor: setorValueInsert,
           descricao: formData.descricao || null
         });
 
@@ -120,7 +149,7 @@ const AdminSetores = () => {
 
     setShowAddDialog(false);
     setEditingSetor(null);
-    setFormData({ email_setor: "", setor: "COMEX", descricao: "" });
+    setFormData({ email_setor: "", setor: "", descricao: "" });
     fetchData();
   };
 
@@ -136,6 +165,9 @@ const AdminSetores = () => {
       toast.error("Não é possível excluir: existem usuários vinculados a este setor. Desative-o em vez de excluir.");
       return;
     }
+
+    // Delete setor_servicos first
+    await supabase.from("setor_servicos").delete().eq("setor_email_id", setor.id);
 
     const { error } = await supabase
       .from("setor_emails")
@@ -155,17 +187,18 @@ const AdminSetores = () => {
     setEditingSetor(setor);
     setFormData({
       email_setor: setor.email_setor,
-      setor: setor.setor as "COMEX" | "ARMAZEM",
+      setor: setor.setor,
       descricao: setor.descricao || ""
     });
     setShowAddDialog(true);
   };
 
-  const openAccessDialog = (setor: Setor) => {
+  const openAccessDialog = async (setor: Setor) => {
     setSelectedSetorForAccess(setor);
-    // For now, we'll show all services as accessible
-    // In a real implementation, you'd fetch the actual permissions
-    setSelectedServicos(new Set(servicos.map(s => s.id)));
+    
+    // Load current permissions from database
+    const currentPermissions = setorServicosMap[setor.id] || new Set();
+    setSelectedServicos(new Set(currentPermissions));
     setShowAccessDialog(true);
   };
 
@@ -181,11 +214,30 @@ const AdminSetores = () => {
     });
   };
 
-  const saveAccessPermissions = () => {
-    // In a real implementation, you'd save this to a junction table
-    toast.success(`Permissões atualizadas para ${selectedSetorForAccess?.setor}`);
+  const saveAccessPermissions = async () => {
+    if (!selectedSetorForAccess) return;
+
+    // Delete existing permissions
+    await supabase.from("setor_servicos").delete().eq("setor_email_id", selectedSetorForAccess.id);
+
+    // Insert new permissions
+    if (selectedServicos.size > 0) {
+      const inserts = Array.from(selectedServicos).map(servicoId => ({
+        setor_email_id: selectedSetorForAccess.id,
+        servico_id: servicoId
+      }));
+
+      const { error } = await supabase.from("setor_servicos").insert(inserts);
+      if (error) {
+        toast.error("Erro ao salvar permissões");
+        return;
+      }
+    }
+
+    toast.success(`Permissões atualizadas para ${selectedSetorForAccess.setor}`);
     setShowAccessDialog(false);
     setSelectedSetorForAccess(null);
+    fetchData();
   };
 
   if (loading) {
@@ -213,7 +265,7 @@ const AdminSetores = () => {
           setShowAddDialog(open);
           if (!open) {
             setEditingSetor(null);
-            setFormData({ email_setor: "", setor: "COMEX", descricao: "" });
+            setFormData({ email_setor: "", setor: "", descricao: "" });
           }
         }}>
           <DialogTrigger asChild>
@@ -239,16 +291,22 @@ const AdminSetores = () => {
                 <Label>Tipo de Setor</Label>
                 <Select
                   value={formData.setor}
-                  onValueChange={(value: "COMEX" | "ARMAZEM") => setFormData({ ...formData, setor: value })}
+                  onValueChange={(value) => setFormData({ ...formData, setor: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="COMEX">COMEX</SelectItem>
-                    <SelectItem value="ARMAZEM">ARMAZÉM</SelectItem>
+                    {tiposSetor.map(tipo => (
+                      <SelectItem key={tipo.id} value={tipo.nome}>
+                        {tipo.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Para criar novos tipos, acesse Parâmetros &gt; Tipos de Setor
+                </p>
               </div>
               <div>
                 <Label>Descrição</Label>
@@ -275,7 +333,7 @@ const AdminSetores = () => {
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <p className="text-sm text-muted-foreground">
-              Selecione os serviços que este setor pode acessar:
+              Selecione os serviços que este setor pode acessar e gerenciar:
             </p>
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
               {servicos.map((servico) => (
@@ -291,10 +349,12 @@ const AdminSetores = () => {
                 </div>
               ))}
             </div>
-            <Button onClick={saveAccessPermissions} className="w-full">
-              <Save className="h-4 w-4 mr-2" />
-              Salvar Permissões
-            </Button>
+            <DialogFooter>
+              <Button onClick={saveAccessPermissions} className="w-full">
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Permissões
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
@@ -310,59 +370,68 @@ const AdminSetores = () => {
                 <TableHead>E-mail do Setor</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Serviços</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {setores.map((setor) => (
-                <TableRow key={setor.id} className={!setor.ativo ? "opacity-50" : ""}>
-                  <TableCell className="font-mono">{setor.email_setor}</TableCell>
-                  <TableCell>{setor.setor}</TableCell>
-                  <TableCell>{setor.descricao || "—"}</TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={setor.ativo}
-                      onCheckedChange={() => handleToggleActive(setor)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(setor)} title="Editar">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openAccessDialog(setor)} title="Permissões">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" title="Excluir">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir Setor</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir o setor <strong>{setor.email_setor}</strong>?
-                              Se houver usuários vinculados, a exclusão não será permitida.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(setor)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {setores.map((setor) => {
+                const servicosCount = setorServicosMap[setor.id]?.size || 0;
+                return (
+                  <TableRow key={setor.id} className={!setor.ativo ? "opacity-50" : ""}>
+                    <TableCell className="font-mono">{setor.email_setor}</TableCell>
+                    <TableCell className="font-medium">{setor.setor}</TableCell>
+                    <TableCell>{setor.descricao || "—"}</TableCell>
+                    <TableCell>
+                      <span className={servicosCount > 0 ? "text-primary" : "text-muted-foreground"}>
+                        {servicosCount} serviço(s)
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={setor.ativo}
+                        onCheckedChange={() => handleToggleActive(setor)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(setor)} title="Editar">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openAccessDialog(setor)} title="Permissões">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" title="Excluir">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir Setor</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir o setor <strong>{setor.email_setor}</strong>?
+                                Se houver usuários vinculados, a exclusão não será permitida.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(setor)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

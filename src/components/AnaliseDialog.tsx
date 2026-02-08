@@ -13,29 +13,37 @@ import { toast } from "sonner";
 
 interface AnaliseDialogProps {
   solicitacao: any;
-  profile: { id: string; nome: string; setor: "COMEX" | "ARMAZEM"; email: string };
+  profile: { id: string; nome: string; setor: "COMEX" | "ARMAZEM" | null; email: string };
   userId: string;
+  isAdmin?: boolean;
   onClose: () => void;
 }
 
-const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogProps) => {
+const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
   const [showAlteracaoConfirm, setShowAlteracaoConfirm] = useState(false);
   const [statusVistoria, setStatusVistoria] = useState(solicitacao.status_vistoria || "");
   const [loading, setLoading] = useState(false);
+  const [adminSelectedSetor, setAdminSelectedSetor] = useState<"COMEX" | "ARMAZEM" | null>(null);
 
-  const setor = profile.setor;
+  const setor = isAdmin ? adminSelectedSetor : profile.setor;
   const isComex = setor === "COMEX";
   const isArmazem = setor === "ARMAZEM";
 
-  // Check current approval state for this sector
-  const currentApproval = isComex ? solicitacao.comex_aprovado : solicitacao.armazem_aprovado;
+  // For admin: check both sectors
+  const comexPending = solicitacao.comex_aprovado === null;
+  const armazemPending = solicitacao.armazem_aprovado === null;
+  const comexRefused = solicitacao.comex_aprovado === false;
+  const armazemRefused = solicitacao.armazem_aprovado === false;
+
+  // Check current approval state for selected sector
+  const currentApproval = isComex ? solicitacao.comex_aprovado : isArmazem ? solicitacao.armazem_aprovado : null;
   const wasRefused = currentApproval === false;
   const alreadyApproved = currentApproval === true;
 
   // Can decide if status is aguardando OR if was previously refused (can change)
-  const canDecide = solicitacao.status === "aguardando_confirmacao" && !alreadyApproved;
+  const canDecide = solicitacao.status === "aguardando_confirmacao" && !alreadyApproved && setor !== null;
   const canChangeRefusal = wasRefused && solicitacao.status !== "recusado";
 
   const handleAprovar = async () => {
@@ -239,6 +247,36 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
               />
             </div>
 
+            {/* Admin Sector Selection */}
+            {isAdmin && solicitacao.status === "aguardando_confirmacao" && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold">Administrador — Selecione o setor para atuar:</p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant={adminSelectedSetor === "COMEX" ? "default" : "outline"}
+                      onClick={() => setAdminSelectedSetor("COMEX")}
+                      disabled={solicitacao.comex_aprovado === true}
+                      className="flex-1"
+                    >
+                      COMEX {solicitacao.comex_aprovado === true && "(Aprovado)"}
+                      {solicitacao.comex_aprovado === false && "(Recusado)"}
+                    </Button>
+                    <Button
+                      variant={adminSelectedSetor === "ARMAZEM" ? "default" : "outline"}
+                      onClick={() => setAdminSelectedSetor("ARMAZEM")}
+                      disabled={solicitacao.armazem_aprovado === true}
+                      className="flex-1"
+                    >
+                      ARMAZÉM {solicitacao.armazem_aprovado === true && "(Aprovado)"}
+                      {solicitacao.armazem_aprovado === false && "(Recusado)"}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Approval Actions */}
             {(canDecide || canChangeRefusal) && (
               <>
@@ -247,7 +285,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, onClose }: AnaliseDialogP
                   <p className="text-sm font-semibold">
                     Sua decisão ({setor})
                     {wasRefused && (
-                      <span className="text-orange-600 ml-2 text-xs">(Alterando decisão anterior)</span>
+                      <span className="text-destructive ml-2 text-xs">(Alterando decisão anterior)</span>
                     )}
                   </p>
                   <div>

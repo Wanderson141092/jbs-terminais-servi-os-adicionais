@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
-  Eye, Filter, Search, ChevronLeft, ChevronRight
+  Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
+  Building2, FileText, Link2, Menu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import StatusBadge, { STATUS_LABELS } from "@/components/StatusBadge";
 import SetorSelector from "@/components/SetorSelector";
 import AnaliseDialog from "@/components/AnaliseDialog";
@@ -20,16 +28,14 @@ import type { User, Session } from "@supabase/supabase-js";
 import jbsLogo from "@/assets/jbs-terminais-logo.png";
 import { startOfWeek, addDays, format, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 
-const TIPO_SERVICOS = [
-  "Todos",
-  "Posicionamento",
-  "Mudança de Quadra",
-  "Rolagem de navio",
-  "Agendamento Expresso",
-  "Reprogramação",
-  "Pesagem interna",
-];
+interface Servico {
+  id: string;
+  nome: string;
+  codigo_prefixo: string;
+  ativo: boolean;
+}
 
 const InternoDashboard = () => {
   const navigate = useNavigate();
@@ -45,6 +51,9 @@ const InternoDashboard = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [servicos, setServicos] = useState<Servico[]>([]);
+  
+  const { isAdmin } = useAdminCheck(user?.id || null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -72,12 +81,30 @@ const InternoDashboard = () => {
     setProfile(data);
   }, [user]);
 
+  const fetchServicos = useCallback(async () => {
+    const { data } = await supabase
+      .from("servicos")
+      .select("*")
+      .eq("ativo", true)
+      .order("nome");
+    setServicos(data || []);
+  }, []);
+
   const fetchSolicitacoes = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // By default, don't load old completed records - user must filter
+    let query = supabase
       .from("solicitacoes")
       .select("*")
       .order("created_at", { ascending: false });
+    
+    // If no specific filters, exclude finalized by default
+    if (statusFilter === "all") {
+      query = query.not("status", "in", '("vistoria_finalizada")');
+    }
+
+    const { data, error } = await query.limit(200);
 
     if (error) {
       toast.error("Erro ao carregar solicitações.");
@@ -85,7 +112,7 @@ const InternoDashboard = () => {
       setSolicitacoes(data || []);
     }
     setLoading(false);
-  }, []);
+  }, [statusFilter]);
 
   const fetchUnread = useCallback(async () => {
     if (!user) return;
@@ -102,15 +129,17 @@ const InternoDashboard = () => {
       fetchProfile();
       fetchSolicitacoes();
       fetchUnread();
+      fetchServicos();
     }
-  }, [user, fetchProfile, fetchSolicitacoes, fetchUnread]);
+  }, [user, fetchProfile, fetchSolicitacoes, fetchUnread, fetchServicos]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/interno");
   };
 
-  if (!profile?.setor && user) {
+  // Admin bypasses setor requirement
+  if (!profile?.setor && !isAdmin && user) {
     return <SetorSelector userId={user.id} onComplete={fetchProfile} />;
   }
 
@@ -129,15 +158,15 @@ const InternoDashboard = () => {
     return matchesStatus && matchesTipo && matchesSearch;
   });
 
-  const statusCounts = solicitacoes.reduce((acc: Record<string, number>, s) => {
+  const statusCounts = filtered.reduce((acc: Record<string, number>, s) => {
     acc[s.status] = (acc[s.status] || 0) + 1;
     return acc;
   }, {});
 
-  // Group by date for weekly view
+  // Group by date for weekly view (filtered by service type)
   const getCountForDay = (day: Date, status?: string) => {
     const dayStr = format(day, "yyyy-MM-dd");
-    return solicitacoes.filter(s => {
+    return filtered.filter(s => {
       const matches = s.data_posicionamento === dayStr;
       if (status) {
         return matches && s.status === status;
@@ -146,21 +175,81 @@ const InternoDashboard = () => {
     }).length;
   };
 
+  const tipoServicosOptions = ["Todos", ...servicos.map(s => s.nome)];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="jbs-header sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={jbsLogo} alt="JBS Terminais" className="h-10 w-auto" />
+            {/* Logo area with white background */}
+            <div className="bg-white rounded-lg p-2">
+              <img src={jbsLogo} alt="JBS Terminais" className="h-8 w-auto" />
+            </div>
             <div>
-              <h1 className="text-sm font-bold">Painel Interno</h1>
+              <h1 className="text-sm font-bold">Serviços Adicionais</h1>
               <p className="text-xs text-primary-foreground/70">
-                {profile?.nome} · {profile?.setor}
+                {profile?.nome} · {isAdmin ? "Admin" : profile?.setor}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Admin Menu */}
+            {isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary-foreground hover:bg-primary-foreground/10"
+                  >
+                    <Menu className="h-4 w-4 mr-1" />
+                    Admin
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/parametros")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Parâmetros
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/usuarios")}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Usuários
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/setores")}>
+                    <Building2 className="h-4 w-4 mr-2" />
+                    Setores
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/servicos")}>
+                    <ClipboardList className="h-4 w-4 mr-2" />
+                    Serviços
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/logs")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Histórico (Logs)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/integracoes")}>
+                    <Link2 className="h-4 w-4 mr-2" />
+                    Integrações
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            
+            {/* Logs for all users */}
+            {!isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/interno/admin/logs")}
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+            )}
+            
             <Button
               variant="ghost"
               size="sm"
@@ -206,7 +295,7 @@ const InternoDashboard = () => {
                     <SelectValue placeholder="Tipo de Serviço" />
                   </SelectTrigger>
                   <SelectContent>
-                    {TIPO_SERVICOS.map(tipo => (
+                    {tipoServicosOptions.map(tipo => (
                       <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
                     ))}
                   </SelectContent>
@@ -238,9 +327,13 @@ const InternoDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - now shows filtered total */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total" value={solicitacoes.length} icon={<ClipboardList className="h-5 w-5" />} />
+          <StatCard 
+            label={tipoServicoFilter === "Todos" ? "Total" : tipoServicoFilter} 
+            value={filtered.length} 
+            icon={<ClipboardList className="h-5 w-5" />} 
+          />
           <StatCard label="Aguardando" value={statusCounts["aguardando_confirmacao"] || 0} icon={<Clock className="h-5 w-5" />} color="text-yellow-600" />
           <StatCard label="Confirmados" value={statusCounts["confirmado_aguardando_vistoria"] || 0} icon={<CheckCircle2 className="h-5 w-5" />} color="text-blue-600" />
           <StatCard label="Recusados" value={statusCounts["recusado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
@@ -360,6 +453,7 @@ const InternoDashboard = () => {
             solicitacao={selectedSolicitacao}
             profile={profile}
             userId={user!.id}
+            isAdmin={isAdmin}
             onClose={() => {
               setSelectedSolicitacao(null);
               fetchSolicitacoes();

@@ -185,6 +185,7 @@ export type Database = {
           campo_interno: string
           created_at: string
           descricao: string | null
+          direcao: string
           id: string
           integracao_id: string | null
           sistema: string | null
@@ -194,6 +195,7 @@ export type Database = {
           campo_interno: string
           created_at?: string
           descricao?: string | null
+          direcao?: string
           id?: string
           integracao_id?: string | null
           sistema?: string | null
@@ -203,6 +205,7 @@ export type Database = {
           campo_interno?: string
           created_at?: string
           descricao?: string | null
+          direcao?: string
           id?: string
           integracao_id?: string | null
           sistema?: string | null
@@ -304,6 +307,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           descricao: string | null
+          estilo: string
           id: string
           titulo: string
           updated_at: string
@@ -312,6 +316,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          estilo?: string
           id?: string
           titulo: string
           updated_at?: string
@@ -320,6 +325,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          estilo?: string
           id?: string
           titulo?: string
           updated_at?: string
@@ -484,6 +490,7 @@ export type Database = {
           grupo: string
           id: string
           ordem: number
+          servico_ids: string[]
           sigla: string | null
           updated_at: string
           valor: string
@@ -494,6 +501,7 @@ export type Database = {
           grupo: string
           id?: string
           ordem?: number
+          servico_ids?: string[]
           sigla?: string | null
           updated_at?: string
           valor: string
@@ -504,6 +512,7 @@ export type Database = {
           grupo?: string
           id?: string
           ordem?: number
+          servico_ids?: string[]
           sigla?: string | null
           updated_at?: string
           valor?: string

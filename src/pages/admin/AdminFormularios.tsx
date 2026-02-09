@@ -188,11 +188,12 @@ const AdminFormularios = () => {
   };
 
   // Form CRUD
-  const openFormDialog = (form?: Formulario) => {
+  const openFormDialog = (form?: Formulario & { estilo?: string }) => {
     if (form) {
       setEditingForm(form);
-      setFormData({ titulo: form.titulo, descricao: form.descricao || "", estilo: "jbs" });
-      setSelectedStyle("jbs");
+      const estilo = (form as any).estilo || "jbs";
+      setFormData({ titulo: form.titulo, descricao: form.descricao || "", estilo });
+      setSelectedStyle(estilo);
     } else {
       setEditingForm(null);
       setFormData({ titulo: "", descricao: "", estilo: "jbs" });
@@ -213,6 +214,7 @@ const AdminFormularios = () => {
         .update({
           titulo: formData.titulo,
           descricao: formData.descricao || null,
+          estilo: formData.estilo,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editingForm.id);
@@ -226,6 +228,7 @@ const AdminFormularios = () => {
       const { error } = await supabase.from("formularios").insert({
         titulo: formData.titulo,
         descricao: formData.descricao || null,
+        estilo: formData.estilo,
       });
 
       if (error) {

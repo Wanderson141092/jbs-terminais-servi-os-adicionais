@@ -173,7 +173,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     setShowConfirmDialog(false);
   };
 
-  // Deferimento only available for Posicionamento + Exportação + vistoria_finalizada
+  // Deferimento available for Posicionamento + Exportação when status matches service config
   const isPositionamentoExportacao = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento") 
     && (solicitacao as any).categoria?.toLowerCase() === "exportação";
   const vistoriaFinalizada = solicitacao.status === "vistoria_finalizada";

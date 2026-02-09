@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2, ArrowLeft, Plus, Save, Edit, Trash2, Settings } from "lucide-react";
@@ -18,6 +19,7 @@ interface Setor {
   email_setor: string;
   setor: string;
   descricao: string | null;
+  perfis: string[];
   ativo: boolean;
 }
 
@@ -26,10 +28,10 @@ interface Servico {
   nome: string;
 }
 
-// Tipos de setor disponíveis para seleção (MASTER é exclusivo para Admin)
-const TIPOS_SETOR_DISPONIVEIS = [
-  { value: "ADMINISTRATIVO", label: "Administrativo", dbValue: "ADMINISTRATIVO" as const },
-  { value: "OPERACIONAL", label: "Operacional", dbValue: "OPERACIONAL" as const },
+// Perfis disponíveis para seleção (renomeado de "Tipo Setor")
+const PERFIS_DISPONIVEIS = [
+  { value: "ADMINISTRATIVO", label: "Administrativo" },
+  { value: "OPERACIONAL", label: "Operacional" },
 ];
 
 const AdminSetores = () => {
@@ -45,7 +47,7 @@ const AdminSetores = () => {
   const [setorServicosMap, setSetorServicosMap] = useState<Record<string, Set<string>>>({});
   const [formData, setFormData] = useState({
     email_setor: "",
-    tiposSetor: [] as string[], // Multi-seleção
+    perfis: [] as string[],
     descricao: ""
   });
 
@@ -55,7 +57,7 @@ const AdminSetores = () => {
 
   const fetchData = async () => {
     const [setoresRes, servicosRes, setorServicosRes] = await Promise.all([
-      supabase.from("setor_emails").select("*").order("setor"),
+      supabase.from("setor_emails").select("*").order("descricao"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("setor_servicos").select("setor_email_id, servico_id")
     ]);
@@ -63,7 +65,12 @@ const AdminSetores = () => {
     if (setoresRes.error) {
       toast.error("Erro ao carregar setores");
     } else {
-      setSetores(setoresRes.data || []);
+      // Parse perfis array - some old records may not have it
+      const parsed = (setoresRes.data || []).map(s => ({
+        ...s,
+        perfis: s.perfis || []
+      }));
+      setSetores(parsed);
     }
     
     if (servicosRes.data) setServicos(servicosRes.data);
@@ -96,12 +103,12 @@ const AdminSetores = () => {
     fetchData();
   };
 
-  const toggleTipoSetor = (tipo: string) => {
+  const togglePerfil = (perfil: string) => {
     setFormData(prev => ({
       ...prev,
-      tiposSetor: prev.tiposSetor.includes(tipo)
-        ? prev.tiposSetor.filter(t => t !== tipo)
-        : [...prev.tiposSetor, tipo]
+      perfis: prev.perfis.includes(perfil)
+        ? prev.perfis.filter(p => p !== perfil)
+        : [...prev.perfis, perfil]
     }));
   };
 
@@ -111,27 +118,17 @@ const AdminSetores = () => {
       return;
     }
 
-    if (formData.tiposSetor.length === 0) {
-      toast.error("Selecione pelo menos um tipo de setor");
+    if (formData.perfis.length === 0) {
+      toast.error("Selecione pelo menos um perfil");
       return;
     }
 
-    // Mapear tipos selecionados para valor do enum no banco
-    // ADMINISTRATIVO e OPERACIONAL são os valores válidos do enum expandido
-    const tipoToDb: Record<string, string> = {
-      "ADMINISTRATIVO": "ADMINISTRATIVO",
-      "OPERACIONAL": "OPERACIONAL",
-    };
-
-    // Usar o primeiro tipo selecionado como principal (banco aceita apenas um valor)
-    const primaryTipo = formData.tiposSetor[0];
-    let setorValue = tipoToDb[primaryTipo];
-    
-    // Fallback para valores antigos se necessário
-    if (!setorValue) {
-      if (primaryTipo === "COMEX") setorValue = "COMEX";
-      else if (primaryTipo === "ARMAZEM" || primaryTipo === "ARMAZÉM") setorValue = "ARMAZEM";
-      else setorValue = "ADMINISTRATIVO"; // Default
+    // Determinar o setor principal para compatibilidade com enum antigo
+    // Se tem ADMINISTRATIVO, usar COMEX. Se tem OPERACIONAL, usar ARMAZEM.
+    // Se tem ambos, usar o primeiro.
+    let setorValue = "COMEX";
+    if (formData.perfis.includes("OPERACIONAL") && !formData.perfis.includes("ADMINISTRATIVO")) {
+      setorValue = "ARMAZEM";
     }
 
     if (editingSetor) {
@@ -140,6 +137,7 @@ const AdminSetores = () => {
         .update({
           email_setor: formData.email_setor,
           setor: setorValue as any,
+          perfis: formData.perfis,
           descricao: formData.descricao || null
         })
         .eq("id", editingSetor.id);
@@ -155,6 +153,7 @@ const AdminSetores = () => {
         .insert({
           email_setor: formData.email_setor,
           setor: setorValue as any,
+          perfis: formData.perfis,
           descricao: formData.descricao || null
         });
 
@@ -167,7 +166,7 @@ const AdminSetores = () => {
 
     setShowAddDialog(false);
     setEditingSetor(null);
-    setFormData({ email_setor: "", tiposSetor: [], descricao: "" });
+    setFormData({ email_setor: "", perfis: [], descricao: "" });
     fetchData();
   };
 
@@ -202,19 +201,19 @@ const AdminSetores = () => {
   const openEditDialog = (setor: Setor) => {
     setEditingSetor(setor);
     
-    // Mapear valor do banco para tipos selecionados
-    const dbToTipo: Record<string, string> = {
-      "COMEX": "ADMINISTRATIVO",
-      "ARMAZEM": "OPERACIONAL",
-      "ADMINISTRATIVO": "ADMINISTRATIVO",
-      "OPERACIONAL": "OPERACIONAL",
-    };
-    
-    const tipoMapeado = dbToTipo[setor.setor] || setor.setor;
+    // Se não tem perfis salvos, inferir do setor antigo
+    let perfis = setor.perfis || [];
+    if (perfis.length === 0) {
+      if (setor.setor === "COMEX" || setor.setor === "ADMINISTRATIVO") {
+        perfis = ["ADMINISTRATIVO"];
+      } else if (setor.setor === "ARMAZEM" || setor.setor === "OPERACIONAL") {
+        perfis = ["OPERACIONAL"];
+      }
+    }
     
     setFormData({
       email_setor: setor.email_setor,
-      tiposSetor: [tipoMapeado],
+      perfis: perfis,
       descricao: setor.descricao || ""
     });
     setShowAddDialog(true);
@@ -257,21 +256,22 @@ const AdminSetores = () => {
       }
     }
 
-    toast.success(`Permissões atualizadas para ${getSetorLabel(selectedSetorForAccess.setor)}`);
+    const setorNome = selectedSetorForAccess.descricao || selectedSetorForAccess.email_setor;
+    toast.success(`Permissões atualizadas para ${setorNome}`);
     setShowAccessDialog(false);
     setSelectedSetorForAccess(null);
     fetchData();
   };
 
-  const getSetorLabel = (setor: string) => {
-    const labels: Record<string, string> = {
-      "COMEX": "Administrativo",
-      "ARMAZEM": "Operacional",
-      "ADMINISTRATIVO": "Administrativo",
-      "OPERACIONAL": "Operacional",
-      "MASTER": "Master"
-    };
-    return labels[setor] || setor;
+  const getPerfisDisplay = (setor: Setor) => {
+    const perfis = setor.perfis || [];
+    if (perfis.length === 0) {
+      // Fallback para enum antigo
+      if (setor.setor === "COMEX") return ["Administrativo"];
+      if (setor.setor === "ARMAZEM") return ["Operacional"];
+      return [setor.setor];
+    }
+    return perfis.map(p => p === "ADMINISTRATIVO" ? "Administrativo" : "Operacional");
   };
 
   if (loading) {
@@ -299,7 +299,7 @@ const AdminSetores = () => {
           setShowAddDialog(open);
           if (!open) {
             setEditingSetor(null);
-            setFormData({ email_setor: "", tiposSetor: [], descricao: "" });
+            setFormData({ email_setor: "", perfis: [], descricao: "" });
           }
         }}>
           <DialogTrigger asChild>
@@ -322,34 +322,31 @@ const AdminSetores = () => {
                 />
               </div>
               <div>
-                <Label>Tipo(s) de Setor</Label>
+                <Label>Perfil(is)</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Selecione um ou mais tipos para este setor
+                  Selecione um ou mais perfis para este setor
                 </p>
                 <div className="space-y-2">
-                  {TIPOS_SETOR_DISPONIVEIS.map(tipo => (
-                    <div key={tipo.value} className="flex items-center space-x-2">
+                  {PERFIS_DISPONIVEIS.map(perfil => (
+                    <div key={perfil.value} className="flex items-center space-x-2">
                       <Checkbox
-                        id={tipo.value}
-                        checked={formData.tiposSetor.includes(tipo.value)}
-                        onCheckedChange={() => toggleTipoSetor(tipo.value)}
+                        id={perfil.value}
+                        checked={formData.perfis.includes(perfil.value)}
+                        onCheckedChange={() => togglePerfil(perfil.value)}
                       />
-                      <Label htmlFor={tipo.value} className="cursor-pointer">
-                        {tipo.label}
+                      <Label htmlFor={perfil.value} className="cursor-pointer">
+                        {perfil.label}
                       </Label>
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Nota: O tipo "Master" é exclusivo para o usuário administrador do sistema
-                </p>
               </div>
               <div>
-                <Label>Descrição</Label>
+                <Label>Descrição / Nome do Setor</Label>
                 <Input
                   value={formData.descricao}
                   onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                  placeholder="Descrição do setor"
+                  placeholder="Ex: Comércio Exterior"
                 />
               </div>
               <Button onClick={handleSave} className="w-full">
@@ -365,7 +362,9 @@ const AdminSetores = () => {
       <Dialog open={showAccessDialog} onOpenChange={setShowAccessDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Permissões de Acesso - {selectedSetorForAccess ? getSetorLabel(selectedSetorForAccess.setor) : ""}</DialogTitle>
+            <DialogTitle>
+              Permissões de Acesso - {selectedSetorForAccess?.descricao || selectedSetorForAccess?.email_setor}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <p className="text-sm text-muted-foreground">
@@ -404,8 +403,8 @@ const AdminSetores = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>E-mail do Setor</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Descrição</TableHead>
+                <TableHead>Nome / Descrição</TableHead>
+                <TableHead>Perfil(is)</TableHead>
                 <TableHead>Serviços</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
@@ -414,11 +413,20 @@ const AdminSetores = () => {
             <TableBody>
               {setores.map((setor) => {
                 const servicosCount = setorServicosMap[setor.id]?.size || 0;
+                const perfisDisplay = getPerfisDisplay(setor);
                 return (
                   <TableRow key={setor.id} className={!setor.ativo ? "opacity-50" : ""}>
-                    <TableCell className="font-mono">{setor.email_setor}</TableCell>
-                    <TableCell className="font-medium">{getSetorLabel(setor.setor)}</TableCell>
-                    <TableCell>{setor.descricao || "—"}</TableCell>
+                    <TableCell className="font-mono text-sm">{setor.email_setor}</TableCell>
+                    <TableCell className="font-medium">{setor.descricao || "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {perfisDisplay.map(p => (
+                          <Badge key={p} variant="secondary" className="text-xs">
+                            {p}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className={servicosCount > 0 ? "text-primary" : "text-muted-foreground"}>
                         {servicosCount} serviço(s)
@@ -448,7 +456,7 @@ const AdminSetores = () => {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Excluir Setor</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Tem certeza que deseja excluir o setor <strong>{setor.email_setor}</strong>?
+                                Tem certeza que deseja excluir o setor <strong>{setor.descricao || setor.email_setor}</strong>?
                                 Se houver usuários vinculados, a exclusão não será permitida.
                               </AlertDialogDescription>
                             </AlertDialogHeader>

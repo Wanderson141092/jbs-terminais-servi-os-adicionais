@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -7,13 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import StatusBadge from "./StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface AnaliseDialogProps {
   solicitacao: any;
-  profile: { id: string; nome: string; setor: "COMEX" | "ARMAZEM" | null; email: string };
+  profile: { id: string; nome: string; setor: "COMEX" | "ARMAZEM" | null; email: string; perfis?: string[] };
   userId: string;
   isAdmin?: boolean;
   onClose: () => void;
@@ -28,6 +29,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [adminSelectedSetor, setAdminSelectedSetor] = useState<"COMEX" | "ARMAZEM" | null>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showEmbeddedPreview, setShowEmbeddedPreview] = useState(true);
+  const [showDeferimentoAction, setShowDeferimentoAction] = useState<string | null>(null);
+  const [motivoRecusaDeferimento, setMotivoRecusaDeferimento] = useState("");
+  const [showLancamentoDialog, setShowLancamentoDialog] = useState(false);
 
   useEffect(() => {
     const fetchAttachments = async () => {
@@ -37,12 +42,28 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         .eq("solicitacao_id", solicitacao.id);
       setAttachments(data || []);
     };
+    
+    const fetchDisplayConfig = async () => {
+      const { data } = await supabase
+        .from("page_config")
+        .select("config_value")
+        .eq("config_key", "visualizacao_anexos_embutida")
+        .single();
+      setShowEmbeddedPreview(data?.config_value === 'true');
+    };
+    
     fetchAttachments();
+    fetchDisplayConfig();
   }, [solicitacao.id]);
 
   const setor = isAdmin ? adminSelectedSetor : profile.setor;
   const isComex = setor === "COMEX";
   const isArmazem = setor === "ARMAZEM";
+
+  // Verificar perfis do usuário
+  const userPerfis = profile.perfis || [];
+  const hasPerfilAdministrativo = userPerfis.includes("ADMINISTRATIVO") || profile.setor === "COMEX";
+  const hasPerfilOperacional = userPerfis.includes("OPERACIONAL") || profile.setor === "ARMAZEM";
 
   const comexPending = solicitacao.comex_aprovado === null;
   const armazemPending = solicitacao.armazem_aprovado === null;
@@ -173,6 +194,57 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setLoading(false);
   };
 
+  const handleDeferimentoDecision = async (docId: string, aceito: boolean) => {
+    const updateData: any = { status: aceito ? 'aceito' : 'recusado' };
+    if (!aceito) {
+      updateData.motivo_recusa = motivoRecusaDeferimento;
+    }
+    
+    const { error } = await supabase
+      .from("deferimento_documents")
+      .update(updateData)
+      .eq("id", docId);
+
+    if (error) {
+      toast.error("Erro ao atualizar status do deferimento");
+      return;
+    }
+
+    await logAudit("deferimento", `Deferimento ${aceito ? 'aceito' : 'recusado'}${!aceito ? ': ' + motivoRecusaDeferimento : ''}`);
+    toast.success(aceito ? "Deferimento aceito!" : "Deferimento recusado!");
+    setShowDeferimentoAction(null);
+    setMotivoRecusaDeferimento("");
+    
+    // Refresh attachments
+    const { data } = await supabase
+      .from("deferimento_documents")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+    setAttachments(data || []);
+  };
+
+  const handleConfirmarLancamento = async () => {
+    setLoading(true);
+    const { error } = await supabase
+      .from("solicitacoes")
+      .update({
+        lancamento_confirmado: true,
+        lancamento_confirmado_por: userId,
+        lancamento_confirmado_data: new Date().toISOString()
+      })
+      .eq("id", solicitacao.id);
+
+    if (error) {
+      toast.error("Erro ao confirmar lançamento");
+    } else {
+      await logAudit("lancamento", "Lançamento do serviço confirmado");
+      toast.success("Lançamento confirmado!");
+      setShowLancamentoDialog(false);
+      onClose();
+    }
+    setLoading(false);
+  };
+
   const logAudit = async (acao: string, detalhes: string) => {
     await supabase.from("audit_log").insert({
       solicitacao_id: solicitacao.id,
@@ -202,6 +274,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       "ARMAZEM": "Operacional",
     };
     return labels[setor] || setor;
+  };
+
+  const getDeferimentoStatusBadge = (status: string | null) => {
+    if (!status || status === 'pendente') {
+      return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">Aguardando análise</Badge>;
+    }
+    if (status === 'aceito') {
+      return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">Aceito</Badge>;
+    }
+    return <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">Recusado</Badge>;
   };
 
   return (
@@ -361,7 +443,42 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {/* Anexos - Visualização embutida */}
+            {/* Confirmação de Lançamento */}
+            {solicitacao.status === "vistoria_finalizada" && !solicitacao.lancamento_confirmado && (
+              <>
+                <Separator />
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-red-600 mb-2">
+                    <DollarSign className="h-5 w-5" />
+                    <span className="font-semibold">Aguardando confirmação de lançamento do serviço</span>
+                  </div>
+                  <p className="text-sm text-red-600 mb-3">
+                    Confirme se o serviço foi lançado no sistema.
+                  </p>
+                  <Button 
+                    onClick={() => setShowLancamentoDialog(true)} 
+                    variant="outline" 
+                    className="border-red-300 text-red-600 hover:bg-red-50"
+                  >
+                    Confirmar Lançamento
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {solicitacao.lancamento_confirmado && (
+              <>
+                <Separator />
+                <div className="bg-muted/50 rounded-lg p-3 flex items-center gap-2">
+                  <Check className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Lançamento confirmado em {new Date(solicitacao.lancamento_confirmado_data).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+              </>
+            )}
+
+            {/* Anexos */}
             <Separator />
             <div className="space-y-3">
               <p className="text-sm font-semibold flex items-center gap-2">
@@ -374,31 +491,66 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 <div className="space-y-4">
                   {attachments.map((att) => (
                     <div key={att.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{att.file_name}</span>
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 mr-1" />
-                            Baixar
-                          </a>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{att.file_name}</span>
+                          {getDeferimentoStatusBadge(att.status)}
+                        </div>
+                        <div className="flex gap-2">
+                          {(!att.status || att.status === 'pendente') && (
+                            <>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-green-600 border-green-300"
+                                onClick={() => handleDeferimentoDecision(att.id, true)}
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                Aceitar
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-600 border-red-300"
+                                onClick={() => setShowDeferimentoAction(att.id)}
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Recusar
+                              </Button>
+                            </>
+                          )}
+                          <Button variant="ghost" size="sm" asChild>
+                            <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
+                              <Download className="h-4 w-4 mr-1" />
+                              Baixar
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Preview embutido ou botão conforme configuração */}
+                      {showEmbeddedPreview ? (
+                        <div className="bg-muted/30 rounded overflow-hidden">
+                          {att.file_url.toLowerCase().endsWith('.pdf') ? (
+                            <iframe 
+                              src={att.file_url} 
+                              className="w-full h-[300px]" 
+                              title={att.file_name}
+                            />
+                          ) : (
+                            <img 
+                              src={att.file_url} 
+                              alt={att.file_name} 
+                              className="max-w-full max-h-[300px] mx-auto"
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
+                          <Eye className="h-4 w-4 mr-1" />
+                          Visualizar
                         </Button>
-                      </div>
-                      {/* Preview embutido */}
-                      <div className="bg-muted/30 rounded overflow-hidden">
-                        {att.file_url.toLowerCase().endsWith('.pdf') ? (
-                          <iframe 
-                            src={att.file_url} 
-                            className="w-full h-[300px]" 
-                            title={att.file_name}
-                          />
-                        ) : (
-                          <img 
-                            src={att.file_url} 
-                            alt={att.file_name} 
-                            className="max-w-full max-h-[300px] mx-auto"
-                          />
-                        )}
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -440,6 +592,61 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Dialog para recusar deferimento */}
+      <Dialog open={!!showDeferimentoAction} onOpenChange={() => setShowDeferimentoAction(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recusar Deferimento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Label>Motivo da recusa</Label>
+            <Textarea
+              value={motivoRecusaDeferimento}
+              onChange={(e) => setMotivoRecusaDeferimento(e.target.value)}
+              placeholder="Informe o motivo da recusa..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeferimentoAction(null)}>Cancelar</Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => showDeferimentoAction && handleDeferimentoDecision(showDeferimentoAction, false)}
+              disabled={!motivoRecusaDeferimento.trim()}
+            >
+              Confirmar Recusa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para confirmar lançamento */}
+      <Dialog open={showLancamentoDialog} onOpenChange={setShowLancamentoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Confirmar Lançamento do Serviço
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Confirme que o serviço foi lançado no sistema financeiro.
+            </p>
+            <div className="bg-muted/50 rounded-lg p-3">
+              <p className="text-sm"><strong>Protocolo:</strong> {solicitacao.protocolo}</p>
+              <p className="text-sm"><strong>Cliente:</strong> {solicitacao.cliente_nome}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLancamentoDialog(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmarLancamento} disabled={loading} className="jbs-btn-primary">
+              <Check className="h-4 w-4 mr-2" />
+              Confirmar Lançamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmação de Recusa */}
       <AlertDialog open={showRecusaConfirm} onOpenChange={setShowRecusaConfirm}>

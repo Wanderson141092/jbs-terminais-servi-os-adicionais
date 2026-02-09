@@ -594,15 +594,17 @@ const InternoDashboard = () => {
                       <Checkbox
                         checked={selectedIds.length === filtered.length && filtered.length > 0}
                         onCheckedChange={() => toggleSelectAll()}
-                        className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                        className="bg-white data-[state=checked]:bg-white data-[state=checked]:text-primary border-primary"
                       />
                     </div>
                   </TableHead>
                   <TableHead className="text-primary-foreground w-[100px]">Ações</TableHead>
                   <TableHead className="text-primary-foreground w-[50px]">$</TableHead>
                   <TableHead className="text-primary-foreground">Protocolo</TableHead>
+                  <TableHead className="text-primary-foreground">Serviço Adicional</TableHead>
                   <TableHead className="text-primary-foreground">Data Serviço</TableHead>
                   <TableHead className="text-primary-foreground">Contêiner</TableHead>
+                  <TableHead className="text-primary-foreground">Tipo Carga</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
                   <TableHead className="text-primary-foreground">Administrativa</TableHead>
@@ -613,13 +615,13 @@ const InternoDashboard = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
                       Nenhuma solicitação encontrada.
                     </TableCell>
                   </TableRow>
@@ -680,12 +682,35 @@ const InternoDashboard = () => {
                         ) : null}
                       </TableCell>
                       <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
+                      <TableCell className="text-sm">{s.tipo_operacao || "Posicionamento"}</TableCell>
                       <TableCell className="text-sm">
-                        {s.data_posicionamento 
-                          ? new Date(s.data_posicionamento + 'T00:00:00').toLocaleDateString("pt-BR")
-                          : "—"}
+                        {(() => {
+                          const servicoConfig = servicos.find(sv => sv.nome === s.tipo_operacao);
+                          if (servicoConfig?.tipo_agendamento === "data_horario" && s.data_agendamento) {
+                            return new Date(s.data_agendamento).toLocaleString("pt-BR", {
+                              day: "2-digit", month: "2-digit", year: "numeric",
+                              hour: "2-digit", minute: "2-digit"
+                            });
+                          }
+                          if (s.data_posicionamento) {
+                            return new Date(s.data_posicionamento + 'T00:00:00').toLocaleDateString("pt-BR");
+                          }
+                          return "—";
+                        })()}
                       </TableCell>
                       <TableCell className="text-sm font-mono">{s.numero_conteiner || "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        {(() => {
+                          const tc = s.tipo_carga;
+                          if (!tc) return "—";
+                          const lower = tc.toLowerCase();
+                          if (lower.includes("dry") || lower.includes("seco")) return "Dry";
+                          if (lower.includes("reefer") || lower.includes("refriger")) return "Reefer";
+                          if (lower.includes("imo") || lower.includes("perigosa")) return "IMO";
+                          if (lower.includes("oog") || lower.includes("over") || lower.includes("especial")) return "OOG";
+                          return tc;
+                        })()}
+                      </TableCell>
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
                       <TableCell>

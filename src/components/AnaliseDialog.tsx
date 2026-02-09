@@ -102,6 +102,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   // Verificar se é serviço de posicionamento (apenas ele tem deferimento)
   const hasDeferimento = isPositionamento;
 
+  // Formatar tipo de carga para exibir Dry, Reefer, IMO, OOG
+  const formatTipoCarga = (tipoCarga: string | null) => {
+    if (!tipoCarga) return "—";
+    const lower = tipoCarga.toLowerCase();
+    if (lower.includes("dry") || lower.includes("seco")) return "Dry";
+    if (lower.includes("reefer") || lower.includes("refriger")) return "Reefer";
+    if (lower.includes("imo") || lower.includes("perigosa")) return "IMO";
+    if (lower.includes("oog") || lower.includes("over") || lower.includes("especial")) return "OOG";
+    return tipoCarga;
+  };
+
   const handleAprovar = async () => {
     if (wasRefused) {
       if (!justificativa.trim()) {
@@ -394,7 +405,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <InfoItem icon={<FileText className="h-4 w-4" />} label="LPCO" value={solicitacao.lpco || "—"} />
               <InfoItem icon={<Calendar className="h-4 w-4" />} label={getDateLabel()} value={formatDateValue()} />
               <InfoItem icon={<Clock className="h-4 w-4" />} label="Serviço Adicional" value={solicitacao.tipo_operacao || "Posicionamento"} />
-              <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={solicitacao.tipo_carga || "—"} />
+              <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
             </div>
 
             {solicitacao.observacoes && (

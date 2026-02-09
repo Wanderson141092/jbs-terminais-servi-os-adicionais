@@ -276,6 +276,17 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     return "Data do serviço";
   };
 
+  // Formatar tipo de carga para exibir Dry, Reefer, IMO, OOG
+  const formatTipoCarga = (tipoCarga: string | null) => {
+    if (!tipoCarga) return "—";
+    const lower = tipoCarga.toLowerCase();
+    if (lower.includes("dry") || lower.includes("seco")) return "Dry";
+    if (lower.includes("reefer") || lower.includes("refriger")) return "Reefer";
+    if (lower.includes("imo") || lower.includes("perigosa")) return "IMO";
+    if (lower.includes("oog") || lower.includes("over") || lower.includes("especial")) return "OOG";
+    return tipoCarga;
+  };
+
   const getDateValue = () => {
     if (isAgendamento && solicitacao.data_agendamento) {
       return new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", {
@@ -312,7 +323,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
           </div>
 
           {solicitacao.tipo_carga && (
-            <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo de Carga" value={solicitacao.tipo_carga} />
+            <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo de Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
           )}
 
           {solicitacao.tipo_operacao && (

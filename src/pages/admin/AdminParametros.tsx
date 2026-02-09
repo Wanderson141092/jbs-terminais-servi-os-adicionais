@@ -615,50 +615,64 @@ const AdminParametros = () => {
                   <TableRow>
                     <TableHead>Serviço</TableHead>
                     <TableHead>Hora Corte</TableHead>
-                    <TableHead>Limite/Dia</TableHead>
+                    <TableHead>Limites</TableHead>
                     <TableHead>Dias Operação</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {regras.map((regra) => (
-                    <TableRow key={regra.id}>
-                      <TableCell className="font-medium">{getServicoNome(regra.servico_id)}</TableCell>
-                      <TableCell>{regra.hora_corte}</TableCell>
-                      <TableCell>{regra.limite_dia || "Sem limite"}</TableCell>
-                      <TableCell className="text-xs">
-                        {regra.dias_semana.join(", ").toUpperCase()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openRegraDialog(regra)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Excluir Regra</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja excluir a regra para <strong>{getServicoNome(regra.servico_id)}</strong>?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteRegra(regra)} className="bg-destructive text-destructive-foreground">
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {regras.map((regra) => {
+                    const hasPerDayLimits = regra.limite_seg || regra.limite_ter || regra.limite_qua || 
+                                            regra.limite_qui || regra.limite_sex || regra.limite_sab;
+                    return (
+                      <TableRow key={regra.id}>
+                        <TableCell className="font-medium">{getServicoNome(regra.servico_id)}</TableCell>
+                        <TableCell>{regra.hora_corte}</TableCell>
+                        <TableCell className="text-xs">
+                          {regra.limite_dia ? (
+                            <span>{regra.limite_dia}/dia</span>
+                          ) : hasPerDayLimits ? (
+                            <span title={`Seg: ${regra.limite_seg || '—'}, Ter: ${regra.limite_ter || '—'}, Qua: ${regra.limite_qua || '—'}, Qui: ${regra.limite_qui || '—'}, Sex: ${regra.limite_sex || '—'}, Sáb: ${regra.limite_sab || '—'}`}>
+                              Por dia da semana
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Sem limite</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {regra.dias_semana.join(", ").toUpperCase()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openRegraDialog(regra)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Excluir Regra</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir a regra para <strong>{getServicoNome(regra.servico_id)}</strong>?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteRegra(regra)} className="bg-destructive text-destructive-foreground">
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {regras.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
@@ -713,7 +727,7 @@ const AdminParametros = () => {
 
       {/* Dialog para Regra */}
       <Dialog open={showRegraDialog} onOpenChange={setShowRegraDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingRegra ? "Editar Regra" : "Adicionar Regra"}</DialogTitle>
           </DialogHeader>
@@ -744,15 +758,6 @@ const AdminParametros = () => {
                   onChange={(e) => setRegraFormData(prev => ({ ...prev, hora_corte: e.target.value }))}
                 />
               </div>
-              <div>
-                <Label>Limite por Dia</Label>
-                <Input
-                  type="number"
-                  value={regraFormData.limite_dia}
-                  onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_dia: e.target.value }))}
-                  placeholder="Sem limite"
-                />
-              </div>
             </div>
             <div>
               <Label>Dias de Operação</Label>
@@ -769,6 +774,121 @@ const AdminParametros = () => {
                 ))}
               </div>
             </div>
+            
+            {/* Tipo de limite - Diário Fixo ou Por Dia da Semana */}
+            <div className="border-t pt-4">
+              <Label className="mb-2 block">Tipo de Limite de Quantidade</Label>
+              <Select
+                value={regraFormData.limite_dia ? "fixo" : (
+                  regraFormData.limite_seg || regraFormData.limite_ter || regraFormData.limite_qua || 
+                  regraFormData.limite_qui || regraFormData.limite_sex || regraFormData.limite_sab
+                ) ? "por_dia" : "nenhum"}
+                onValueChange={(v) => {
+                  if (v === "fixo") {
+                    setRegraFormData(prev => ({
+                      ...prev,
+                      limite_seg: "", limite_ter: "", limite_qua: "", 
+                      limite_qui: "", limite_sex: "", limite_sab: ""
+                    }));
+                  } else if (v === "por_dia") {
+                    setRegraFormData(prev => ({ ...prev, limite_dia: "" }));
+                  } else {
+                    setRegraFormData(prev => ({
+                      ...prev,
+                      limite_dia: "",
+                      limite_seg: "", limite_ter: "", limite_qua: "", 
+                      limite_qui: "", limite_sex: "", limite_sab: ""
+                    }));
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo de limite" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhum">Sem limite</SelectItem>
+                  <SelectItem value="fixo">Limite diário fixo</SelectItem>
+                  <SelectItem value="por_dia">Limite por dia da semana</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Limite diário fixo */}
+            {regraFormData.limite_dia !== "" && (
+              <div>
+                <Label>Limite Diário (todos os dias)</Label>
+                <Input
+                  type="number"
+                  value={regraFormData.limite_dia}
+                  onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_dia: e.target.value }))}
+                  placeholder="Ex: 10"
+                />
+              </div>
+            )}
+
+            {/* Limites por dia da semana */}
+            {(regraFormData.limite_seg !== "" || regraFormData.limite_ter !== "" || 
+              regraFormData.limite_qua !== "" || regraFormData.limite_qui !== "" || 
+              regraFormData.limite_sex !== "" || regraFormData.limite_sab !== "" ||
+              (!regraFormData.limite_dia && regraFormData.limite_dia !== "")) && (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Segunda</Label>
+                  <Input
+                    type="number"
+                    value={regraFormData.limite_seg}
+                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_seg: e.target.value }))}
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Terça</Label>
+                  <Input
+                    type="number"
+                    value={regraFormData.limite_ter}
+                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_ter: e.target.value }))}
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Quarta</Label>
+                  <Input
+                    type="number"
+                    value={regraFormData.limite_qua}
+                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qua: e.target.value }))}
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Quinta</Label>
+                  <Input
+                    type="number"
+                    value={regraFormData.limite_qui}
+                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qui: e.target.value }))}
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Sexta</Label>
+                  <Input
+                    type="number"
+                    value={regraFormData.limite_sex}
+                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sex: e.target.value }))}
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Sábado</Label>
+                  <Input
+                    type="number"
+                    value={regraFormData.limite_sab}
+                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sab: e.target.value }))}
+                    placeholder="—"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="aplica_dia_anterior"

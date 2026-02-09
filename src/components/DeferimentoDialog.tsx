@@ -71,6 +71,18 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
 
   const showEmbeddedPreview = servicoConfig?.deferimento_embutidos ?? true;
 
+  // Calcula o status geral do deferimento baseado em todos os documentos
+  const calculateGeneralStatus = (docs: DeferimentoDoc[]): "recebido" | "recusado" | "aguardando" => {
+    if (docs.length === 0) return "aguardando";
+    
+    const hasRecusado = docs.some(d => d.status === "recusado");
+    const allAceitos = docs.every(d => d.status === "aceito");
+    
+    if (hasRecusado) return "recusado";
+    if (allAceitos) return "recebido";
+    return "aguardando";
+  };
+
   const handleAceitar = async (docId: string) => {
     setLoading(true);
     const { error } = await supabase
@@ -84,9 +96,13 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
       return;
     }
 
-    await logAudit("deferimento_aceito", "Deferimento aceito - Status alterado para 'Recebido'");
+    // Recalcula status geral após aceitar
+    const updatedDocs = documents.map(d => d.id === docId ? { ...d, status: "aceito" } : d);
+    const generalStatus = calculateGeneralStatus(updatedDocs);
+    
+    await logAudit("deferimento_aceito", `Deferimento aceito - Status geral: ${generalStatus}`);
     await createNotification(`Deferimento aceito para ${solicitacao.protocolo}`, "deferimento");
-    toast.success("Deferimento aceito!");
+    toast.success("Deferimento aceito! Status: Recebido");
     setLoading(false);
     fetchDocuments();
   };

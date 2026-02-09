@@ -14,6 +14,7 @@ interface ReclassificacaoDialogProps {
   solicitacao: any;
   userId: string;
   userSetor?: string | null; // Setor do usuário
+  userPerfis?: string[]; // Perfis do usuário (ADMINISTRATIVO, OPERACIONAL, etc)
   isAdmin?: boolean;
   onClose: () => void;
 }
@@ -21,7 +22,7 @@ interface ReclassificacaoDialogProps {
 type SetorKey = "COMEX" | "ARMAZEM";
 type NovaDecisao = "aprovado" | "recusado";
 
-const ReclassificacaoDialog = ({ solicitacao, userId, userSetor, isAdmin = false, onClose }: ReclassificacaoDialogProps) => {
+const ReclassificacaoDialog = ({ solicitacao, userId, userSetor, userPerfis = [], isAdmin = false, onClose }: ReclassificacaoDialogProps) => {
   const [selectedSetor, setSelectedSetor] = useState<SetorKey | "">("");
   const [justificativa, setJustificativa] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
@@ -32,56 +33,30 @@ const ReclassificacaoDialog = ({ solicitacao, userId, userSetor, isAdmin = false
   const comexStatus = solicitacao.comex_aprovado;
   const armazemStatus = solicitacao.armazem_aprovado;
 
-  // Buscar permissões do setor do usuário
+  // Buscar permissões do setor do usuário baseado nos perfis
   useEffect(() => {
-    const fetchSetorPermissions = async () => {
-      if (!userSetor || isAdmin) return;
-
-      // Buscar o setor_email pelo setor do usuário
-      const { data: setorData } = await supabase
-        .from("setor_emails")
-        .select("id, setor")
-        .eq("ativo", true);
-
-      if (!setorData) return;
-
-      // Verificar quais perfis o setor tem
-      const matchingSetores = setorData.filter(s => {
-        const setorLabel = s.setor;
-        // Mapear setor do usuário para perfis permitidos
-        if (userSetor === "COMEX" || userSetor === "ADMINISTRATIVO") {
-          return setorLabel === "COMEX" || setorLabel === "ADMINISTRATIVO";
-        }
-        if (userSetor === "ARMAZEM" || userSetor === "OPERACIONAL") {
-          return setorLabel === "ARMAZEM" || setorLabel === "OPERACIONAL";
-        }
-        if (userSetor === "MASTER") {
-          return true; // Master tem acesso a tudo
-        }
-        return false;
-      });
-
-      const perfilSet = new Set<string>();
-      matchingSetores.forEach(s => {
-        if (s.setor === "COMEX" || s.setor === "ADMINISTRATIVO") {
-          perfilSet.add("COMEX");
-        }
-        if (s.setor === "ARMAZEM" || s.setor === "OPERACIONAL") {
-          perfilSet.add("ARMAZEM");
-        }
-      });
-
-      // Se é MASTER, tem acesso a ambos
-      if (userSetor === "MASTER") {
+    const perfilSet = new Set<string>();
+    
+    if (isAdmin) {
+      // Admin tem acesso a tudo
+      perfilSet.add("COMEX");
+      perfilSet.add("ARMAZEM");
+    } else {
+      // Verificar perfis do usuário
+      if (userPerfis.includes("ADMINISTRATIVO") || userSetor === "COMEX" || userSetor === "ADMINISTRATIVO") {
+        perfilSet.add("COMEX");
+      }
+      if (userPerfis.includes("OPERACIONAL") || userSetor === "ARMAZEM" || userSetor === "OPERACIONAL") {
+        perfilSet.add("ARMAZEM");
+      }
+      if (userPerfis.includes("MASTER") || userSetor === "MASTER") {
         perfilSet.add("COMEX");
         perfilSet.add("ARMAZEM");
       }
-
-      setSetorServicos(perfilSet);
-    };
-
-    fetchSetorPermissions();
-  }, [userSetor, isAdmin]);
+    }
+    
+    setSetorServicos(perfilSet);
+  }, [userSetor, userPerfis, isAdmin]);
 
   const getStatusLabel = (status: boolean | null) => {
     if (status === null) return "Pendente";

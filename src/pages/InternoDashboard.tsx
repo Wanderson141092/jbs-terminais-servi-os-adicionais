@@ -161,10 +161,19 @@ const InternoDashboard = () => {
 
   // Verifica se precisa mostrar SetorSelector:
   // - Não é admin
+  // - Não logou como admin (admin@jbsterminais.com.br)
   // - Profile existe mas não tem setor definido
   // - Email é do domínio @jbsterminais.com.br
   useEffect(() => {
-    if (profile && !isAdmin && !profile.setor && profile.email?.endsWith("@jbsterminais.com.br")) {
+    // Admins (role ou email admin@jbsterminais.com.br) NUNCA veem o SetorSelector
+    const isAdminEmail = profile?.email === "admin@jbsterminais.com.br";
+    if (isAdmin || isAdminEmail) {
+      setShowSetorSelector(false);
+      return;
+    }
+    
+    // Só mostra SetorSelector se não tem setor e é email corporativo
+    if (profile && !profile.setor && !profile.email_setor && profile.email?.endsWith("@jbsterminais.com.br")) {
       setShowSetorSelector(true);
     } else {
       setShowSetorSelector(false);
@@ -576,13 +585,15 @@ const InternoDashboard = () => {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-primary text-primary-foreground pointer-events-none">
-                  <TableHead className="text-primary-foreground w-[40px] pointer-events-auto">
-                    <Checkbox
-                      checked={selectedIds.length === filtered.length && filtered.length > 0}
-                      onCheckedChange={() => toggleSelectAll()}
-                      className="border-primary-foreground/50"
-                    />
+                <TableRow className="bg-primary hover:bg-primary">
+                  <TableHead className="text-primary-foreground w-[40px]">
+                    <div className="bg-white rounded p-0.5 w-fit">
+                      <Checkbox
+                        checked={selectedIds.length === filtered.length && filtered.length > 0}
+                        onCheckedChange={() => toggleSelectAll()}
+                        className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                      />
+                    </div>
                   </TableHead>
                   <TableHead className="text-primary-foreground w-[100px]">Ações</TableHead>
                   <TableHead className="text-primary-foreground w-[50px]">$</TableHead>
@@ -688,7 +699,8 @@ const InternoDashboard = () => {
           profile={{
             ...profile,
             // Mapear setor antigo para novo
-            setor: profile.setor === "COMEX" ? "COMEX" : profile.setor === "ARMAZEM" ? "ARMAZEM" : profile.setor
+            setor: profile.setor === "COMEX" ? "COMEX" : profile.setor === "ARMAZEM" ? "ARMAZEM" : profile.setor,
+            perfis: userPerfis
           }}
           userId={user.id}
           isAdmin={isAdmin}
@@ -705,6 +717,7 @@ const InternoDashboard = () => {
           solicitacao={reclassificacaoSolicitacao}
           userId={user.id}
           userSetor={profile.setor}
+          userPerfis={userPerfis}
           isAdmin={isAdmin}
           onClose={() => {
             setReclassificacaoSolicitacao(null);

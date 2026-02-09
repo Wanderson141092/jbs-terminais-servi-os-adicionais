@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { FileText } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { FileText, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -13,6 +13,24 @@ const Index = () => {
   const [resultado, setResultado] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [hashdataUrl, setHashdataUrl] = useState<string | null>(null);
+  const [showIframe, setShowIframe] = useState(false);
+
+  // Carregar URL do iframe do Hashdata
+  useEffect(() => {
+    const fetchHashdataUrl = async () => {
+      const { data } = await supabase
+        .from("page_config")
+        .select("config_value")
+        .eq("config_key", "hashdata_iframe_url")
+        .single();
+      
+      if (data?.config_value) {
+        setHashdataUrl(data.config_value);
+      }
+    };
+    fetchHashdataUrl();
+  }, []);
 
   // Recebe servicoId (id do serviço) e valor (protocolo/conteiner/lpco)
   const handleSearch = useCallback(async (servicoId: string, valor: string) => {
@@ -100,7 +118,7 @@ const Index = () => {
           </div>
 
           {/* Action Card - Solicitar/Cancelar */}
-          <Dialog>
+          <Dialog open={showIframe} onOpenChange={setShowIframe}>
             <DialogTrigger asChild>
               <Card className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer mb-8">
                 <CardHeader className="pb-2 text-center">
@@ -122,18 +140,27 @@ const Index = () => {
                 <DialogTitle>Serviço Adicional - Solicitação ou Cancelamento</DialogTitle>
               </DialogHeader>
               <div className="py-4">
-                {/* Hashdata iframe will go here */}
-                <div className="bg-muted/50 rounded-lg p-8 text-center min-h-[400px] flex items-center justify-center">
-                  <div>
-                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      Integração com formulário Hashdata
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      O formulário será carregado aqui
-                    </p>
+                {hashdataUrl ? (
+                  <iframe 
+                    src={hashdataUrl}
+                    className="w-full min-h-[500px] rounded-lg border"
+                    title="Formulário Hashdata"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="bg-muted/50 rounded-lg p-8 text-center min-h-[400px] flex items-center justify-center">
+                    <div>
+                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">
+                        URL do formulário Hashdata não configurada
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Configure em Parâmetros → Página Externa
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>

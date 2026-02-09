@@ -25,6 +25,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
   const [showAlteracaoConfirm, setShowAlteracaoConfirm] = useState(false);
   const [statusVistoria, setStatusVistoria] = useState(solicitacao.status_vistoria || "");
+  const [selectedStatus, setSelectedStatus] = useState(solicitacao.status || "");
   const [loading, setLoading] = useState(false);
   const [adminSelectedSetor, setAdminSelectedSetor] = useState<"COMEX" | "ARMAZEM" | null>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -166,6 +167,46 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     await executeApproval(true);
   };
 
+  const handleUpdateStatus = async () => {
+    if (!selectedStatus) return;
+    setLoading(true);
+    
+    // Map status to vistoria label if needed
+    let statusVistoriaLabel = null;
+    if (selectedStatus === "vistoria_finalizada") {
+      statusVistoriaLabel = "Vistoria Finalizada";
+    } else if (selectedStatus === "vistoriado_com_pendencia") {
+      statusVistoriaLabel = "Vistoriado com Pendência";
+    } else if (selectedStatus === "nao_vistoriado") {
+      statusVistoriaLabel = "Não Vistoriado";
+    }
+    
+    const updateData: any = {
+      status: selectedStatus,
+      updated_at: new Date().toISOString()
+    };
+    
+    if (statusVistoriaLabel) {
+      updateData.status_vistoria = statusVistoriaLabel;
+    }
+    
+    const { error } = await supabase
+      .from("solicitacoes")
+      .update(updateData)
+      .eq("id", solicitacao.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar status: " + error.message);
+    } else {
+      const statusLabel = STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label || selectedStatus;
+      await logAudit("status", `Status atualizado para: ${statusLabel}`);
+      await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
+      toast.success("Status atualizado!");
+      onClose();
+    }
+    setLoading(false);
+  };
+
   const handleUpdateVistoria = async () => {
     if (!statusVistoria) return;
     setLoading(true);
@@ -180,6 +221,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           : statusVistoria === "Não Vistoriado"
           ? "nao_vistoriado" as any
           : solicitacao.status,
+        updated_at: new Date().toISOString()
       })
       .eq("id", solicitacao.id);
 
@@ -188,11 +230,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     } else {
       await logAudit("vistoria", `Status de vistoria atualizado para: ${statusVistoria}`);
       await createNotification(`Vistoria da solicitação ${solicitacao.protocolo}: ${statusVistoria}`, "vistoria");
-      toast.success("Status de vistoria atualizado!");
+      toast.success("Status atualizado!");
       onClose();
     }
     setLoading(false);
   };
+
+  const STATUS_OPTIONS = [
+    { value: "aguardando_confirmacao", label: "Aguardando Confirmação" },
+    { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
+    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
+    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
+    { value: "nao_vistoriado", label: "Não Vistoriado" },
+    { value: "recusado", label: "Recusado" },
+    { value: "cancelado", label: "Cancelado" },
+  ];
 
   const handleDeferimentoDecision = async (docId: string, aceito: boolean) => {
     const updateData: any = { status: aceito ? 'aceito' : 'recusado' };
@@ -420,24 +472,28 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {/* Vistoria */}
-            {solicitacao.status === "confirmado_aguardando_vistoria" && (
+            {/* Atualizar Status - disponível após aprovação */}
+            {(solicitacao.comex_aprovado || solicitacao.armazem_aprovado) && (
               <>
                 <Separator />
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold">Atualizar Vistoria:</p>
-                  <Select value={statusVistoria} onValueChange={setStatusVistoria}>
+                  <p className="text-sm font-semibold">Atualizar Status:</p>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o status da vistoria" />
+                      <SelectValue placeholder="Selecione o novo status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Vistoria Finalizada">Vistoria Finalizada</SelectItem>
-                      <SelectItem value="Vistoriado com Pendência">Vistoriado com Pendência</SelectItem>
-                      <SelectItem value="Não Vistoriado">Não Vistoriado</SelectItem>
+                      {STATUS_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  <Button onClick={handleUpdateVistoria} disabled={loading || !statusVistoria} className="jbs-btn-primary">
-                    Atualizar Vistoria
+                  <Button 
+                    onClick={handleUpdateStatus} 
+                    disabled={loading || selectedStatus === solicitacao.status} 
+                    className="jbs-btn-primary"
+                  >
+                    Atualizar Status
                   </Button>
                 </div>
               </>

@@ -81,12 +81,12 @@ const BatchApprovalDialog = ({
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="select-none">
+          <DialogTitle className="flex items-center gap-2 pointer-events-none">
             <CheckCircle2 className="h-5 w-5 text-secondary" />
             Aprovação em Lote (Operacional)
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="pointer-events-none">
             Aprovar {solicitacoes.length} processo(s) selecionado(s)
           </DialogDescription>
         </DialogHeader>

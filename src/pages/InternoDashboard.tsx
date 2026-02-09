@@ -127,8 +127,11 @@ const InternoDashboard = () => {
       .select("*")
       .order("created_at", { ascending: false });
     
-    // If no specific filters, exclude finalized by default
-    if (statusFilter === "all") {
+    // Filter logic:
+    // - If service=todos AND lançamento=todos: exclude vistoria_finalizada (show nothing meaningful)
+    // - If service=todos AND lançamento=pendente/confirmado: include vistoria_finalizada (need them for launch filter)
+    // - If specific service: that's the primary filter
+    if (statusFilter === "all" && lancamentoFilter === "all") {
       query = query.not("status", "in", '("vistoria_finalizada")');
     }
 
@@ -140,7 +143,7 @@ const InternoDashboard = () => {
       setSolicitacoes(data || []);
     }
     setLoading(false);
-  }, [statusFilter]);
+  }, [statusFilter, lancamentoFilter]);
 
   const fetchUnread = useCallback(async () => {
     if (!user) return;
@@ -227,6 +230,12 @@ const InternoDashboard = () => {
           matchesLancamento = needsLaunch && s.lancamento_confirmado === true;
         }
       }
+    }
+
+    // Se serviço=todos E lançamento=todos, não mostrar nada (query já exclui vistoria_finalizada)
+    // Se serviço=todos E lançamento=pendente/confirmado, mostrar apenas os com lançamento matching
+    if (tipoServicoFilter === "Todos" && lancamentoFilter === "all") {
+      // Comportamento padrão - query já filtrou vistoria_finalizada
     }
     
     return matchesStatus && matchesTipo && matchesSearch && matchesLancamento;
@@ -471,7 +480,7 @@ const InternoDashboard = () => {
                   </p>
                   <p className="text-lg font-bold">{format(day, "dd/MM")}</p>
                   <p className="text-2xl font-bold text-primary mt-1">{getCountForDay(day)}</p>
-                  <p className="text-[10px] text-muted-foreground">pedidos</p>
+                  <p className="text-[10px] text-muted-foreground">{getCountForDay(day) === 1 ? "solicitação" : "solicitações"}</p>
                 </div>
               ))}
             </div>
@@ -677,20 +686,25 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Botão Deferimento - só para Posicionamento + Exportação + vistoria_finalizada */}
-                          {(s.tipo_operacao || "").toLowerCase().includes("posicionamento") && 
-                           (s.categoria || "").toLowerCase() === "exportação" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeferimentoSolicitacao(s)}
-                              title="Deferimento"
-                              disabled={s.status !== "vistoria_finalizada"}
-                              className={s.status !== "vistoria_finalizada" ? "opacity-40" : ""}
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
-                          )}
+                          {/* Botão Deferimento - aparece quando status corresponde ao configurado no serviço */}
+                          {(() => {
+                            const servicoConf = servicos.find(sv => sv.nome === s.tipo_operacao);
+                            const statusLanc = servicoConf?.status_confirmacao_lancamento || [];
+                            const showDefBtn = statusLanc.includes(s.status) && 
+                              (s.tipo_operacao || "").toLowerCase().includes("posicionamento") &&
+                              (s.categoria || "").toLowerCase() === "exportação";
+                            if (!showDefBtn) return null;
+                            return (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeferimentoSolicitacao(s)}
+                                title="Deferimento"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            );
+                          })()}
                           {/* PDF individual */}
                           <Button
                             variant="ghost"

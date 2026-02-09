@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatTipoCarga } from "@/lib/tipoCarga";
 import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,15 +41,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [motivoRecusaDeferimento, setMotivoRecusaDeferimento] = useState("");
   const [showLancamentoDialog, setShowLancamentoDialog] = useState(false);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
+  const [servicos, setServicos] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      // Buscar anexos (tipo 'anexo', não deferimento)
+      // Buscar todos os anexos (análise + anexos gerais, excluindo deferimento)
       const { data: attachData } = await supabase
         .from("deferimento_documents")
         .select("*")
         .eq("solicitacao_id", solicitacao.id)
-        .eq("document_type", "anexo");
+        .neq("document_type", "deferimento");
       setAttachments(attachData || []);
       
       // Buscar configurações do serviço
@@ -62,6 +64,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       if (servicoData) {
         setServicoConfig(servicoData);
       }
+
+      // Buscar todos os serviços para configuração de lançamento
+      const { data: allServicos } = await supabase
+        .from("servicos")
+        .select("*, status_confirmacao_lancamento")
+        .eq("ativo", true);
+      setServicos(allServicos || []);
     };
     
     fetchData();
@@ -102,16 +111,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   // Verificar se é serviço de posicionamento (apenas ele tem deferimento)
   const hasDeferimento = isPositionamento;
 
-  // Formatar tipo de carga para exibir Dry, Reefer, IMO, OOG
-  const formatTipoCarga = (tipoCarga: string | null) => {
-    if (!tipoCarga) return "—";
-    const lower = tipoCarga.toLowerCase();
-    if (lower.includes("dry") || lower.includes("seco")) return "Dry";
-    if (lower.includes("reefer") || lower.includes("refriger")) return "Reefer";
-    if (lower.includes("imo") || lower.includes("perigosa")) return "IMO";
-    if (lower.includes("oog") || lower.includes("over") || lower.includes("especial")) return "OOG";
-    return tipoCarga;
-  };
 
   const handleAprovar = async () => {
     if (wasRefused) {
@@ -545,8 +544,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {/* Confirmação de Lançamento */}
-            {solicitacao.status === "vistoria_finalizada" && !solicitacao.lancamento_confirmado && (
+            {/* Confirmação de Lançamento - mostra quando status está na lista do serviço */}
+            {(() => {
+              const svcConf = servicos.find(sv => sv.nome === (solicitacao.tipo_operacao || ""));
+              const statusLanc = svcConf?.status_confirmacao_lancamento || [];
+              return statusLanc.includes(solicitacao.status) && !solicitacao.lancamento_confirmado;
+            })() && (
               <>
                 <Separator />
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">

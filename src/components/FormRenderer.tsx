@@ -31,6 +31,7 @@ interface Formulario {
   id: string;
   titulo: string;
   descricao: string | null;
+  estilo?: string;
 }
 
 interface FormRendererProps {
@@ -51,7 +52,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     const fetchData = async () => {
       setLoading(true);
       const [formRes, camposRes] = await Promise.all([
-        supabase.from("formularios").select("*").eq("id", formularioId).single(),
+        supabase.from("formularios").select("id, titulo, descricao, estilo").eq("id", formularioId).single(),
         supabase.from("formulario_campos").select("*").eq("formulario_id", formularioId).order("ordem"),
       ]);
 
@@ -198,9 +199,47 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     );
   }
 
+  const estilo = formulario.estilo || "jbs";
+  
+  // Style classes based on form style
+  const styleClasses: Record<string, { container: string; header: string; field: string; button: string }> = {
+    jbs: {
+      container: "bg-card rounded-lg p-6 md:p-8 max-w-2xl mx-auto",
+      header: "text-center mb-8 pb-4 border-b-2 border-secondary",
+      field: "space-y-2",
+      button: "w-full jbs-btn-primary",
+    },
+    hashdata: {
+      container: "bg-card rounded-xl p-6 md:p-10 max-w-3xl mx-auto shadow-lg border",
+      header: "mb-8 pb-4 border-b border-muted",
+      field: "space-y-2 bg-muted/30 rounded-lg p-4",
+      button: "w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg",
+    },
+    google: {
+      container: "bg-card rounded-lg max-w-2xl mx-auto border-t-4 border-t-primary shadow-md",
+      header: "p-6 md:p-8 pb-4",
+      field: "space-y-2 border rounded-lg p-4 bg-card",
+      button: "bg-primary hover:bg-primary/90 text-primary-foreground px-8",
+    },
+    jotform: {
+      container: "bg-gradient-to-b from-muted/20 to-card rounded-2xl p-6 md:p-10 max-w-2xl mx-auto shadow-xl",
+      header: "text-center mb-10 pb-6 border-b border-muted/50",
+      field: "space-y-2 bg-card rounded-xl p-5 shadow-sm border",
+      button: "w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-3 text-lg",
+    },
+    formstack: {
+      container: "bg-card max-w-2xl mx-auto p-6 md:p-8 border rounded-lg",
+      header: "mb-6 pb-3 border-b-2 border-primary",
+      field: "space-y-1",
+      button: "w-full bg-primary hover:bg-primary/90 text-primary-foreground",
+    },
+  };
+  
+  const currentStyle = styleClasses[estilo] || styleClasses.jbs;
+
   return (
-    <div className="bg-card rounded-lg p-6 md:p-8 max-w-2xl mx-auto">
-      <div className="text-center mb-8 pb-4 border-b-2 border-secondary">
+    <div className={currentStyle.container}>
+      <div className={currentStyle.header}>
         <h1 className="text-2xl font-bold text-primary mb-2">{formulario.titulo}</h1>
         {formulario.descricao && (
           <p className="text-muted-foreground">{formulario.descricao}</p>
@@ -209,7 +248,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {campos.filter(isFieldVisible).map((campo) => (
-          <div key={campo.id} className="space-y-2">
+          <div key={campo.id} className={currentStyle.field}>
             <Label className="flex items-center gap-1">
               {campo.rotulo}
               {campo.obrigatorio && <span className="text-destructive">*</span>}
@@ -316,7 +355,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
           </div>
         ))}
 
-        <Button type="submit" disabled={submitting} className="w-full jbs-btn-primary">
+        <Button type="submit" disabled={submitting} className={currentStyle.button}>
           <Send className="h-4 w-4 mr-2" />
           {submitting ? "Enviando..." : "Enviar"}
         </Button>

@@ -31,6 +31,7 @@ interface UserRole {
 interface Setor {
   email_setor: string;
   setor: string;
+  descricao: string | null;
 }
 
 // ID do Admin Master - primeiro admin criado no sistema
@@ -64,7 +65,7 @@ const AdminUsuarios = () => {
   const fetchData = async () => {
     const [profilesRes, setoresRes, rolesRes] = await Promise.all([
       supabase.from("profiles").select("*").order("nome"),
-      supabase.from("setor_emails").select("email_setor, setor").eq("ativo", true),
+      supabase.from("setor_emails").select("email_setor, setor, descricao").eq("ativo", true),
       supabase.from("user_roles").select("user_id, role")
     ]);
 
@@ -536,7 +537,7 @@ const AdminUsuarios = () => {
                           <SelectContent>
                             {setores.map(s => (
                               <SelectItem key={s.email_setor} value={s.email_setor}>
-                                {getSetorLabel(s.setor)}
+                                {s.descricao || s.email_setor}
                               </SelectItem>
                             ))}
                           </SelectContent>

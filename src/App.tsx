@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import InternoLogin from "./pages/InternoLogin";
+import RecuperarSenha from "./pages/RecuperarSenha";
 import InternoDashboard from "./pages/InternoDashboard";
 import AdminParametros from "./pages/admin/AdminParametros";
 import AdminUsuarios from "./pages/admin/AdminUsuarios";
@@ -25,6 +26,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/interno" element={<InternoLogin />} />
+          <Route path="/recuperar-senha" element={<RecuperarSenha />} />
           <Route path="/interno/dashboard" element={<InternoDashboard />} />
           <Route path="/interno/admin/parametros" element={<AdminParametros />} />
           <Route path="/interno/admin/usuarios" element={<AdminUsuarios />} />

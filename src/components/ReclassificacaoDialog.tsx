@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 interface ReclassificacaoDialogProps {
   solicitacao: any;
   userId: string;
+  userSetor?: string | null; // Setor do usuário
   isAdmin?: boolean;
   onClose: () => void;
 }
@@ -20,23 +21,74 @@ interface ReclassificacaoDialogProps {
 type SetorKey = "COMEX" | "ARMAZEM";
 type NovaDecisao = "aprovado" | "recusado";
 
-const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }: ReclassificacaoDialogProps) => {
+const ReclassificacaoDialog = ({ solicitacao, userId, userSetor, isAdmin = false, onClose }: ReclassificacaoDialogProps) => {
   const [selectedSetor, setSelectedSetor] = useState<SetorKey | "">("");
-  const [novaDecisao, setNovaDecisao] = useState<NovaDecisao | "">("");
   const [justificativa, setJustificativa] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [setorServicos, setSetorServicos] = useState<Set<string>>(new Set());
 
   // Verifica status atual de cada setor
   const comexStatus = solicitacao.comex_aprovado;
   const armazemStatus = solicitacao.armazem_aprovado;
+
+  // Buscar permissões do setor do usuário
+  useEffect(() => {
+    const fetchSetorPermissions = async () => {
+      if (!userSetor || isAdmin) return;
+
+      // Buscar o setor_email pelo setor do usuário
+      const { data: setorData } = await supabase
+        .from("setor_emails")
+        .select("id, setor")
+        .eq("ativo", true);
+
+      if (!setorData) return;
+
+      // Verificar quais perfis o setor tem
+      const matchingSetores = setorData.filter(s => {
+        const setorLabel = s.setor;
+        // Mapear setor do usuário para perfis permitidos
+        if (userSetor === "COMEX" || userSetor === "ADMINISTRATIVO") {
+          return setorLabel === "COMEX" || setorLabel === "ADMINISTRATIVO";
+        }
+        if (userSetor === "ARMAZEM" || userSetor === "OPERACIONAL") {
+          return setorLabel === "ARMAZEM" || setorLabel === "OPERACIONAL";
+        }
+        if (userSetor === "MASTER") {
+          return true; // Master tem acesso a tudo
+        }
+        return false;
+      });
+
+      const perfilSet = new Set<string>();
+      matchingSetores.forEach(s => {
+        if (s.setor === "COMEX" || s.setor === "ADMINISTRATIVO") {
+          perfilSet.add("COMEX");
+        }
+        if (s.setor === "ARMAZEM" || s.setor === "OPERACIONAL") {
+          perfilSet.add("ARMAZEM");
+        }
+      });
+
+      // Se é MASTER, tem acesso a ambos
+      if (userSetor === "MASTER") {
+        perfilSet.add("COMEX");
+        perfilSet.add("ARMAZEM");
+      }
+
+      setSetorServicos(perfilSet);
+    };
+
+    fetchSetorPermissions();
+  }, [userSetor, isAdmin]);
 
   const getStatusLabel = (status: boolean | null) => {
     if (status === null) return "Pendente";
     return status ? "Aprovado" : "Recusado";
   };
 
-  // Determina qual será a nova decisão oposta
+  // Determina qual será a nova decisão oposta (automático)
   const getNovaDecisaoOposta = (setor: SetorKey): NovaDecisao | null => {
     const currentStatus = setor === "COMEX" ? comexStatus : armazemStatus;
     if (currentStatus === null) return null;
@@ -45,11 +97,10 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
 
   const handleSetorChange = (setor: SetorKey) => {
     setSelectedSetor(setor);
-    const novaDecisaoAuto = getNovaDecisaoOposta(setor);
-    if (novaDecisaoAuto) {
-      setNovaDecisao(novaDecisaoAuto);
-    }
   };
+
+  // Sempre usa a decisão oposta
+  const novaDecisao = selectedSetor ? getNovaDecisaoOposta(selectedSetor) : null;
 
   const handleSubmit = () => {
     if (!selectedSetor) {
@@ -57,7 +108,7 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
       return;
     }
     if (!novaDecisao) {
-      toast.error("Selecione a nova decisão.");
+      toast.error("Não é possível reclassificar um setor pendente.");
       return;
     }
     if (!justificativa.trim() || justificativa.trim().length < 10) {
@@ -125,13 +176,25 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
     onClose();
   };
 
+  // Setores disponíveis para reclassificação
   const setoresDisponiveis: { key: SetorKey; label: string; status: boolean | null }[] = [
-    { key: "COMEX", label: "Administrativo", status: comexStatus },
+    { key: "COMEX", label: "Administrativa", status: comexStatus },
     { key: "ARMAZEM", label: "Operacional", status: armazemStatus },
   ];
 
-  // Filtrar setores que já têm decisão (podem ser reclassificados)
-  const setoresComDecisao = setoresDisponiveis.filter(s => s.status !== null);
+  // Filtrar setores: 
+  // 1. Devem ter decisão (não pendente)
+  // 2. Usuário deve ter permissão (se não for admin)
+  const setoresComDecisao = setoresDisponiveis.filter(s => {
+    if (s.status === null) return false; // Só pode reclassificar se já tem decisão
+    if (isAdmin) return true; // Admin pode tudo
+    // Usuário corporativo só pode reclassificar setores que seu perfil permite
+    return setorServicos.has(s.key);
+  });
+
+  // Se usuário não tem permissão para nenhum setor
+  const semPermissao = !isAdmin && setoresComDecisao.length === 0 && 
+    (comexStatus !== null || armazemStatus !== null);
 
   return (
     <>
@@ -156,7 +219,7 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Administrativo:</span>{" "}
+                  <span className="text-muted-foreground">Administrativa:</span>{" "}
                   <span className={comexStatus === true ? "text-green-600" : comexStatus === false ? "text-destructive" : ""}>
                     {getStatusLabel(comexStatus)}
                   </span>
@@ -170,7 +233,12 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
               </div>
             </div>
 
-            {setoresComDecisao.length === 0 ? (
+            {semPermissao ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Você não tem permissão para reclassificar este processo. 
+                Seu setor não possui acesso aos setores com decisão.
+              </p>
+            ) : setoresComDecisao.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 Nenhum setor com decisão para reclassificar.
               </p>
@@ -178,10 +246,10 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
               <>
                 {/* Seleção de Setor */}
                 <div>
-                  <Label>Setor a Reclassificar</Label>
+                  <Label>Tipo de Aprovação a Reclassificar</Label>
                   <Select value={selectedSetor} onValueChange={(v) => handleSetorChange(v as SetorKey)}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione o setor" />
+                      <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
                     <SelectContent>
                       {setoresComDecisao.map((setor) => (
@@ -193,19 +261,20 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
                   </Select>
                 </div>
 
-                {/* Nova Decisão */}
-                {selectedSetor && (
-                  <div>
-                    <Label>Nova Decisão</Label>
-                    <Select value={novaDecisao} onValueChange={(v) => setNovaDecisao(v as NovaDecisao)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione a nova decisão" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="aprovado">Aprovar</SelectItem>
-                        <SelectItem value="recusado">Recusar</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Nova Decisão - Automática (oposta da atual) */}
+                {selectedSetor && novaDecisao && (
+                  <div className="bg-muted/30 rounded-lg p-3">
+                    <Label className="text-sm">Nova Decisão</Label>
+                    <p className="text-lg font-semibold mt-1">
+                    {novaDecisao === "aprovado" ? (
+                        <span className="text-secondary">Aprovado</span>
+                      ) : (
+                        <span className="text-destructive">Recusado</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      A nova decisão é automaticamente o oposto da atual
+                    </p>
                   </div>
                 )}
 
@@ -248,12 +317,12 @@ const ReclassificacaoDialog = ({ solicitacao, userId, isAdmin = false, onClose }
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Confirmar Reclassificação
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
-                Você está prestes a reclassificar o setor <strong>{selectedSetor === "COMEX" ? "Administrativo" : "Operacional"}</strong> de{" "}
+                Você está prestes a reclassificar a aprovação <strong>{selectedSetor === "COMEX" ? "Administrativa" : "Operacional"}</strong> de{" "}
                 <strong>{getStatusLabel(selectedSetor === "COMEX" ? comexStatus : armazemStatus)}</strong> para{" "}
                 <strong>{novaDecisao === "aprovado" ? "Aprovado" : "Recusado"}</strong>.
               </p>

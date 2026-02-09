@@ -277,8 +277,11 @@ const InternoLogin = () => {
             </TabsContent>
           </Tabs>
 
-          <div className="mt-6 text-center">
-            <a href="/" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <div className="mt-6 space-y-2 text-center">
+            <a href="/recuperar-senha" className="block text-xs text-primary hover:underline">
+              Esqueceu sua senha?
+            </a>
+            <a href="/" className="block text-xs text-muted-foreground hover:text-foreground transition-colors">
               ← Voltar ao portal externo
             </a>
           </div>

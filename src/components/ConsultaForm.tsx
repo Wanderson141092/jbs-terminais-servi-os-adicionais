@@ -130,13 +130,12 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         </Button>
       </div>
 
-      {/* Legenda dos formatos aceitos */}
-      <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
-        <p><strong>Formatos aceitos:</strong></p>
-        <p>• Contêiner: 3 letras + U + 7 números (Ex: ABCU1234567)</p>
-        <p>• Protocolo: JBS + letra do serviço + números (Ex: JBSP000001)</p>
-        {isPosicionamento && (
-          <p>• LPCO: 1 letra + 10 números (Ex: A1234567890)</p>
+      {/* Legenda dinâmica baseada no serviço */}
+      <div className="text-xs text-muted-foreground pt-2 border-t">
+        {isPosicionamento ? (
+          <p>Informe o contêiner, o LPCO ou o protocolo JBS do serviço adicional que deseja consultar.</p>
+        ) : (
+          <p>Informe o contêiner ou protocolo JBS do serviço adicional que deseja consultar.</p>
         )}
       </div>
     </form>

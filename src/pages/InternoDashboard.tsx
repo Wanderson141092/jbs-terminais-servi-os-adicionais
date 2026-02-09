@@ -3,9 +3,12 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ExcelExportDialog from "@/components/ExcelExportDialog";
+import { downloadProcessoPdf, downloadBatchPdfs } from "@/components/ProcessoPdfGenerator";
+import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -68,6 +71,7 @@ const InternoDashboard = () => {
   const [showBatchStatus, setShowBatchStatus] = useState(false);
   const [userPerfis, setUserPerfis] = useState<string[]>([]);
   const [deferimentoSolicitacao, setDeferimentoSolicitacao] = useState<any>(null);
+  const [showExcelExport, setShowExcelExport] = useState(false);
   
   const { isAdmin } = useAdminCheck(user?.id || null);
   
@@ -557,6 +561,20 @@ const InternoDashboard = () => {
               <Button variant="outline" size="sm" onClick={fetchSolicitacoes}>
                 Atualizar
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowExcelExport(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                Exportar
+              </Button>
+              {selectedIds.length > 0 && selectedIds.length <= 10 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => downloadBatchPdfs(filtered.filter(s => selectedIds.includes(s.id)))}
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  PDF ({selectedIds.length})
+                </Button>
+              )}
               
               {/* Batch Action Buttons */}
               {selectedIds.length > 0 && (
@@ -659,17 +677,29 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Botão Deferimento - só para serviço de Posicionamento */}
-                          {(s.tipo_operacao || "").toLowerCase().includes("posicionamento") && (
+                          {/* Botão Deferimento - só para Posicionamento + Exportação + vistoria_finalizada */}
+                          {(s.tipo_operacao || "").toLowerCase().includes("posicionamento") && 
+                           (s.categoria || "").toLowerCase() === "exportação" && (
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setDeferimentoSolicitacao(s)}
                               title="Deferimento"
+                              disabled={s.status !== "vistoria_finalizada"}
+                              className={s.status !== "vistoria_finalizada" ? "opacity-40" : ""}
                             >
                               <FileText className="h-4 w-4" />
                             </Button>
                           )}
+                          {/* PDF individual */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadProcessoPdf(s)}
+                            title="Salvar PDF"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -704,16 +734,7 @@ const InternoDashboard = () => {
                       </TableCell>
                       <TableCell className="text-sm font-mono">{s.numero_conteiner || "—"}</TableCell>
                       <TableCell className="text-sm">
-                        {(() => {
-                          const tc = s.tipo_carga;
-                          if (!tc) return "—";
-                          const lower = tc.toLowerCase();
-                          if (lower.includes("dry") || lower.includes("seco")) return "Dry";
-                          if (lower.includes("reefer") || lower.includes("refriger")) return "Reefer";
-                          if (lower.includes("imo") || lower.includes("perigosa")) return "IMO";
-                          if (lower.includes("oog") || lower.includes("over") || lower.includes("especial")) return "OOG";
-                          return tc;
-                        })()}
+                        {formatTipoCarga(s.tipo_carga)}
                       </TableCell>
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
@@ -808,6 +829,9 @@ const InternoDashboard = () => {
           }}
         />
       )}
+
+      {/* Excel Export Dialog */}
+      <ExcelExportDialog open={showExcelExport} onClose={() => setShowExcelExport(false)} />
     </div>
   );
 };

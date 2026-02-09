@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import StatusBadge from "./StatusBadge";
 import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { formatTipoCarga } from "@/lib/tipoCarga";
 
 interface ProcessoViewDialogProps {
   open: boolean;
@@ -144,16 +145,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Tipo Carga</Label>
-                <p>{(() => {
-                  const tc = solicitacao.tipo_carga;
-                  if (!tc) return "—";
-                  const lower = tc.toLowerCase();
-                  if (lower.includes("dry") || lower.includes("seco")) return "Dry";
-                  if (lower.includes("reefer") || lower.includes("refriger")) return "Reefer";
-                  if (lower.includes("imo") || lower.includes("perigosa")) return "IMO";
-                  if (lower.includes("oog") || lower.includes("over") || lower.includes("especial")) return "OOG";
-                  return tc;
-                })()}</p>
+                <p>{formatTipoCarga(solicitacao.tipo_carga)}</p>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Data Posicionamento</Label>

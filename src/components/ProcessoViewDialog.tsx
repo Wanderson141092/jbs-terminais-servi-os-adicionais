@@ -151,7 +151,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                 <p>{solicitacao.data_posicionamento || "—"}</p>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Tipo Operação</Label>
+                <Label className="text-xs text-muted-foreground">Serviço Adicional</Label>
                 <p>{solicitacao.tipo_operacao || "—"}</p>
               </div>
               <div>

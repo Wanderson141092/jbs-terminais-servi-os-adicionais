@@ -88,6 +88,7 @@ export type Database = {
       deferimento_documents: {
         Row: {
           created_at: string
+          document_type: string
           file_name: string
           file_url: string
           id: string
@@ -97,6 +98,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          document_type?: string
           file_name: string
           file_url: string
           id?: string
@@ -106,6 +108,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          document_type?: string
           file_name?: string
           file_url?: string
           id?: string
@@ -486,6 +489,7 @@ export type Database = {
           ativo: boolean
           codigo_prefixo: string
           created_at: string
+          deferimento_embutidos: boolean
           descricao: string | null
           id: string
           nome: string
@@ -498,6 +502,7 @@ export type Database = {
           ativo?: boolean
           codigo_prefixo: string
           created_at?: string
+          deferimento_embutidos?: boolean
           descricao?: string | null
           id?: string
           nome: string
@@ -510,6 +515,7 @@ export type Database = {
           ativo?: boolean
           codigo_prefixo?: string
           created_at?: string
+          deferimento_embutidos?: boolean
           descricao?: string | null
           id?: string
           nome?: string

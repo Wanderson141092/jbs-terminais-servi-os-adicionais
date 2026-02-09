@@ -12,9 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2 } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
+import ParametrosCamposManager from "@/components/ParametrosCamposManager";
 
 interface RegraServico {
   id: string;
@@ -447,7 +448,7 @@ const AdminParametros = () => {
       </div>
 
       <Tabs defaultValue="pagina-externa" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="pagina-externa" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             Página Externa
@@ -455,6 +456,10 @@ const AdminParametros = () => {
           <TabsTrigger value="pagina-interna" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
             Página Interna
+          </TabsTrigger>
+          <TabsTrigger value="campos-respostas" className="flex items-center gap-2">
+            <List className="h-4 w-4" />
+            Campos Respostas
           </TabsTrigger>
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -573,6 +578,24 @@ const AdminParametros = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ============= CAMPOS RESPOSTAS ============= */}
+        <TabsContent value="campos-respostas">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <List className="h-5 w-5" />
+                Parâmetros de Campos Respostas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Gerencie os valores disponíveis para Tipo Carga, Categoria e Status de Deferimento.
+              </p>
+              <ParametrosCamposManager />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ============= REGRAS DE SERVIÇO ============= */}

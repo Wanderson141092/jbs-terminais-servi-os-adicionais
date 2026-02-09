@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle } from "lucide-react";
+import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import StatusBadge from "./StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatTipoCarga } from "@/lib/tipoCarga";
+import { downloadProcessoPdf } from "./ProcessoPdfGenerator";
 
 interface Solicitacao {
   id: string;
@@ -171,11 +173,14 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     setShowConfirmDialog(false);
   };
 
-  // Verificar se pode enviar deferimento
-  const vistoriaFinalizada = solicitacao.status_vistoria === "Vistoria Finalizada";
+  // Deferimento only available for Posicionamento + Exportação + vistoria_finalizada
+  const isPositionamentoExportacao = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento") 
+    && (solicitacao as any).categoria?.toLowerCase() === "exportação";
+  const vistoriaFinalizada = solicitacao.status === "vistoria_finalizada";
+  const showDeferimento = isPositionamentoExportacao && vistoriaFinalizada;
   
-  // Pode enviar se: vistoria finalizada E (não tem doc OU status geral é recusado)
-  const canUpload = vistoriaFinalizada && (allDocs.length === 0 || generalStatus === "recusado");
+  // Pode enviar se: deferimento habilitado E (não tem doc OU status geral é recusado)
+  const canUpload = showDeferimento && (allDocs.length === 0 || generalStatus === "recusado");
 
   // Status do deferimento com cores baseado no status geral
   const getDeferimentoStatusSection = () => {
@@ -294,16 +299,8 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     return "Data do serviço";
   };
 
-  // Formatar tipo de carga para exibir Dry, Reefer, IMO, OOG
-  const formatTipoCarga = (tipoCarga: string | null) => {
-    if (!tipoCarga) return "—";
-    const lower = tipoCarga.toLowerCase();
-    if (lower.includes("dry") || lower.includes("seco")) return "Dry";
-    if (lower.includes("reefer") || lower.includes("refriger")) return "Reefer";
-    if (lower.includes("imo") || lower.includes("perigosa")) return "IMO";
-    if (lower.includes("oog") || lower.includes("over") || lower.includes("especial")) return "OOG";
-    return tipoCarga;
-  };
+  // Formatar tipo de carga usando utility
+  const formattedTipoCarga = formatTipoCarga(solicitacao.tipo_carga);
 
   const getDateValue = () => {
     if (isAgendamento && solicitacao.data_agendamento) {
@@ -321,6 +318,16 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     return "—";
   };
 
+  // Build info items, filtering out empty ones for visual cleanliness
+  const infoItems = [
+    { icon: <User className="h-4 w-4" />, label: "Cliente", value: solicitacao.cliente_nome },
+    solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
+    solicitacao.numero_conteiner ? { icon: <Package className="h-4 w-4" />, label: "Contêiner", value: solicitacao.numero_conteiner } : null,
+    { icon: <Calendar className="h-4 w-4" />, label: getDateLabel(), value: getDateValue() !== "—" ? getDateValue() : null },
+    solicitacao.tipo_carga ? { icon: <Package className="h-4 w-4" />, label: "Tipo de Carga", value: formattedTipoCarga } : null,
+    solicitacao.tipo_operacao ? { icon: <FileText className="h-4 w-4" />, label: "Serviço Adicional", value: solicitacao.tipo_operacao } : null,
+  ].filter(Boolean) as { icon: React.ReactNode; label: string; value: string }[];
+
   return (
     <>
       <Card className="border-0 shadow-lg">
@@ -329,24 +336,20 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
             <CardTitle className="text-lg font-bold text-foreground">
               Protocolo: {solicitacao.protocolo}
             </CardTitle>
-            <StatusBadge status={solicitacao.status} />
+            <div className="flex items-center gap-2">
+              <StatusBadge status={solicitacao.status} />
+              <Button variant="outline" size="sm" onClick={() => downloadProcessoPdf(solicitacao)} title="Baixar PDF">
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InfoItem icon={<User className="h-4 w-4" />} label="Cliente" value={solicitacao.cliente_nome} />
-            <InfoItem icon={<FileText className="h-4 w-4" />} label="LPCO" value={solicitacao.lpco || "—"} />
-            <InfoItem icon={<Package className="h-4 w-4" />} label="Contêiner" value={solicitacao.numero_conteiner || "—"} />
-            <InfoItem icon={<Calendar className="h-4 w-4" />} label={getDateLabel()} value={getDateValue()} />
+            {infoItems.map((item, i) => (
+              <InfoItem key={i} icon={item.icon} label={item.label} value={item.value} />
+            ))}
           </div>
-
-          {solicitacao.tipo_carga && (
-            <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo de Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
-          )}
-
-          {solicitacao.tipo_operacao && (
-            <InfoItem icon={<FileText className="h-4 w-4" />} label="Serviço Adicional" value={solicitacao.tipo_operacao} />
-          )}
 
           {solicitacao.observacoes && (
             <>
@@ -368,8 +371,8 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
             </>
           )}
 
-          {/* Seção de Deferimento - Só aparece com vistoria finalizada */}
-          {vistoriaFinalizada && (
+          {/* Seção de Deferimento - Só aparece para Posicionamento + Exportação + vistoria_finalizada */}
+          {showDeferimento && (
             <>
               <Separator />
               {getDeferimentoStatusSection()}

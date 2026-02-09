@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Link2, ArrowLeft, Plus, Save, Edit, Trash2, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ExcelImportMappings from "@/components/ExcelImportMappings";
 
 interface Integracao {
   id: string;
@@ -442,13 +443,16 @@ const AdminIntegracoes = () => {
 
         {/* ============= FIELD MAPPINGS ============= */}
         <TabsContent value="mappings">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
               <CardTitle>Mapeamento de Campos ({fieldMappings.length})</CardTitle>
-              <Button onClick={() => openMappingDialog()}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Mapeamento
-              </Button>
+              <div className="flex gap-2 items-center">
+                <ExcelImportMappings onImported={fetchData} />
+                <Button onClick={() => openMappingDialog()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Mapeamento
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="bg-muted/50 p-4 rounded-lg mb-4 text-sm">

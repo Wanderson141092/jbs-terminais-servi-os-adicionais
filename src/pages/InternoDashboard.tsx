@@ -348,6 +348,11 @@ const InternoDashboard = () => {
                     Serviços
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/admins")}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Administradores CPF
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("/interno/admin/logs")}>
                     <FileText className="h-4 w-4 mr-2" />
                     Histórico (Logs)
@@ -355,6 +360,10 @@ const InternoDashboard = () => {
                   <DropdownMenuItem onClick={() => navigate("/interno/admin/integracoes")}>
                     <Link2 className="h-4 w-4 mr-2" />
                     Integrações
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/historico-integracoes")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Histórico Integrações
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

@@ -440,9 +440,9 @@ const AdminParametros = () => {
             <Globe className="h-4 w-4" />
             Página Externa
           </TabsTrigger>
-          <TabsTrigger value="visualizacao" className="flex items-center gap-2">
+          <TabsTrigger value="pagina-interna" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
-            Visualização
+            Página Interna
           </TabsTrigger>
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -488,14 +488,45 @@ const AdminParametros = () => {
                   </Button>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div className="border-t pt-4">
-                <h3 className="font-semibold mb-3">Regras de Roteamento (Subcritérios de Visualização)</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+        {/* ============= PÁGINA INTERNA ============= */}
+        <TabsContent value="pagina-interna">
+          <div className="space-y-6">
+            {/* Visualização de anexos - agora está em Serviços */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="h-5 w-5" />
+                  Visualização de Anexos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  A configuração de anexos embutidos ou botão visualizar agora é definida <strong>por serviço</strong>.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Acesse <Button variant="link" className="p-0 h-auto" onClick={() => navigate("/interno/admin/servicos")}>Serviços</Button> para configurar como os anexos são exibidos em cada serviço.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Regras de Roteamento */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="h-5 w-5" />
+                  Regras de Roteamento (Subcritérios de Visualização)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
                   Defina quais setores devem ser notificados para atuar em processos com base em critérios específicos.
                 </p>
                 
-                <div className="flex justify-end mb-3">
+                <div className="flex justify-end">
                   <Button onClick={() => openRoutingDialog()}>
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar Regra
@@ -560,48 +591,9 @@ const AdminParametros = () => {
                     )}
                   </TableBody>
                 </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ============= VISUALIZAÇÃO ============= */}
-        <TabsContent value="visualizacao">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="h-5 w-5" />
-                Configurações de Visualização
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Configure como os anexos e documentos são exibidos na análise.
-              </p>
-
-              {pageConfigs.filter(c => c.config_key.includes('visualizacao')).map(config => (
-                <div key={config.id} className="flex items-center justify-between border rounded-lg p-4">
-                  <div>
-                    <p className="font-medium">{config.description || config.config_key}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {config.config_value === 'true' ? 'Visualização embutida direto na tela' : 'Botão para visualizar'}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={config.config_value === 'true'}
-                    onCheckedChange={async (checked) => {
-                      await supabase
-                        .from("page_config")
-                        .update({ config_value: checked ? 'true' : 'false' })
-                        .eq("id", config.id);
-                      toast.success("Configuração atualizada!");
-                      fetchAllData();
-                    }}
-                  />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ============= REGRAS DE SERVIÇO ============= */}

@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ClipboardList, ArrowLeft, Plus, Save, Edit, Trash2 } from "lucide-react";
+import { ClipboardList, ArrowLeft, Plus, Save, Edit, Trash2, Calendar, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Servico {
@@ -17,7 +20,17 @@ interface Servico {
   codigo_prefixo: string;
   descricao: string | null;
   ativo: boolean;
+  tipo_agendamento: string | null;
+  anexos_embutidos: boolean | null;
+  status_confirmacao_lancamento?: string[];
 }
+
+const STATUS_OPTIONS = [
+  { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
+  { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
+  { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
+  { value: "nao_vistoriado", label: "Não Vistoriado" },
+];
 
 const AdminServicos = () => {
   const navigate = useNavigate();
@@ -28,7 +41,10 @@ const AdminServicos = () => {
   const [formData, setFormData] = useState({
     nome: "",
     codigo_prefixo: "",
-    descricao: ""
+    descricao: "",
+    tipo_agendamento: "none",
+    anexos_embutidos: true,
+    status_confirmacao_lancamento: [] as string[]
   });
 
   useEffect(() => {
@@ -73,6 +89,24 @@ const AdminServicos = () => {
     fetchServicos();
   };
 
+  const handleToggleAnexos = async (servico: Servico) => {
+    const { error } = await supabase
+      .from("servicos")
+      .update({ 
+        anexos_embutidos: !servico.anexos_embutidos, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", servico.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar visualização de anexos");
+      return;
+    }
+
+    toast.success(servico.anexos_embutidos ? "Anexos: Botão visualizar" : "Anexos: Embutidos na tela");
+    fetchServicos();
+  };
+
   const handleDelete = async (servico: Servico) => {
     const hasRecords = await checkHasRecords(servico.nome);
     
@@ -106,6 +140,8 @@ const AdminServicos = () => {
       return;
     }
 
+    const tipoAgendamento = formData.tipo_agendamento === "none" ? null : formData.tipo_agendamento;
+
     if (editingServico) {
       const { error } = await supabase
         .from("servicos")
@@ -113,6 +149,9 @@ const AdminServicos = () => {
           nome: formData.nome,
           codigo_prefixo: formData.codigo_prefixo.toUpperCase(),
           descricao: formData.descricao || null,
+          tipo_agendamento: tipoAgendamento,
+          anexos_embutidos: formData.anexos_embutidos,
+          status_confirmacao_lancamento: formData.status_confirmacao_lancamento,
           updated_at: new Date().toISOString()
         })
         .eq("id", editingServico.id);
@@ -128,7 +167,10 @@ const AdminServicos = () => {
         .insert({
           nome: formData.nome,
           codigo_prefixo: formData.codigo_prefixo.toUpperCase(),
-          descricao: formData.descricao || null
+          descricao: formData.descricao || null,
+          tipo_agendamento: tipoAgendamento,
+          anexos_embutidos: formData.anexos_embutidos,
+          status_confirmacao_lancamento: formData.status_confirmacao_lancamento
         });
 
       if (error) {
@@ -140,7 +182,14 @@ const AdminServicos = () => {
 
     setShowDialog(false);
     setEditingServico(null);
-    setFormData({ nome: "", codigo_prefixo: "", descricao: "" });
+    setFormData({ 
+      nome: "", 
+      codigo_prefixo: "", 
+      descricao: "", 
+      tipo_agendamento: "none",
+      anexos_embutidos: true,
+      status_confirmacao_lancamento: []
+    });
     fetchServicos();
   };
 
@@ -149,9 +198,28 @@ const AdminServicos = () => {
     setFormData({
       nome: servico.nome,
       codigo_prefixo: servico.codigo_prefixo,
-      descricao: servico.descricao || ""
+      descricao: servico.descricao || "",
+      tipo_agendamento: servico.tipo_agendamento || "none",
+      anexos_embutidos: servico.anexos_embutidos ?? true,
+      status_confirmacao_lancamento: servico.status_confirmacao_lancamento || []
     });
     setShowDialog(true);
+  };
+
+  const toggleStatusConfirmacao = (status: string) => {
+    setFormData(prev => ({
+      ...prev,
+      status_confirmacao_lancamento: prev.status_confirmacao_lancamento.includes(status)
+        ? prev.status_confirmacao_lancamento.filter(s => s !== status)
+        : [...prev.status_confirmacao_lancamento, status]
+    }));
+  };
+
+  const getAgendamentoLabel = (tipo: string | null) => {
+    if (!tipo) return "—";
+    if (tipo === "data") return "Data (DD/MM/AAAA)";
+    if (tipo === "data_horario") return "Data e Horário";
+    return "—";
   };
 
   if (loading) {
@@ -179,7 +247,14 @@ const AdminServicos = () => {
           setShowDialog(open);
           if (!open) {
             setEditingServico(null);
-            setFormData({ nome: "", codigo_prefixo: "", descricao: "" });
+            setFormData({ 
+              nome: "", 
+              codigo_prefixo: "", 
+              descricao: "",
+              tipo_agendamento: "none",
+              anexos_embutidos: true,
+              status_confirmacao_lancamento: []
+            });
           }
         }}>
           <DialogTrigger asChild>
@@ -188,11 +263,11 @@ const AdminServicos = () => {
               Adicionar Serviço
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>{editingServico ? "Editar Serviço" : "Adicionar Serviço"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 mt-4">
+            <div className="space-y-4 mt-4 max-h-[70vh] overflow-y-auto pr-2">
               <div>
                 <Label>Nome do Serviço</Label>
                 <Input
@@ -222,6 +297,67 @@ const AdminServicos = () => {
                   placeholder="Descrição do serviço"
                 />
               </div>
+
+              <div className="border-t pt-4">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Agendamento
+                </Label>
+                <Select 
+                  value={formData.tipo_agendamento} 
+                  onValueChange={(v) => setFormData({ ...formData, tipo_agendamento: v })}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Tipo de agendamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não (usar data de solicitação)</SelectItem>
+                    <SelectItem value="data">Sim - Somente Data (DD/MM/AAAA)</SelectItem>
+                    <SelectItem value="data_horario">Sim - Data e Horário (DD/MM/AAAA - hh:mm)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.tipo_agendamento === "none" && "Processos usarão a coluna 'Data Solicitação'"}
+                  {formData.tipo_agendamento === "data" && "Posicionamento: usa campo 'Data Posicionamento'"}
+                  {formData.tipo_agendamento === "data_horario" && "Agendamentos: usa campo 'Data Agendamento' com hora"}
+                </p>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Visualização de Anexos
+                </Label>
+                <div className="flex items-center gap-3 mt-2">
+                  <Switch
+                    checked={formData.anexos_embutidos}
+                    onCheckedChange={(c) => setFormData({ ...formData, anexos_embutidos: c })}
+                  />
+                  <span className="text-sm">
+                    {formData.anexos_embutidos ? "Anexos embutidos na tela" : "Botão para visualizar"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label>Status para Confirmação de Lançamento ($)</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Selecione os status que acionam o alerta de lançamento pendente
+                </p>
+                <div className="space-y-2">
+                  {STATUS_OPTIONS.map(opt => (
+                    <div key={opt.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={opt.value}
+                        checked={formData.status_confirmacao_lancamento.includes(opt.value)}
+                        onCheckedChange={() => toggleStatusConfirmacao(opt.value)}
+                      />
+                      <Label htmlFor={opt.value} className="cursor-pointer text-sm">{opt.label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <Button onClick={handleSave} className="w-full">
                 <Save className="h-4 w-4 mr-2" />
                 {editingServico ? "Salvar Alterações" : "Adicionar"}
@@ -241,7 +377,8 @@ const AdminServicos = () => {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Prefixo</TableHead>
-                <TableHead>Descrição</TableHead>
+                <TableHead>Agendamento</TableHead>
+                <TableHead>Anexos</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
@@ -251,7 +388,25 @@ const AdminServicos = () => {
                 <TableRow key={servico.id} className={!servico.ativo ? "opacity-50" : ""}>
                   <TableCell className="font-medium">{servico.nome}</TableCell>
                   <TableCell className="font-mono">{servico.codigo_prefixo}</TableCell>
-                  <TableCell>{servico.descricao || "—"}</TableCell>
+                  <TableCell>
+                    {servico.tipo_agendamento ? (
+                      <Badge variant="outline" className="text-xs">
+                        {getAgendamentoLabel(servico.tipo_agendamento)}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleToggleAnexos(servico)}
+                      title={servico.anexos_embutidos ? "Clique para: Botão visualizar" : "Clique para: Embutido"}
+                    >
+                      <Eye className={`h-4 w-4 ${servico.anexos_embutidos ? "text-primary" : "text-muted-foreground"}`} />
+                    </Button>
+                  </TableCell>
                   <TableCell>
                     <Switch
                       checked={servico.ativo}

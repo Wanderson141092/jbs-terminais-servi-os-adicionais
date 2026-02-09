@@ -482,6 +482,7 @@ export type Database = {
       }
       servicos: {
         Row: {
+          anexos_embutidos: boolean | null
           ativo: boolean
           codigo_prefixo: string
           created_at: string
@@ -489,9 +490,11 @@ export type Database = {
           id: string
           nome: string
           status_confirmacao_lancamento: string[] | null
+          tipo_agendamento: string | null
           updated_at: string
         }
         Insert: {
+          anexos_embutidos?: boolean | null
           ativo?: boolean
           codigo_prefixo: string
           created_at?: string
@@ -499,9 +502,11 @@ export type Database = {
           id?: string
           nome: string
           status_confirmacao_lancamento?: string[] | null
+          tipo_agendamento?: string | null
           updated_at?: string
         }
         Update: {
+          anexos_embutidos?: boolean | null
           ativo?: boolean
           codigo_prefixo?: string
           created_at?: string
@@ -509,6 +514,7 @@ export type Database = {
           id?: string
           nome?: string
           status_confirmacao_lancamento?: string[] | null
+          tipo_agendamento?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -592,6 +598,7 @@ export type Database = {
           comex_justificativa: string | null
           comex_usuario_id: string | null
           created_at: string
+          data_agendamento: string | null
           data_posicionamento: string | null
           id: string
           lancamento_confirmado: boolean | null
@@ -619,6 +626,7 @@ export type Database = {
           comex_justificativa?: string | null
           comex_usuario_id?: string | null
           created_at?: string
+          data_agendamento?: string | null
           data_posicionamento?: string | null
           id?: string
           lancamento_confirmado?: boolean | null
@@ -646,6 +654,7 @@ export type Database = {
           comex_justificativa?: string | null
           comex_usuario_id?: string | null
           created_at?: string
+          data_agendamento?: string | null
           data_posicionamento?: string | null
           id?: string
           lancamento_confirmado?: boolean | null

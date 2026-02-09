@@ -22,6 +22,7 @@ interface Servico {
   ativo: boolean;
   tipo_agendamento: string | null;
   anexos_embutidos: boolean | null;
+  deferimento_embutidos: boolean | null;
   status_confirmacao_lancamento?: string[];
 }
 
@@ -44,6 +45,7 @@ const AdminServicos = () => {
     descricao: "",
     tipo_agendamento: "none",
     anexos_embutidos: true,
+    deferimento_embutidos: true,
     status_confirmacao_lancamento: [] as string[]
   });
 
@@ -151,6 +153,7 @@ const AdminServicos = () => {
           descricao: formData.descricao || null,
           tipo_agendamento: tipoAgendamento,
           anexos_embutidos: formData.anexos_embutidos,
+          deferimento_embutidos: formData.deferimento_embutidos,
           status_confirmacao_lancamento: formData.status_confirmacao_lancamento,
           updated_at: new Date().toISOString()
         })
@@ -170,6 +173,7 @@ const AdminServicos = () => {
           descricao: formData.descricao || null,
           tipo_agendamento: tipoAgendamento,
           anexos_embutidos: formData.anexos_embutidos,
+          deferimento_embutidos: formData.deferimento_embutidos,
           status_confirmacao_lancamento: formData.status_confirmacao_lancamento
         });
 
@@ -188,6 +192,7 @@ const AdminServicos = () => {
       descricao: "", 
       tipo_agendamento: "none",
       anexos_embutidos: true,
+      deferimento_embutidos: true,
       status_confirmacao_lancamento: []
     });
     fetchServicos();
@@ -201,6 +206,7 @@ const AdminServicos = () => {
       descricao: servico.descricao || "",
       tipo_agendamento: servico.tipo_agendamento || "none",
       anexos_embutidos: servico.anexos_embutidos ?? true,
+      deferimento_embutidos: servico.deferimento_embutidos ?? true,
       status_confirmacao_lancamento: servico.status_confirmacao_lancamento || []
     });
     setShowDialog(true);
@@ -253,6 +259,7 @@ const AdminServicos = () => {
               descricao: "",
               tipo_agendamento: "none",
               anexos_embutidos: true,
+              deferimento_embutidos: true,
               status_confirmacao_lancamento: []
             });
           }
@@ -323,19 +330,38 @@ const AdminServicos = () => {
                 </p>
               </div>
 
-              <div className="border-t pt-4">
+              <div className="border-t pt-4 space-y-4">
                 <Label className="flex items-center gap-2">
                   <Eye className="h-4 w-4" />
-                  Visualização de Anexos
+                  Visualização
                 </Label>
-                <div className="flex items-center gap-3 mt-2">
-                  <Switch
-                    checked={formData.anexos_embutidos}
-                    onCheckedChange={(c) => setFormData({ ...formData, anexos_embutidos: c })}
-                  />
-                  <span className="text-sm">
-                    {formData.anexos_embutidos ? "Anexos embutidos na tela" : "Botão para visualizar"}
-                  </span>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Anexos (Tela de Análise)</span>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={formData.anexos_embutidos}
+                        onCheckedChange={(c) => setFormData({ ...formData, anexos_embutidos: c })}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {formData.anexos_embutidos ? "Embutido" : "Botão"}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Deferimento (Tela de Deferimento)</span>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={formData.deferimento_embutidos}
+                        onCheckedChange={(c) => setFormData({ ...formData, deferimento_embutidos: c })}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {formData.deferimento_embutidos ? "Embutido" : "Botão"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -34,12 +34,14 @@ import { startOfWeek, addDays, format, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import useNotifications from "@/hooks/useNotifications";
+import DeferimentoDialog from "@/components/DeferimentoDialog";
 
 interface Servico {
   id: string;
   nome: string;
   codigo_prefixo: string;
   ativo: boolean;
+  tipo_agendamento: string | null;
   status_confirmacao_lancamento?: string[];
 }
 
@@ -65,6 +67,7 @@ const InternoDashboard = () => {
   const [showBatchApproval, setShowBatchApproval] = useState(false);
   const [showBatchStatus, setShowBatchStatus] = useState(false);
   const [userPerfis, setUserPerfis] = useState<string[]>([]);
+  const [deferimentoSolicitacao, setDeferimentoSolicitacao] = useState<any>(null);
   
   const { isAdmin } = useAdminCheck(user?.id || null);
   
@@ -598,7 +601,7 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground w-[100px]">Ações</TableHead>
                   <TableHead className="text-primary-foreground w-[50px]">$</TableHead>
                   <TableHead className="text-primary-foreground">Protocolo</TableHead>
-                  <TableHead className="text-primary-foreground">Data Posic.</TableHead>
+                  <TableHead className="text-primary-foreground">Data Serviço</TableHead>
                   <TableHead className="text-primary-foreground">Contêiner</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
@@ -648,6 +651,17 @@ const InternoDashboard = () => {
                               title="Reclassificar Aprovação"
                             >
                               <RefreshCw className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {/* Botão Deferimento - só para serviço de Posicionamento */}
+                          {(s.tipo_operacao || "").toLowerCase().includes("posicionamento") && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeferimentoSolicitacao(s)}
+                              title="Deferimento"
+                            >
+                              <FileText className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
@@ -749,6 +763,18 @@ const InternoDashboard = () => {
           onSuccess={() => {
             setShowBatchStatus(false);
             setSelectedIds([]);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
+
+      {/* Deferimento Dialog */}
+      {deferimentoSolicitacao && user && (
+        <DeferimentoDialog
+          solicitacao={deferimentoSolicitacao}
+          userId={user.id}
+          onClose={() => {
+            setDeferimentoSolicitacao(null);
             fetchSolicitacoes();
           }}
         />

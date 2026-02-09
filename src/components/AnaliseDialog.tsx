@@ -43,11 +43,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   useEffect(() => {
     const fetchData = async () => {
-      // Buscar anexos de deferimento
+      // Buscar anexos (tipo 'anexo', não deferimento)
       const { data: attachData } = await supabase
         .from("deferimento_documents")
         .select("*")
-        .eq("solicitacao_id", solicitacao.id);
+        .eq("solicitacao_id", solicitacao.id)
+        .eq("document_type", "anexo");
       setAttachments(attachData || []);
       
       // Buscar configurações do serviço
@@ -199,27 +200,34 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
     
+    // Validação: só permite mudança de status de vistoria se ambos aprovaram
+    const bothApproved = solicitacao.comex_aprovado === true && solicitacao.armazem_aprovado === true;
+    const vistoriaStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
+    
+    if (vistoriaStatuses.includes(selectedStatus) && !bothApproved) {
+      toast.error("Ambos os setores (Administrativo e Operacional) devem aprovar antes de alterar para este status.");
+      return;
+    }
+    
     setLoading(true);
     
-    const updateData: any = {
-      status: selectedStatus,
-      updated_at: new Date().toISOString()
-    };
-    
-    // Map status to vistoria label if needed
+    // Map status to vistoria label
+    let statusVistoria: string | null = null;
     if (selectedStatus === "vistoria_finalizada") {
-      updateData.status_vistoria = "Vistoria Finalizada";
+      statusVistoria = "Vistoria Finalizada";
     } else if (selectedStatus === "vistoriado_com_pendencia") {
-      updateData.status_vistoria = "Vistoriado com Pendência";
+      statusVistoria = "Vistoriado com Pendência";
     } else if (selectedStatus === "nao_vistoriado") {
-      updateData.status_vistoria = "Não Vistoriado";
-    } else if (selectedStatus === "confirmado_aguardando_vistoria") {
-      updateData.status_vistoria = null;
+      statusVistoria = "Não Vistoriado";
     }
     
     const { error } = await supabase
       .from("solicitacoes")
-      .update(updateData)
+      .update({
+        status: selectedStatus,
+        status_vistoria: statusVistoria,
+        updated_at: new Date().toISOString()
+      })
       .eq("id", solicitacao.id);
 
     if (error) {
@@ -229,7 +237,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
     
     const statusLabel = STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label || selectedStatus;
-    await logAudit("status", `Status atualizado para: ${statusLabel}`);
+    await logAudit("status_atualizado", `Status atualizado para: ${statusLabel}`);
     await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
     
     toast.success("Status atualizado com sucesso!");
@@ -561,8 +569,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {/* Anexos - Separado de Deferimento */}
-            {solicitacao.status === "vistoria_finalizada" && attachments.length > 0 && (
+            {/* Anexos - Separados do Deferimento */}
+            {attachments.length > 0 && (
               <>
                 <Separator />
                 <div className="space-y-3">
@@ -571,111 +579,52 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     Anexos
                   </p>
                   <div className="space-y-2">
-                    {attachments.map((att) => (
-                      <div key={att.id} className="border rounded-lg p-3 flex items-center justify-between">
-                        <span className="text-sm">{att.file_name}</span>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            Visualizar
-                          </Button>
-                          <Button variant="ghost" size="sm" asChild>
-                            <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
-                              <Download className="h-4 w-4 mr-1" />
-                              Baixar
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Deferimento - Somente para Posicionamento e quando há anexos */}
-            {hasDeferimento && attachments.length > 0 && solicitacao.status !== "vistoria_finalizada" && (
-              <>
-                <Separator />
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Deferimento
-                  </p>
-                  <div className="space-y-4">
-                    {attachments.map((att) => (
-                      <div key={att.id} className="border rounded-lg p-3 space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
+                    {showEmbeddedPreview ? (
+                      attachments.map((att) => (
+                        <div key={att.id} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">{att.file_name}</span>
-                            {getDeferimentoStatusBadge(att.status)}
-                          </div>
-                          <div className="flex gap-2">
-                            {(!att.status || att.status === 'pendente') && (
-                              <>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-green-600 border-green-300"
-                                  onClick={() => handleDeferimentoDecision(att.id, true)}
-                                  disabled={loading}
-                                >
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Aceitar
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-red-600 border-red-300"
-                                  onClick={() => setShowDeferimentoAction(att.id)}
-                                  disabled={loading}
-                                >
-                                  <X className="h-4 w-4 mr-1" />
-                                  Recusar
-                                </Button>
-                              </>
-                            )}
                             <Button variant="ghost" size="sm" asChild>
                               <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4 mr-1" />
-                                Baixar
+                                <Download className="h-4 w-4" />
                               </a>
                             </Button>
                           </div>
-                        </div>
-                        
-                        {/* Preview embutido ou botão conforme configuração do serviço */}
-                        {showEmbeddedPreview ? (
                           <div className="bg-muted/30 rounded overflow-hidden">
                             {att.file_url.toLowerCase().endsWith('.pdf') ? (
                               <iframe 
                                 src={att.file_url} 
-                                className="w-full h-[300px]" 
+                                className="w-full h-[250px]" 
                                 title={att.file_name}
                               />
                             ) : (
                               <img 
                                 src={att.file_url} 
                                 alt={att.file_name} 
-                                className="max-w-full max-h-[300px] mx-auto"
+                                className="max-w-full max-h-[250px] mx-auto"
                               />
                             )}
                           </div>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            Visualizar
-                          </Button>
-                        )}
-
-                        {/* Motivo de recusa se recusado */}
-                        {att.status === 'recusado' && att.motivo_recusa && (
-                          <div className="bg-red-50 rounded p-2 text-sm text-red-600">
-                            <strong>Motivo:</strong> {att.motivo_recusa}
+                        </div>
+                      ))
+                    ) : (
+                      attachments.map((att) => (
+                        <div key={att.id} className="border rounded-lg p-3 flex items-center justify-between">
+                          <span className="text-sm">{att.file_name}</span>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
+                              <Eye className="h-4 w-4 mr-1" />
+                              Visualizar
+                            </Button>
+                            <Button variant="ghost" size="sm" asChild>
+                              <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </Button>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </>

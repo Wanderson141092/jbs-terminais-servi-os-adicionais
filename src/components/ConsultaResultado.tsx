@@ -18,6 +18,7 @@ interface Solicitacao {
   cliente_nome: string;
   cliente_email: string;
   data_posicionamento: string | null;
+  data_agendamento: string | null;
   tipo_carga: string | null;
   tipo_operacao: string | null;
   observacoes: string | null;
@@ -35,6 +36,10 @@ interface DeferimentoDocument {
   created_at: string;
 }
 
+interface ServicoConfig {
+  tipo_agendamento: string | null;
+}
+
 interface ConsultaResultadoProps {
   solicitacao: Solicitacao;
   onRefresh: () => void;
@@ -46,6 +51,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loadingDocs, setLoadingDocs] = useState(true);
+  const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
 
   // Verificar se já existe um documento de deferimento
   useEffect(() => {
@@ -55,6 +61,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
         .from("deferimento_documents")
         .select("*")
         .eq("solicitacao_id", solicitacao.id)
+        .eq("document_type", "deferimento")
         .order("created_at", { ascending: false })
         .limit(1);
 
@@ -66,8 +73,19 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       setLoadingDocs(false);
     };
 
+    const fetchServicoConfig = async () => {
+      const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
+      const { data } = await supabase
+        .from("servicos")
+        .select("tipo_agendamento")
+        .eq("nome", tipoOperacao)
+        .maybeSingle();
+      setServicoConfig(data);
+    };
+
     fetchExistingDoc();
-  }, [solicitacao.id]);
+    fetchServicoConfig();
+  }, [solicitacao.id, solicitacao.tipo_operacao]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -248,6 +266,32 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     return null;
   };
 
+  // Determina o label de data baseado no serviço
+  const isPositionamento = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
+  const isAgendamento = servicoConfig?.tipo_agendamento === "data_horario";
+
+  const getDateLabel = () => {
+    if (isPositionamento) return "Posicionar dia";
+    if (isAgendamento) return "Agendar para";
+    return "Data do serviço";
+  };
+
+  const getDateValue = () => {
+    if (isAgendamento && solicitacao.data_agendamento) {
+      return new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+    if (solicitacao.data_posicionamento) {
+      return new Date(solicitacao.data_posicionamento + 'T00:00:00').toLocaleDateString("pt-BR");
+    }
+    return "—";
+  };
+
   return (
     <>
       <Card className="border-0 shadow-lg">
@@ -264,7 +308,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
             <InfoItem icon={<User className="h-4 w-4" />} label="Cliente" value={solicitacao.cliente_nome} />
             <InfoItem icon={<FileText className="h-4 w-4" />} label="LPCO" value={solicitacao.lpco || "—"} />
             <InfoItem icon={<Package className="h-4 w-4" />} label="Contêiner" value={solicitacao.numero_conteiner || "—"} />
-            <InfoItem icon={<Calendar className="h-4 w-4" />} label="Data Posicionamento" value={solicitacao.data_posicionamento || "—"} />
+            <InfoItem icon={<Calendar className="h-4 w-4" />} label={getDateLabel()} value={getDateValue()} />
           </div>
 
           {solicitacao.tipo_carga && (
@@ -272,7 +316,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
           )}
 
           {solicitacao.tipo_operacao && (
-            <InfoItem icon={<FileText className="h-4 w-4" />} label="Tipo de Operação" value={solicitacao.tipo_operacao} />
+            <InfoItem icon={<FileText className="h-4 w-4" />} label="Serviço Adicional" value={solicitacao.tipo_operacao} />
           )}
 
           {solicitacao.observacoes && (

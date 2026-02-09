@@ -361,7 +361,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {/* Anexos */}
+            {/* Anexos - Visualização embutida */}
             <Separator />
             <div className="space-y-3">
               <p className="text-sm font-semibold flex items-center gap-2">
@@ -371,19 +371,33 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               {attachments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum anexo disponível</p>
               ) : (
-                <div className="grid gap-2">
+                <div className="space-y-4">
                   {attachments.map((att) => (
-                    <div key={att.id} className="flex items-center justify-between p-2 border rounded">
-                      <span className="text-sm">{att.file_name}</span>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                    <div key={att.id} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{att.file_name}</span>
                         <Button variant="ghost" size="sm" asChild>
                           <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4" />
+                            <Download className="h-4 w-4 mr-1" />
+                            Baixar
                           </a>
                         </Button>
+                      </div>
+                      {/* Preview embutido */}
+                      <div className="bg-muted/30 rounded overflow-hidden">
+                        {att.file_url.toLowerCase().endsWith('.pdf') ? (
+                          <iframe 
+                            src={att.file_url} 
+                            className="w-full h-[300px]" 
+                            title={att.file_name}
+                          />
+                        ) : (
+                          <img 
+                            src={att.file_url} 
+                            alt={att.file_name} 
+                            className="max-w-full max-h-[300px] mx-auto"
+                          />
+                        )}
                       </div>
                     </div>
                   ))}

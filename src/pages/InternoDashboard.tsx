@@ -22,6 +22,7 @@ import StatusBadge, { STATUS_LABELS } from "@/components/StatusBadge";
 import AnaliseDialog from "@/components/AnaliseDialog";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import ReclassificacaoDialog from "@/components/ReclassificacaoDialog";
+import SetorSelector from "@/components/SetorSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
@@ -53,6 +54,7 @@ const InternoDashboard = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [servicos, setServicos] = useState<Servico[]>([]);
+  const [showSetorSelector, setShowSetorSelector] = useState(false);
   
   const { isAdmin } = useAdminCheck(user?.id || null);
 
@@ -139,9 +141,30 @@ const InternoDashboard = () => {
     navigate("/interno");
   };
 
-  // Admin NÃO precisa selecionar setor - vai direto para dashboard
-  // Não-admin sem setor precisa configurar (isso será gerenciado pelo admin agora)
-  // A tela de SetorSelector não aparece mais para Admin
+  // Verifica se precisa mostrar SetorSelector:
+  // - Não é admin
+  // - Profile existe mas não tem setor definido
+  // - Email é do domínio @jbsterminais.com.br
+  useEffect(() => {
+    if (profile && !isAdmin && !profile.setor && profile.email?.endsWith("@jbsterminais.com.br")) {
+      setShowSetorSelector(true);
+    } else {
+      setShowSetorSelector(false);
+    }
+  }, [profile, isAdmin]);
+
+  // Se precisa configurar setor, mostra SetorSelector
+  if (showSetorSelector && user) {
+    return (
+      <SetorSelector 
+        userId={user.id} 
+        onComplete={() => {
+          setShowSetorSelector(false);
+          fetchProfile();
+        }} 
+      />
+    );
+  }
 
   // Week days for dashboard
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeekStart, i));
@@ -404,14 +427,14 @@ const InternoDashboard = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-primary text-primary-foreground">
+                  <TableHead className="text-primary-foreground w-[100px]">Ações</TableHead>
                   <TableHead className="text-primary-foreground">Protocolo</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Contêiner</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
-                  <TableHead className="text-primary-foreground">Administrativo</TableHead>
+                  <TableHead className="text-primary-foreground">Administrativa</TableHead>
                   <TableHead className="text-primary-foreground">Operacional</TableHead>
                   <TableHead className="text-primary-foreground">Data</TableHead>
-                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -430,19 +453,6 @@ const InternoDashboard = () => {
                 ) : (
                   filtered.map((s) => (
                     <TableRow key={s.id} className="hover:bg-muted/30">
-                      <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
-                      <TableCell className="text-sm">{s.cliente_nome}</TableCell>
-                      <TableCell className="text-sm font-mono">{s.numero_conteiner || "—"}</TableCell>
-                      <TableCell><StatusBadge status={s.status} /></TableCell>
-                      <TableCell>
-                        <ApprovalIndicator approved={s.comex_aprovado} />
-                      </TableCell>
-                      <TableCell>
-                        <ApprovalIndicator approved={s.armazem_aprovado} />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {s.data_posicionamento || "—"}
-                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
@@ -465,6 +475,19 @@ const InternoDashboard = () => {
                             </Button>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
+                      <TableCell className="text-sm">{s.cliente_nome}</TableCell>
+                      <TableCell className="text-sm font-mono">{s.numero_conteiner || "—"}</TableCell>
+                      <TableCell><StatusBadge status={s.status} /></TableCell>
+                      <TableCell>
+                        <ApprovalIndicator approved={s.comex_aprovado} />
+                      </TableCell>
+                      <TableCell>
+                        <ApprovalIndicator approved={s.armazem_aprovado} />
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {s.data_posicionamento || "—"}
                       </TableCell>
                     </TableRow>
                   ))
@@ -494,10 +517,11 @@ const InternoDashboard = () => {
       )}
 
       {/* Reclassificação Dialog */}
-      {reclassificacaoSolicitacao && user && (
+      {reclassificacaoSolicitacao && user && profile && (
         <ReclassificacaoDialog
           solicitacao={reclassificacaoSolicitacao}
           userId={user.id}
+          userSetor={profile.setor}
           isAdmin={isAdmin}
           onClose={() => {
             setReclassificacaoSolicitacao(null);

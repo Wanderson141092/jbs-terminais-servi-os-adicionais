@@ -52,6 +52,7 @@ const InternoDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [tipoServicoFilter, setTipoServicoFilter] = useState("Todos");
+  const [lancamentoFilter, setLancamentoFilter] = useState<"all" | "pendente" | "confirmado">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<any>(null);
   const [reclassificacaoSolicitacao, setReclassificacaoSolicitacao] = useState<any>(null);
@@ -195,7 +196,24 @@ const InternoDashboard = () => {
       (s.lpco && s.lpco.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (s.numero_conteiner && s.numero_conteiner.toLowerCase().includes(searchTerm.toLowerCase())) ||
       s.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesTipo && matchesSearch;
+    
+    // Filtro de lançamento
+    let matchesLancamento = true;
+    if (lancamentoFilter !== "all") {
+      const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+      if (!servico?.status_confirmacao_lancamento?.length) {
+        matchesLancamento = false;
+      } else {
+        const needsLaunch = servico.status_confirmacao_lancamento.includes(s.status);
+        if (lancamentoFilter === "pendente") {
+          matchesLancamento = needsLaunch && !s.lancamento_confirmado;
+        } else if (lancamentoFilter === "confirmado") {
+          matchesLancamento = needsLaunch && s.lancamento_confirmado === true;
+        }
+      }
+    }
+    
+    return matchesStatus && matchesTipo && matchesSearch && matchesLancamento;
   });
 
   const statusCounts = filtered.reduce((acc: Record<string, number>, s) => {
@@ -489,7 +507,7 @@ const InternoDashboard = () => {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[220px]">
+                <SelectTrigger className="w-[200px]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filtrar por status" />
                 </SelectTrigger>
@@ -498,6 +516,17 @@ const InternoDashboard = () => {
                   {Object.entries(STATUS_LABELS).map(([key, label]) => (
                     <SelectItem key={key} value={key}>{label}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={lancamentoFilter} onValueChange={(v) => setLancamentoFilter(v as any)}>
+                <SelectTrigger className="w-[180px]">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Lançamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pendente">Lançamento Pendente</SelectItem>
+                  <SelectItem value="confirmado">Lançamento Confirmado</SelectItem>
                 </SelectContent>
               </Select>
               <Button variant="outline" size="sm" onClick={fetchSolicitacoes}>
@@ -538,8 +567,8 @@ const InternoDashboard = () => {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-primary text-primary-foreground">
-                  <TableHead className="text-primary-foreground w-[40px]">
+                <TableRow className="bg-primary text-primary-foreground pointer-events-none">
+                  <TableHead className="text-primary-foreground w-[40px] pointer-events-auto">
                     <Checkbox
                       checked={selectedIds.length === filtered.length && filtered.length > 0}
                       onCheckedChange={() => toggleSelectAll()}
@@ -549,12 +578,13 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground w-[100px]">Ações</TableHead>
                   <TableHead className="text-primary-foreground w-[50px]">$</TableHead>
                   <TableHead className="text-primary-foreground">Protocolo</TableHead>
-                  <TableHead className="text-primary-foreground">Cliente</TableHead>
+                  <TableHead className="text-primary-foreground">Data Posic.</TableHead>
                   <TableHead className="text-primary-foreground">Contêiner</TableHead>
+                  <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
                   <TableHead className="text-primary-foreground">Administrativa</TableHead>
                   <TableHead className="text-primary-foreground">Operacional</TableHead>
-                  <TableHead className="text-primary-foreground">Data</TableHead>
+                  <TableHead className="text-primary-foreground">Data Solic.</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -616,8 +646,13 @@ const InternoDashboard = () => {
                         ) : null}
                       </TableCell>
                       <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
-                      <TableCell className="text-sm">{s.cliente_nome}</TableCell>
+                      <TableCell className="text-sm">
+                        {s.data_posicionamento 
+                          ? new Date(s.data_posicionamento + 'T00:00:00').toLocaleDateString("pt-BR")
+                          : "—"}
+                      </TableCell>
                       <TableCell className="text-sm font-mono">{s.numero_conteiner || "—"}</TableCell>
+                      <TableCell className="text-sm">{s.cliente_nome}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
                       <TableCell>
                         <ApprovalIndicator approved={s.comex_aprovado} />
@@ -626,7 +661,7 @@ const InternoDashboard = () => {
                         <ApprovalIndicator approved={s.armazem_aprovado} />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {s.data_posicionamento || "—"}
+                        {new Date(s.created_at).toLocaleDateString("pt-BR")}
                       </TableCell>
                     </TableRow>
                   ))

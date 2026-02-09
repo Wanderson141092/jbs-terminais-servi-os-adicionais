@@ -607,7 +607,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
-      setor_tipo: "COMEX" | "ARMAZEM"
+      setor_tipo:
+        | "COMEX"
+        | "ARMAZEM"
+        | "ADMINISTRATIVO"
+        | "OPERACIONAL"
+        | "MASTER"
       status_solicitacao:
         | "aguardando_confirmacao"
         | "cancelado"
@@ -744,7 +749,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      setor_tipo: ["COMEX", "ARMAZEM"],
+      setor_tipo: [
+        "COMEX",
+        "ARMAZEM",
+        "ADMINISTRATIVO",
+        "OPERACIONAL",
+        "MASTER",
+      ],
       status_solicitacao: [
         "aguardando_confirmacao",
         "cancelado",

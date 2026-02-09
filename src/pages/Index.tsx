@@ -14,64 +14,67 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = useCallback(async (tipo: string, valor: string) => {
+  // Recebe servicoId (id do serviço) e valor (protocolo/conteiner/lpco)
+  const handleSearch = useCallback(async (servicoId: string, valor: string) => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      let data = null;
-      let error = null;
+      // Primeiro buscar o nome do serviço para filtrar tipo_operacao
+      const { data: servicoData } = await supabase
+        .from("servicos")
+        .select("nome")
+        .eq("id", servicoId)
+        .single();
 
-      if (tipo === "todos") {
-        // Busca em todos os campos
-        const resultProtocolo = await supabase
+      if (!servicoData) {
+        toast.error("Serviço não encontrado.");
+        setResultado(null);
+        setIsLoading(false);
+        return;
+      }
+
+      const tipoOperacao = servicoData.nome;
+      const valorUpper = valor.toUpperCase().trim();
+
+      // Tentar buscar por protocolo
+      let { data, error } = await supabase
+        .from("solicitacoes")
+        .select("*")
+        .eq("protocolo", valorUpper)
+        .eq("tipo_operacao", tipoOperacao)
+        .maybeSingle();
+
+      if (!data && !error) {
+        // Tentar por número de contêiner
+        const resultContainer = await supabase
           .from("solicitacoes")
           .select("*")
-          .eq("protocolo", valor)
+          .eq("numero_conteiner", valorUpper)
+          .eq("tipo_operacao", tipoOperacao)
           .maybeSingle();
         
-        if (resultProtocolo.data) {
-          data = resultProtocolo.data;
-        } else {
-          const resultLpco = await supabase
-            .from("solicitacoes")
-            .select("*")
-            .eq("lpco", valor)
-            .maybeSingle();
-          
-          if (resultLpco.data) {
-            data = resultLpco.data;
-          } else {
-            const resultConteiner = await supabase
-              .from("solicitacoes")
-              .select("*")
-              .eq("numero_conteiner", valor)
-              .maybeSingle();
-            
-            data = resultConteiner.data;
-            error = resultConteiner.error;
-          }
-        }
-      } else {
-        let query = supabase.from("solicitacoes").select("*");
+        data = resultContainer.data;
+        error = resultContainer.error;
+      }
 
-        if (tipo === "protocolo") {
-          query = query.eq("protocolo", valor);
-        } else if (tipo === "lpco") {
-          query = query.eq("lpco", valor);
-        } else {
-          query = query.eq("numero_conteiner", valor);
-        }
-
-        const result = await query.maybeSingle();
-        data = result.data;
-        error = result.error;
+      if (!data && !error) {
+        // Tentar por LPCO
+        const resultLpco = await supabase
+          .from("solicitacoes")
+          .select("*")
+          .eq("lpco", valorUpper)
+          .eq("tipo_operacao", tipoOperacao)
+          .maybeSingle();
+        
+        data = resultLpco.data;
+        error = resultLpco.error;
       }
 
       if (error) throw error;
       setResultado(data);
 
       if (!data) {
-        toast.info("Nenhuma solicitação encontrada com os dados informados.");
+        toast.info("Nenhuma solicitação encontrada para este serviço com os dados informados.");
       }
     } catch (err: any) {
       toast.error("Erro na consulta: " + err.message);
@@ -153,7 +156,7 @@ const Index = () => {
             {!isLoading && resultado && (
               <ConsultaResultado
                 solicitacao={resultado}
-                onRefresh={() => handleSearch("protocolo", resultado.protocolo)}
+                onRefresh={() => handleSearch(resultado.tipo_operacao, resultado.protocolo)}
               />
             )}
 

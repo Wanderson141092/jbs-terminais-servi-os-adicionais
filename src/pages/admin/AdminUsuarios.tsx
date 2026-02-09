@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, ArrowLeft, Save, Shield, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
+import { Users, ArrowLeft, Save, Shield, Edit, Trash2, Ban, CheckCircle, Plus, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Profile {
@@ -44,8 +44,18 @@ const AdminUsuarios = () => {
   const [loading, setLoading] = useState(true);
   const [changes, setChanges] = useState<Record<string, string>>({});
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
-  const [editFormData, setEditFormData] = useState({ nome: "" });
+  const [editFormData, setEditFormData] = useState({ nome: "", email: "" });
   const [showEditDialog, setShowEditDialog] = useState(false);
+  
+  // Criar usuário
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createFormData, setCreateFormData] = useState({ nome: "", email: "", senha: "" });
+  const [createLoading, setCreateLoading] = useState(false);
+  
+  // Alterar senha Admin
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordData, setPasswordData] = useState({ senhaAtual: "", novaSenha: "", confirmarSenha: "" });
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -58,7 +68,16 @@ const AdminUsuarios = () => {
       supabase.from("user_roles").select("user_id, role")
     ]);
 
-    if (profilesRes.data) setProfiles(profilesRes.data);
+    if (profilesRes.data) {
+      // Remover duplicados por email
+      const uniqueProfiles = profilesRes.data.reduce((acc: Profile[], profile) => {
+        if (!acc.find(p => p.email === profile.email)) {
+          acc.push(profile);
+        }
+        return acc;
+      }, []);
+      setProfiles(uniqueProfiles);
+    }
     if (setoresRes.data) setSetores(setoresRes.data);
     if (rolesRes.data) setUserRoles(rolesRes.data);
     setLoading(false);
@@ -67,22 +86,23 @@ const AdminUsuarios = () => {
   const isAdmin = (userId: string) => userRoles.some(r => r.user_id === userId && r.role === "admin");
   
   const isAdminMaster = (profile: Profile) => {
-    // O admin master é o primeiro admin criado - identificamos pelo email ou pelo primeiro admin
+    if (profile.email === ADMIN_MASTER_EMAIL) return true;
     const adminUsers = profiles.filter(p => isAdmin(p.id));
     if (adminUsers.length === 0) return false;
-    
-    // Se tem email específico de admin, é o master
-    if (profile.email === ADMIN_MASTER_EMAIL) return true;
-    
-    // Ou é o admin mais antigo
     const sortedAdmins = adminUsers.sort((a, b) => 
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
     return sortedAdmins[0]?.id === profile.id;
   };
 
+  // Verifica se é usuário criado internamente (não via Microsoft)
+  const isInternalUser = (profile: Profile) => {
+    // Usuário interno: criado pela plataforma (pode ter sido criado manualmente)
+    // Usuário Microsoft: tem email @jbsterminais.com.br mas não é o admin
+    return profile.email === ADMIN_MASTER_EMAIL || !profile.email.includes("@");
+  };
+
   const handleSetorChange = (profileId: string, emailSetor: string) => {
-    // Admin não precisa de setor
     if (isAdmin(profileId)) {
       toast.info("Administradores não precisam de setor - têm acesso a tudo");
       return;
@@ -98,7 +118,7 @@ const AdminUsuarios = () => {
         .from("profiles")
         .update({ 
           email_setor: emailSetor,
-          setor: (setorInfo?.setor || null) as "COMEX" | "ARMAZEM" | null,
+          setor: (setorInfo?.setor || null) as any,
           updated_at: new Date().toISOString()
         })
         .eq("id", profileId);
@@ -118,7 +138,6 @@ const AdminUsuarios = () => {
     const profile = profiles.find(p => p.id === userId);
     if (!profile) return;
 
-    // Não pode remover admin do Admin Master
     if (isAdminMaster(profile) && isAdmin(userId)) {
       toast.error("Não é possível remover a permissão de Admin do usuário Admin Master");
       return;
@@ -153,7 +172,6 @@ const AdminUsuarios = () => {
   };
 
   const toggleBlockUser = async (profile: Profile) => {
-    // Não pode bloquear o Admin Master
     if (isAdminMaster(profile)) {
       toast.error("Não é possível bloquear o usuário Admin Master");
       return;
@@ -175,19 +193,26 @@ const AdminUsuarios = () => {
 
   const handleEditUser = (user: Profile) => {
     setEditingUser(user);
-    setEditFormData({ nome: user.nome || "" });
+    setEditFormData({ nome: user.nome || "", email: user.email });
     setShowEditDialog(true);
   };
 
   const saveUserEdit = async () => {
     if (!editingUser) return;
 
+    const updateData: any = { 
+      nome: editFormData.nome,
+      updated_at: new Date().toISOString()
+    };
+
+    // Só permite alterar email para usuários internos (não Microsoft)
+    if (isInternalUser(editingUser) && editFormData.email !== editingUser.email) {
+      updateData.email = editFormData.email;
+    }
+
     const { error } = await supabase
       .from("profiles")
-      .update({ 
-        nome: editFormData.nome,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq("id", editingUser.id);
 
     if (error) {
@@ -202,16 +227,12 @@ const AdminUsuarios = () => {
   };
 
   const deleteUser = async (profile: Profile) => {
-    // Não pode excluir o Admin Master
     if (isAdminMaster(profile)) {
       toast.error("Não é possível excluir o usuário Admin Master");
       return;
     }
 
-    // Delete user roles first
     await supabase.from("user_roles").delete().eq("user_id", profile.id);
-    
-    // Delete profile
     const { error } = await supabase.from("profiles").delete().eq("id", profile.id);
 
     if (error) {
@@ -223,11 +244,95 @@ const AdminUsuarios = () => {
     fetchData();
   };
 
-  const getSetorDisplay = (profile: Profile) => {
-    if (isAdmin(profile.id)) {
-      return "Todos (Admin)";
+  // Criar usuário interno
+  const handleCreateUser = async () => {
+    if (!createFormData.nome.trim()) {
+      toast.error("Nome é obrigatório");
+      return;
     }
-    return profile.setor || "Não definido";
+    if (!createFormData.email.trim() || !createFormData.email.endsWith("@jbsterminais.com.br")) {
+      toast.error("E-mail deve ser do domínio @jbsterminais.com.br");
+      return;
+    }
+    if (createFormData.senha.length < 6) {
+      toast.error("Senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+
+    setCreateLoading(true);
+
+    // Criar usuário no Supabase Auth
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: createFormData.email,
+      password: createFormData.senha,
+      options: {
+        emailRedirectTo: `${window.location.origin}/interno/dashboard`
+      }
+    });
+
+    if (signUpError) {
+      toast.error("Erro ao criar usuário: " + signUpError.message);
+      setCreateLoading(false);
+      return;
+    }
+
+    if (signUpData.user) {
+      // Criar profile
+      await supabase.from("profiles").upsert({
+        id: signUpData.user.id,
+        email: createFormData.email,
+        nome: createFormData.nome,
+        bloqueado: true, // Começa bloqueado até confirmar email
+      });
+
+      toast.success("Usuário criado! Um e-mail de confirmação foi enviado. O cadastro ficará desativado até a confirmação.");
+    }
+
+    setShowCreateDialog(false);
+    setCreateFormData({ nome: "", email: "", senha: "" });
+    setCreateLoading(false);
+    fetchData();
+  };
+
+  // Alterar senha Admin
+  const handleChangePassword = async () => {
+    if (passwordData.novaSenha !== passwordData.confirmarSenha) {
+      toast.error("As senhas não coincidem");
+      return;
+    }
+    if (passwordData.novaSenha.length < 6) {
+      toast.error("Nova senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    const { error } = await supabase.auth.updateUser({
+      password: passwordData.novaSenha
+    });
+
+    if (error) {
+      toast.error("Erro ao alterar senha: " + error.message);
+      setPasswordLoading(false);
+      return;
+    }
+
+    toast.success("Senha alterada com sucesso!");
+    setShowPasswordDialog(false);
+    setPasswordData({ senhaAtual: "", novaSenha: "", confirmarSenha: "" });
+    setPasswordLoading(false);
+  };
+
+  const getSetorLabel = (setor: string | null) => {
+    if (!setor) return "Não definido";
+    const labels: Record<string, string> = {
+      "COMEX": "Administrativo",
+      "ARMAZEM": "Operacional",
+      "ADMINISTRATIVO": "Administrativo",
+      "OPERACIONAL": "Operacional",
+      "MASTER": "Master"
+    };
+    return labels[setor] || setor;
   };
 
   if (loading) {
@@ -240,15 +345,112 @@ const AdminUsuarios = () => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/interno/dashboard")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <Users className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Gerenciar Usuários</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/interno/dashboard")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Users className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Gerenciar Usuários</h1>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
+            <Key className="h-4 w-4 mr-2" />
+            Alterar Senha Admin
+          </Button>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Criar Usuário
+          </Button>
         </div>
       </div>
+
+      {/* Dialog Criar Usuário */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Usuário Interno</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Nome</Label>
+              <Input
+                value={createFormData.nome}
+                onChange={(e) => setCreateFormData(prev => ({ ...prev, nome: e.target.value }))}
+                placeholder="Nome completo"
+              />
+            </div>
+            <div>
+              <Label>E-mail</Label>
+              <Input
+                type="email"
+                value={createFormData.email}
+                onChange={(e) => setCreateFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="usuario@jbsterminais.com.br"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Apenas domínio @jbsterminais.com.br
+              </p>
+            </div>
+            <div>
+              <Label>Senha Inicial</Label>
+              <Input
+                type="password"
+                value={createFormData.senha}
+                onChange={(e) => setCreateFormData(prev => ({ ...prev, senha: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
+              <p>Um e-mail será enviado para o usuário confirmar o cadastro.</p>
+              <p className="mt-1">O acesso ficará desativado até a confirmação.</p>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
+            <Button onClick={handleCreateUser} disabled={createLoading}>
+              {createLoading ? "Criando..." : "Criar Usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Alterar Senha Admin */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Senha do Admin</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Nova Senha</Label>
+              <Input
+                type="password"
+                value={passwordData.novaSenha}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, novaSenha: e.target.value }))}
+                placeholder="Nova senha"
+              />
+            </div>
+            <div>
+              <Label>Confirmar Nova Senha</Label>
+              <Input
+                type="password"
+                value={passwordData.confirmarSenha}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmarSenha: e.target.value }))}
+                placeholder="Confirme a nova senha"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>Cancelar</Button>
+            <Button onClick={handleChangePassword} disabled={passwordLoading}>
+              {passwordLoading ? "Alterando..." : "Alterar Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
@@ -266,8 +468,17 @@ const AdminUsuarios = () => {
             </div>
             <div>
               <Label>E-mail</Label>
-              <Input value={editingUser?.email || ""} disabled className="bg-muted" />
-              <p className="text-xs text-muted-foreground mt-1">O e-mail não pode ser alterado (vinculado ao Microsoft)</p>
+              <Input 
+                value={editFormData.email} 
+                onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
+                disabled={editingUser ? !isInternalUser(editingUser) : true} 
+                className={editingUser && !isInternalUser(editingUser) ? "bg-muted" : ""}
+              />
+              {editingUser && !isInternalUser(editingUser) && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  E-mail vinculado ao Microsoft não pode ser alterado
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter className="mt-4">
@@ -325,7 +536,7 @@ const AdminUsuarios = () => {
                           <SelectContent>
                             {setores.map(s => (
                               <SelectItem key={s.email_setor} value={s.email_setor}>
-                                {s.setor}
+                                {getSetorLabel(s.setor)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -356,12 +567,10 @@ const AdminUsuarios = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        {/* Edit Button */}
                         <Button variant="ghost" size="icon" onClick={() => handleEditUser(profile)}>
                           <Edit className="h-4 w-4" />
                         </Button>
 
-                        {/* Block/Unblock Button - disabled for Admin Master */}
                         {!isMaster && (
                           <Button
                             variant="ghost"
@@ -377,7 +586,6 @@ const AdminUsuarios = () => {
                           </Button>
                         )}
 
-                        {/* Delete Button - disabled for Admin Master */}
                         {!isMaster && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

@@ -3,28 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Building2, Clock, Key, FileText } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-interface TipoSetor {
-  id: string;
-  nome: string;
-  descricao: string | null;
-  pode_aprovar: boolean;
-  pode_recusar: boolean;
-  pode_visualizar_todos: boolean;
-  pode_editar_processo: boolean;
-  ativo: boolean;
-}
 
 interface RegraServico {
   id: string;
@@ -66,19 +54,6 @@ const AdminParametros = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
-  // Tipos de Setor
-  const [tiposSetor, setTiposSetor] = useState<TipoSetor[]>([]);
-  const [showTipoDialog, setShowTipoDialog] = useState(false);
-  const [editingTipo, setEditingTipo] = useState<TipoSetor | null>(null);
-  const [tipoFormData, setTipoFormData] = useState({
-    nome: "",
-    descricao: "",
-    pode_aprovar: true,
-    pode_recusar: true,
-    pode_visualizar_todos: true,
-    pode_editar_processo: true
-  });
 
   // Regras de Serviço
   const [regras, setRegras] = useState<RegraServico[]>([]);
@@ -107,139 +82,17 @@ const AdminParametros = () => {
   }, []);
 
   const fetchAllData = async () => {
-    const [tiposRes, regrasRes, servicosRes, protocolRes] = await Promise.all([
-      supabase.from("tipos_setor").select("*").order("nome"),
+    const [regrasRes, servicosRes, protocolRes] = await Promise.all([
       supabase.from("regras_servico").select("*").order("created_at"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("protocol_config").select("*").limit(1).single()
     ]);
 
-    if (tiposRes.data) setTiposSetor(tiposRes.data);
     if (regrasRes.data) setRegras(regrasRes.data);
     if (servicosRes.data) setServicos(servicosRes.data);
     if (protocolRes.data) setProtocolConfig(protocolRes.data);
     
     setLoading(false);
-  };
-
-  // ============= TIPOS DE SETOR =============
-  const openTipoDialog = (tipo?: TipoSetor) => {
-    if (tipo) {
-      setEditingTipo(tipo);
-      setTipoFormData({
-        nome: tipo.nome,
-        descricao: tipo.descricao || "",
-        pode_aprovar: tipo.pode_aprovar,
-        pode_recusar: tipo.pode_recusar,
-        pode_visualizar_todos: tipo.pode_visualizar_todos,
-        pode_editar_processo: tipo.pode_editar_processo
-      });
-    } else {
-      setEditingTipo(null);
-      setTipoFormData({
-        nome: "",
-        descricao: "",
-        pode_aprovar: true,
-        pode_recusar: true,
-        pode_visualizar_todos: true,
-        pode_editar_processo: true
-      });
-    }
-    setShowTipoDialog(true);
-  };
-
-  const saveTipo = async () => {
-    if (!tipoFormData.nome.trim()) {
-      toast.error("Nome é obrigatório");
-      return;
-    }
-
-    setSaving(true);
-    if (editingTipo) {
-      const { error } = await supabase
-        .from("tipos_setor")
-        .update({
-          nome: tipoFormData.nome.toUpperCase(),
-          descricao: tipoFormData.descricao || null,
-          pode_aprovar: tipoFormData.pode_aprovar,
-          pode_recusar: tipoFormData.pode_recusar,
-          pode_visualizar_todos: tipoFormData.pode_visualizar_todos,
-          pode_editar_processo: tipoFormData.pode_editar_processo,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", editingTipo.id);
-
-      if (error) {
-        toast.error("Erro ao atualizar tipo de setor");
-        setSaving(false);
-        return;
-      }
-      toast.success("Tipo de setor atualizado!");
-    } else {
-      const { error } = await supabase
-        .from("tipos_setor")
-        .insert({
-          nome: tipoFormData.nome.toUpperCase(),
-          descricao: tipoFormData.descricao || null,
-          pode_aprovar: tipoFormData.pode_aprovar,
-          pode_recusar: tipoFormData.pode_recusar,
-          pode_visualizar_todos: tipoFormData.pode_visualizar_todos,
-          pode_editar_processo: tipoFormData.pode_editar_processo
-        });
-
-      if (error) {
-        toast.error("Erro ao criar tipo de setor");
-        setSaving(false);
-        return;
-      }
-      toast.success("Tipo de setor criado!");
-    }
-
-    setShowTipoDialog(false);
-    setSaving(false);
-    fetchAllData();
-  };
-
-  const toggleTipoAtivo = async (tipo: TipoSetor) => {
-    const { error } = await supabase
-      .from("tipos_setor")
-      .update({ ativo: !tipo.ativo, updated_at: new Date().toISOString() })
-      .eq("id", tipo.id);
-
-    if (error) {
-      toast.error("Erro ao atualizar status");
-      return;
-    }
-    toast.success(tipo.ativo ? "Tipo desativado" : "Tipo ativado");
-    fetchAllData();
-  };
-
-  const deleteTipo = async (tipo: TipoSetor) => {
-    // Verifica se há setores vinculados (para COMEX e ARMAZEM que são do enum)
-    // Para tipos customizados, verificamos pelo nome no campo setor
-    const tipoNome = tipo.nome as "COMEX" | "ARMAZEM";
-    const { data: setoresVinculados } = await supabase
-      .from("setor_emails")
-      .select("id")
-      .eq("setor", tipoNome)
-      .limit(1);
-
-    if (setoresVinculados && setoresVinculados.length > 0) {
-      toast.error("Não é possível excluir: existem setores vinculados. Desative em vez de excluir.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("tipos_setor")
-      .delete()
-      .eq("id", tipo.id);
-
-    if (error) {
-      toast.error("Erro ao excluir tipo de setor");
-      return;
-    }
-    toast.success("Tipo de setor excluído!");
-    fetchAllData();
   };
 
   // ============= REGRAS DE SERVIÇO =============
@@ -402,12 +255,8 @@ const AdminParametros = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="tipos" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="tipos" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Tipos de Setor
-          </TabsTrigger>
+      <Tabs defaultValue="regras" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Regras de Negócio
@@ -418,48 +267,42 @@ const AdminParametros = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* ============= TIPOS DE SETOR ============= */}
-        <TabsContent value="tipos">
+        {/* ============= REGRAS DE SERVIÇO ============= */}
+        <TabsContent value="regras">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Tipos de Setor ({tiposSetor.length})</CardTitle>
-              <Button onClick={() => openTipoDialog()}>
+              <CardTitle>Regras por Serviço ({regras.length})</CardTitle>
+              <Button onClick={() => openRegraDialog()}>
                 <Plus className="h-4 w-4 mr-2" />
-                Adicionar Tipo
+                Adicionar Regra
               </Button>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Configure os tipos de setor disponíveis e suas permissões de acesso no sistema.
+                Defina os limites diários, hora de corte e dias de operação para cada serviço.
               </p>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Aprovar</TableHead>
-                    <TableHead>Recusar</TableHead>
-                    <TableHead>Ver Todos</TableHead>
-                    <TableHead>Editar</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Serviço</TableHead>
+                    <TableHead>Hora Corte</TableHead>
+                    <TableHead>Limite/Dia</TableHead>
+                    <TableHead>Dias Operação</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tiposSetor.map((tipo) => (
-                    <TableRow key={tipo.id} className={!tipo.ativo ? "opacity-50" : ""}>
-                      <TableCell className="font-medium">{tipo.nome}</TableCell>
-                      <TableCell>{tipo.descricao || "—"}</TableCell>
-                      <TableCell>{tipo.pode_aprovar ? "✓" : "✗"}</TableCell>
-                      <TableCell>{tipo.pode_recusar ? "✓" : "✗"}</TableCell>
-                      <TableCell>{tipo.pode_visualizar_todos ? "✓" : "✗"}</TableCell>
-                      <TableCell>{tipo.pode_editar_processo ? "✓" : "✗"}</TableCell>
-                      <TableCell>
-                        <Switch checked={tipo.ativo} onCheckedChange={() => toggleTipoAtivo(tipo)} />
+                  {regras.map((regra) => (
+                    <TableRow key={regra.id}>
+                      <TableCell className="font-medium">{getServicoNome(regra.servico_id)}</TableCell>
+                      <TableCell>{regra.hora_corte}</TableCell>
+                      <TableCell>{regra.limite_dia || "Sem limite"}</TableCell>
+                      <TableCell className="text-xs">
+                        {regra.dias_semana.join(", ").toUpperCase()}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openTipoDialog(tipo)}>
+                          <Button variant="ghost" size="icon" onClick={() => openRegraDialog(regra)}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <AlertDialog>
@@ -470,15 +313,15 @@ const AdminParametros = () => {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Excluir Tipo de Setor</AlertDialogTitle>
+                                <AlertDialogTitle>Excluir Regra</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Tem certeza que deseja excluir o tipo <strong>{tipo.nome}</strong>?
-                                  Se houver setores vinculados, a exclusão não será permitida.
+                                  Tem certeza que deseja excluir a regra para <strong>{getServicoNome(regra.servico_id)}</strong>?
+                                  O sistema aplicará as configurações padrão.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteTipo(tipo)} className="bg-destructive text-destructive-foreground">
+                                <AlertDialogAction onClick={() => deleteRegra(regra)} className="bg-destructive text-destructive-foreground">
                                   Excluir
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -488,264 +331,85 @@ const AdminParametros = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Dialog para Tipo de Setor */}
-          <Dialog open={showTipoDialog} onOpenChange={setShowTipoDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingTipo ? "Editar Tipo de Setor" : "Novo Tipo de Setor"}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label>Nome</Label>
-                  <Input
-                    value={tipoFormData.nome}
-                    onChange={(e) => setTipoFormData({ ...tipoFormData, nome: e.target.value.toUpperCase() })}
-                    placeholder="Ex: FINANCEIRO"
-                  />
-                </div>
-                <div>
-                  <Label>Descrição</Label>
-                  <Input
-                    value={tipoFormData.descricao}
-                    onChange={(e) => setTipoFormData({ ...tipoFormData, descricao: e.target.value })}
-                    placeholder="Descrição do tipo de setor"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label>Permissões</Label>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="pode_aprovar"
-                      checked={tipoFormData.pode_aprovar}
-                      onCheckedChange={(checked) => setTipoFormData({ ...tipoFormData, pode_aprovar: !!checked })}
-                    />
-                    <label htmlFor="pode_aprovar" className="text-sm">Pode aprovar solicitações</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="pode_recusar"
-                      checked={tipoFormData.pode_recusar}
-                      onCheckedChange={(checked) => setTipoFormData({ ...tipoFormData, pode_recusar: !!checked })}
-                    />
-                    <label htmlFor="pode_recusar" className="text-sm">Pode recusar solicitações</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="pode_visualizar_todos"
-                      checked={tipoFormData.pode_visualizar_todos}
-                      onCheckedChange={(checked) => setTipoFormData({ ...tipoFormData, pode_visualizar_todos: !!checked })}
-                    />
-                    <label htmlFor="pode_visualizar_todos" className="text-sm">Pode visualizar todos os processos</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="pode_editar_processo"
-                      checked={tipoFormData.pode_editar_processo}
-                      onCheckedChange={(checked) => setTipoFormData({ ...tipoFormData, pode_editar_processo: !!checked })}
-                    />
-                    <label htmlFor="pode_editar_processo" className="text-sm">Pode editar processos</label>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter className="mt-4">
-                <Button onClick={saveTipo} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Salvando..." : "Salvar"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        {/* ============= REGRAS DE NEGÓCIO ============= */}
-        <TabsContent value="regras">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Regras de Negócio por Serviço ({regras.length})</CardTitle>
-              <Button onClick={() => openRegraDialog()}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Regra
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted/50 p-4 rounded-lg mb-4 text-sm space-y-2">
-                <p><strong>Padrões do sistema (quando não há regra configurada):</strong></p>
-                <p>• <strong>Posicionamento:</strong> Hora de corte 15:00 do dia anterior, dias Seg-Sex, limite infinito</p>
-                <p>• <strong>Demais serviços:</strong> Hora de corte 17:00 do dia da solicitação, dias Seg-Sáb, limite infinito</p>
-              </div>
-              
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Serviço</TableHead>
-                    <TableHead>Hora de Corte</TableHead>
-                    <TableHead>Dia Anterior</TableHead>
-                    <TableHead>Dias da Semana</TableHead>
-                    <TableHead>Limite Geral</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {regras.length === 0 ? (
+                  {regras.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        Nenhuma regra customizada. Os padrões do sistema serão aplicados.
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Nenhuma regra configurada. O sistema usará valores padrão.
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    regras.map((regra) => (
-                      <TableRow key={regra.id} className={!regra.ativo ? "opacity-50" : ""}>
-                        <TableCell className="font-medium">{getServicoNome(regra.servico_id)}</TableCell>
-                        <TableCell>{regra.hora_corte}</TableCell>
-                        <TableCell>{regra.aplica_dia_anterior ? "Sim" : "Não"}</TableCell>
-                        <TableCell>{regra.dias_semana.join(", ").toUpperCase()}</TableCell>
-                        <TableCell>{regra.limite_dia || "∞"}</TableCell>
-                        <TableCell>
-                          <Switch checked={regra.ativo} onCheckedChange={async () => {
-                            await supabase.from("regras_servico").update({ ativo: !regra.ativo }).eq("id", regra.id);
-                            fetchAllData();
-                          }} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openRegraDialog(regra)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Excluir Regra</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Excluir a regra para <strong>{getServicoNome(regra.servico_id)}</strong>?
-                                    O padrão do sistema será aplicado.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteRegra(regra)} className="bg-destructive text-destructive-foreground">
-                                    Excluir
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
                   )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
 
-          {/* Dialog para Regra de Serviço */}
+          {/* Dialog para Regra */}
           <Dialog open={showRegraDialog} onOpenChange={setShowRegraDialog}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>{editingRegra ? "Editar Regra" : "Nova Regra de Serviço"}</DialogTitle>
+                <DialogTitle>{editingRegra ? "Editar Regra" : "Adicionar Regra"}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="space-y-4 mt-4">
                 <div>
                   <Label>Serviço</Label>
                   <Select
                     value={regraFormData.servico_id}
-                    onValueChange={(value) => {
-                      setRegraFormData({ ...regraFormData, servico_id: value });
-                      // Se for Posicionamento, define como dia anterior
-                      const servico = servicos.find(s => s.id === value);
-                      if (servico?.nome.toLowerCase().includes("posicionamento")) {
-                        setRegraFormData(prev => ({ ...prev, servico_id: value, aplica_dia_anterior: true, hora_corte: "15:00" }));
-                      }
-                    }}
+                    onValueChange={(v) => setRegraFormData(prev => ({ ...prev, servico_id: v }))}
                     disabled={!!editingRegra}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o serviço" />
                     </SelectTrigger>
                     <SelectContent>
-                      {servicos.map((servico) => (
-                        <SelectItem key={servico.id} value={servico.id}>
-                          {servico.nome}
-                        </SelectItem>
+                      {servicos.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Hora de Corte</Label>
                     <Input
                       type="time"
                       value={regraFormData.hora_corte}
-                      onChange={(e) => setRegraFormData({ ...regraFormData, hora_corte: e.target.value })}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, hora_corte: e.target.value }))}
                     />
                   </div>
                   <div>
-                    <Label>Limite Geral/Dia</Label>
+                    <Label>Limite por Dia</Label>
                     <Input
                       type="number"
                       value={regraFormData.limite_dia}
-                      onChange={(e) => setRegraFormData({ ...regraFormData, limite_dia: e.target.value })}
-                      placeholder="Infinito"
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_dia: e.target.value }))}
+                      placeholder="Sem limite"
                     />
                   </div>
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="aplica_dia_anterior"
-                    checked={regraFormData.aplica_dia_anterior}
-                    onCheckedChange={(checked) => setRegraFormData({ ...regraFormData, aplica_dia_anterior: !!checked })}
-                  />
-                  <label htmlFor="aplica_dia_anterior" className="text-sm">
-                    Hora de corte aplica ao dia anterior (ex: Posicionamento)
-                  </label>
-                </div>
-
                 <div>
-                  <Label className="mb-2 block">Dias da Semana</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DIAS_SEMANA.map((dia) => (
-                      <div key={dia.key} className="flex items-center space-x-1">
+                  <Label>Dias de Operação</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {DIAS_SEMANA.map(dia => (
+                      <div key={dia.key} className="flex items-center space-x-2">
                         <Checkbox
                           id={dia.key}
                           checked={regraFormData.dias_semana.includes(dia.key)}
                           onCheckedChange={() => toggleDiaSemana(dia.key)}
                         />
-                        <label htmlFor={dia.key} className="text-sm">{dia.label}</label>
+                        <Label htmlFor={dia.key} className="cursor-pointer text-sm">{dia.label}</Label>
                       </div>
                     ))}
                   </div>
                 </div>
-
-                <div>
-                  <Label className="mb-2 block">Limite por Dia da Semana (opcional)</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {DIAS_SEMANA.map((dia) => (
-                      <div key={dia.key}>
-                        <Label className="text-xs">{dia.label}</Label>
-                        <Input
-                          type="number"
-                          value={regraFormData[`limite_${dia.key}` as keyof typeof regraFormData] as string}
-                          onChange={(e) => setRegraFormData({ ...regraFormData, [`limite_${dia.key}`]: e.target.value })}
-                          placeholder="∞"
-                          className="h-8"
-                        />
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="aplica_dia_anterior"
+                    checked={regraFormData.aplica_dia_anterior}
+                    onCheckedChange={(c) => setRegraFormData(prev => ({ ...prev, aplica_dia_anterior: !!c }))}
+                  />
+                  <Label htmlFor="aplica_dia_anterior">
+                    Aplicar regra ao dia anterior (pedidos após hora de corte contam para o próximo dia)
+                  </Label>
                 </div>
               </div>
               <DialogFooter className="mt-4">
@@ -758,57 +422,47 @@ const AdminParametros = () => {
           </Dialog>
         </TabsContent>
 
-        {/* ============= CONFIGURAÇÃO DE PROTOCOLO ============= */}
+        {/* ============= PROTOCOLO ============= */}
         <TabsContent value="protocolo">
           <Card>
             <CardHeader>
               <CardTitle>Configuração de Protocolo</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-muted/50 p-4 rounded-lg text-sm space-y-2">
-                <p><strong>Formato do Protocolo:</strong> {protocolConfig?.prefixo || "JBS"} + Letra do Serviço + Número Sequencial</p>
-                <p>Exemplo: JBSP000001 (JBS + P de Posicionamento + Sequencial)</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Prefixo do Protocolo</Label>
-                  <Input
-                    value={protocolConfig?.prefixo || ""}
-                    onChange={(e) => setProtocolConfig(prev => prev ? { ...prev, prefixo: e.target.value.toUpperCase() } : null)}
-                    placeholder="JBS"
-                    maxLength={5}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Máximo 5 caracteres</p>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Configure o prefixo dos protocolos gerados automaticamente.
+              </p>
+              {protocolConfig && (
+                <div className="space-y-4 max-w-md">
+                  <div>
+                    <Label>Prefixo do Protocolo</Label>
+                    <Input
+                      value={protocolConfig.prefixo}
+                      onChange={(e) => setProtocolConfig({ ...protocolConfig, prefixo: e.target.value.toUpperCase() })}
+                      placeholder="JBS"
+                      maxLength={5}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Exemplo: {protocolConfig.prefixo}A000001 (prefixo + letra do serviço + número)
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Último Número Gerado</Label>
+                    <Input
+                      value={protocolConfig.ultimo_numero}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Este campo é atualizado automaticamente
+                    </p>
+                  </div>
+                  <Button onClick={saveProtocolConfig} disabled={saving}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {saving ? "Salvando..." : "Salvar Configuração"}
+                  </Button>
                 </div>
-                <div>
-                  <Label>Último Número Gerado</Label>
-                  <Input
-                    value={protocolConfig?.ultimo_numero || 0}
-                    disabled
-                    className="bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Somente leitura</p>
-                </div>
-              </div>
-
-              <div className="bg-muted/50 p-4 rounded-lg text-sm space-y-2">
-                <p><strong>Formato do LPCO:</strong> 1 letra + 10 números = 11 caracteres</p>
-                <p>Exemplo: A1234567890 (Regra fixa do Siscomex)</p>
-                <p className="text-muted-foreground">O LPCO não é configurável, segue padrão do Siscomex.</p>
-              </div>
-
-              <div className="bg-muted/50 p-4 rounded-lg text-sm space-y-2">
-                <p><strong>Formato do Contêiner:</strong> 4 letras + 7 números = 11 caracteres</p>
-                <p>Exemplo: ABCD1234567 (Padrão internacional)</p>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={saveProtocolConfig} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Salvando..." : "Salvar Configuração"}
-                </Button>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

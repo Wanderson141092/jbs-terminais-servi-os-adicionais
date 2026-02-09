@@ -44,23 +44,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const isComex = setor === "COMEX";
   const isArmazem = setor === "ARMAZEM";
 
-  // For admin: check both sectors
   const comexPending = solicitacao.comex_aprovado === null;
   const armazemPending = solicitacao.armazem_aprovado === null;
-  const comexRefused = solicitacao.comex_aprovado === false;
-  const armazemRefused = solicitacao.armazem_aprovado === false;
 
-  // Check current approval state for selected sector
   const currentApproval = isComex ? solicitacao.comex_aprovado : isArmazem ? solicitacao.armazem_aprovado : null;
   const wasRefused = currentApproval === false;
   const alreadyApproved = currentApproval === true;
 
-  // Can decide if status is aguardando OR if was previously refused (can change)
   const canDecide = solicitacao.status === "aguardando_confirmacao" && !alreadyApproved && setor !== null;
   const canChangeRefusal = wasRefused && solicitacao.status !== "recusado";
 
   const handleAprovar = async () => {
-    // If changing from refused to approved, require justification
     if (wasRefused) {
       if (!justificativa.trim()) {
         toast.error("Justificativa obrigatória para alterar de recusado para aprovado.");
@@ -73,7 +67,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setShowAlteracaoConfirm(true);
       return;
     }
-
     await executeApproval(true);
   };
 
@@ -96,6 +89,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     const logAction = aprovado 
       ? (wasRefused ? "Alteração para Aprovado" : "Aprovação")
       : "Recusa";
+    const setorLabel = isComex ? "Administrativo" : "Operacional";
 
     if (isComex) {
       updateData.comex_aprovado = aprovado;
@@ -124,17 +118,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
 
-    // Log audit
     const detalhes = justificativa.trim() 
-      ? `${logAction} pelo setor ${setor}. Justificativa: ${justificativa}`
-      : `${logAction} pelo setor ${setor}`;
+      ? `${logAction} pelo setor ${setorLabel}. Justificativa: ${justificativa}`
+      : `${logAction} pelo setor ${setorLabel}`;
 
     await logAudit(logAction.toLowerCase(), detalhes);
 
-    // Create notification
     const notifMsg = aprovado
-      ? `Solicitação ${solicitacao.protocolo} aprovada pelo setor ${setor}`
-      : `Solicitação ${solicitacao.protocolo} recusada pelo setor ${setor}: ${justificativa}`;
+      ? `Solicitação ${solicitacao.protocolo} aprovada pelo setor ${setorLabel}`
+      : `Solicitação ${solicitacao.protocolo} recusada pelo setor ${setorLabel}: ${justificativa}`;
 
     await createNotification(notifMsg, aprovado ? "aprovacao" : "recusa");
 
@@ -191,7 +183,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   };
 
   const createNotification = async (mensagem: string, tipo: string) => {
-    // Notify all internal users
     const { data: profiles } = await supabase.from("profiles").select("id");
     if (profiles) {
       const notifications = profiles.map((p) => ({
@@ -202,6 +193,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       }));
       await supabase.from("notifications").insert(notifications);
     }
+  };
+
+  const getSetorLabel = (setor: string | null) => {
+    if (!setor) return "—";
+    const labels: Record<string, string> = {
+      "COMEX": "Administrativo",
+      "ARMAZEM": "Operacional",
+    };
+    return labels[setor] || setor;
   };
 
   return (
@@ -245,14 +245,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             {/* Approval Status */}
             <div className="grid grid-cols-2 gap-4">
               <ApprovalCard
-                label="COMEX"
+                label="Administrativo"
                 approved={solicitacao.comex_aprovado}
                 justificativa={solicitacao.comex_justificativa}
                 data={solicitacao.comex_data}
                 isCurrentSetor={isComex}
               />
               <ApprovalCard
-                label="ARMAZÉM"
+                label="Operacional"
                 approved={solicitacao.armazem_aprovado}
                 justificativa={solicitacao.armazem_justificativa}
                 data={solicitacao.armazem_data}
@@ -273,7 +273,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       disabled={solicitacao.comex_aprovado === true}
                       className="flex-1"
                     >
-                      COMEX {solicitacao.comex_aprovado === true && "(Aprovado)"}
+                      Administrativo {solicitacao.comex_aprovado === true && "(Aprovado)"}
                       {solicitacao.comex_aprovado === false && "(Recusado)"}
                     </Button>
                     <Button
@@ -282,7 +282,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       disabled={solicitacao.armazem_aprovado === true}
                       className="flex-1"
                     >
-                      ARMAZÉM {solicitacao.armazem_aprovado === true && "(Aprovado)"}
+                      Operacional {solicitacao.armazem_aprovado === true && "(Aprovado)"}
                       {solicitacao.armazem_aprovado === false && "(Recusado)"}
                     </Button>
                   </div>
@@ -296,7 +296,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 <Separator />
                 <div className="space-y-3">
                   <p className="text-sm font-semibold">
-                    Sua decisão ({setor})
+                    Sua decisão ({getSetorLabel(setor)})
                     {wasRefused && (
                       <span className="text-destructive ml-2 text-xs">(Alterando decisão anterior)</span>
                     )}
@@ -366,7 +366,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             <div className="space-y-3">
               <p className="text-sm font-semibold flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Anexos e Documentos
+                Anexos e Documentos ({attachments.length})
               </p>
               {attachments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum anexo disponível</p>
@@ -399,6 +399,33 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Preview Modal */}
+      {previewUrl && (
+        <Dialog open onOpenChange={() => setPreviewUrl(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>Visualizar Documento</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 min-h-[60vh]">
+              {previewUrl.toLowerCase().endsWith('.pdf') ? (
+                <iframe src={previewUrl} className="w-full h-[60vh]" title="Preview" />
+              ) : (
+                <img src={previewUrl} alt="Preview" className="max-w-full max-h-[60vh] mx-auto" />
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPreviewUrl(null)}>Fechar</Button>
+              <Button asChild>
+                <a href={previewUrl} download target="_blank" rel="noopener noreferrer">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </a>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Confirmação de Recusa */}
       <AlertDialog open={showRecusaConfirm} onOpenChange={setShowRecusaConfirm}>
@@ -434,99 +461,88 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       <AlertDialog open={showAlteracaoConfirm} onOpenChange={setShowAlteracaoConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
-              <AlertTriangle className="h-5 w-5" />
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
               Confirmação de Alteração
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
-                Este pedido foi <strong>anteriormente recusado</strong>. Você está alterando a decisão para <strong>Aprovado</strong>.
+                Você está alterando a decisão anterior de <strong>Recusado</strong> para <strong>Aprovado</strong>.
               </p>
               <div className="bg-muted p-3 rounded text-sm">
                 <strong>Protocolo:</strong> {solicitacao.protocolo}<br />
-                <strong>Justificativa:</strong> {justificativa}
+                <strong>Justificativa da alteração:</strong> {justificativa}
               </div>
-              <p className="text-orange-600 font-medium">
-                Deseja realmente continuar?
+              <p className="font-medium">
+                Deseja continuar?
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmAlteracao} className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
               Confirmar Aprovação
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Preview de Anexo */}
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Visualização do Documento</DialogTitle>
-          </DialogHeader>
-          {previewUrl && (
-            <div className="w-full h-[70vh]">
-              {previewUrl.toLowerCase().endsWith('.pdf') ? (
-                <iframe src={previewUrl} className="w-full h-full" />
-              ) : (
-                <img src={previewUrl} alt="Documento" className="max-w-full max-h-full mx-auto" />
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
 
+// Helper Components
 const InfoItem = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
   <div className="flex items-start gap-2">
     <span className="text-muted-foreground mt-0.5">{icon}</span>
     <div>
-      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-medium">{value}</p>
     </div>
   </div>
 );
 
-const ApprovalCard = ({ label, approved, justificativa, data, isCurrentSetor }: {
-  label: string;
-  approved: boolean | null;
-  justificativa?: string | null;
-  data?: string | null;
+const ApprovalCard = ({ 
+  label, 
+  approved, 
+  justificativa, 
+  data,
+  isCurrentSetor 
+}: { 
+  label: string; 
+  approved: boolean | null; 
+  justificativa?: string;
+  data?: string;
   isCurrentSetor: boolean;
-}) => (
-  <div className={`rounded-lg border-2 p-3 ${
-    isCurrentSetor ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30"
-  }`}>
-    <div className="flex items-center justify-between mb-2">
-      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      {isCurrentSetor && (
-        <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded">
-          Seu setor
-        </span>
+}) => {
+  const getBg = () => {
+    if (approved === null) return "bg-muted/50";
+    if (approved) return "bg-secondary/10 border-secondary";
+    return "bg-destructive/10 border-destructive";
+  };
+
+  return (
+    <div className={`rounded-lg p-3 border ${getBg()} ${isCurrentSetor ? "ring-2 ring-primary" : ""}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-semibold text-sm">{label}</span>
+        {approved === null && <Clock className="h-4 w-4 text-muted-foreground" />}
+        {approved === true && <CheckCircle2 className="h-4 w-4 text-secondary" />}
+        {approved === false && <XCircle className="h-4 w-4 text-destructive" />}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {approved === null && "Pendente"}
+        {approved === true && "Aprovado"}
+        {approved === false && "Recusado"}
+      </p>
+      {data && (
+        <p className="text-xs text-muted-foreground mt-1">
+          {new Date(data).toLocaleDateString("pt-BR")} às {new Date(data).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+        </p>
+      )}
+      {justificativa && (
+        <p className="text-xs mt-2 text-muted-foreground italic">"{justificativa}"</p>
       )}
     </div>
-    {approved === null || approved === undefined ? (
-      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-        <Clock className="h-4 w-4" /> Pendente
-      </div>
-    ) : approved ? (
-      <div className="flex items-center gap-1 text-sm text-secondary">
-        <CheckCircle2 className="h-4 w-4" /> Aprovado
-      </div>
-    ) : (
-      <div>
-        <div className="flex items-center gap-1 text-sm text-destructive">
-          <XCircle className="h-4 w-4" /> Recusado
-        </div>
-        {justificativa && <p className="text-xs text-muted-foreground mt-1 italic">"{justificativa}"</p>}
-      </div>
-    )}
-    {data && <p className="text-[10px] text-muted-foreground mt-1">{new Date(data).toLocaleString("pt-BR")}</p>}
-  </div>
-);
+  );
+};
 
 export default AnaliseDialog;

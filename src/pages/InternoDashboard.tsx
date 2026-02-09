@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu
+  Building2, FileText, Link2, Menu, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,9 +19,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import StatusBadge, { STATUS_LABELS } from "@/components/StatusBadge";
-import SetorSelector from "@/components/SetorSelector";
 import AnaliseDialog from "@/components/AnaliseDialog";
 import NotificationsPanel from "@/components/NotificationsPanel";
+import ReclassificacaoDialog from "@/components/ReclassificacaoDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
@@ -48,6 +48,7 @@ const InternoDashboard = () => {
   const [tipoServicoFilter, setTipoServicoFilter] = useState("Todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<any>(null);
+  const [reclassificacaoSolicitacao, setReclassificacaoSolicitacao] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -138,10 +139,9 @@ const InternoDashboard = () => {
     navigate("/interno");
   };
 
-  // Admin bypasses setor requirement
-  if (!profile?.setor && !isAdmin && user) {
-    return <SetorSelector userId={user.id} onComplete={fetchProfile} />;
-  }
+  // Admin NÃO precisa selecionar setor - vai direto para dashboard
+  // Não-admin sem setor precisa configurar (isso será gerenciado pelo admin agora)
+  // A tela de SetorSelector não aparece mais para Admin
 
   // Week days for dashboard
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeekStart, i));
@@ -177,6 +177,19 @@ const InternoDashboard = () => {
 
   const tipoServicosOptions = ["Todos", ...servicos.map(s => s.nome)];
 
+  // Mapeamento de labels para exibição
+  const getSetorLabel = (setor: string | null) => {
+    if (!setor) return "—";
+    const labels: Record<string, string> = {
+      "COMEX": "Administrativo",
+      "ARMAZEM": "Operacional",
+      "ADMINISTRATIVO": "Administrativo",
+      "OPERACIONAL": "Operacional",
+      "MASTER": "Master"
+    };
+    return labels[setor] || setor;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -190,7 +203,7 @@ const InternoDashboard = () => {
             <div>
               <h1 className="text-sm font-bold">Serviços Adicionais</h1>
               <p className="text-xs text-primary-foreground/70">
-                {profile?.nome} · {isAdmin ? "Admin" : profile?.setor}
+                {profile?.nome} · {isAdmin ? "Admin" : getSetorLabel(profile?.setor)}
               </p>
             </div>
           </div>
@@ -395,8 +408,8 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Contêiner</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
-                  <TableHead className="text-primary-foreground">COMEX</TableHead>
-                  <TableHead className="text-primary-foreground">Armazém</TableHead>
+                  <TableHead className="text-primary-foreground">Administrativo</TableHead>
+                  <TableHead className="text-primary-foreground">Operacional</TableHead>
                   <TableHead className="text-primary-foreground">Data</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -427,17 +440,31 @@ const InternoDashboard = () => {
                       <TableCell>
                         <ApprovalIndicator approved={s.armazem_aprovado} />
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {new Date(s.created_at).toLocaleDateString("pt-BR")}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {s.data_posicionamento || "—"}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedSolicitacao(s)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedSolicitacao(s)}
+                            title="Visualizar / Analisar"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {/* Botão reclassificar - só aparece se já tem decisão */}
+                          {(s.comex_aprovado !== null || s.armazem_aprovado !== null) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setReclassificacaoSolicitacao(s)}
+                              title="Reclassificar Aprovação"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -446,29 +473,47 @@ const InternoDashboard = () => {
             </Table>
           </CardContent>
         </Card>
-
-        {/* Analysis Dialog */}
-        {selectedSolicitacao && profile && (
-          <AnaliseDialog
-            solicitacao={selectedSolicitacao}
-            profile={profile}
-            userId={user!.id}
-            isAdmin={isAdmin}
-            onClose={() => {
-              setSelectedSolicitacao(null);
-              fetchSolicitacoes();
-            }}
-          />
-        )}
       </main>
+
+      {/* Análise Dialog */}
+      {selectedSolicitacao && profile && user && (
+        <AnaliseDialog
+          solicitacao={selectedSolicitacao}
+          profile={{
+            ...profile,
+            // Mapear setor antigo para novo
+            setor: profile.setor === "COMEX" ? "COMEX" : profile.setor === "ARMAZEM" ? "ARMAZEM" : profile.setor
+          }}
+          userId={user.id}
+          isAdmin={isAdmin}
+          onClose={() => {
+            setSelectedSolicitacao(null);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
+
+      {/* Reclassificação Dialog */}
+      {reclassificacaoSolicitacao && user && (
+        <ReclassificacaoDialog
+          solicitacao={reclassificacaoSolicitacao}
+          userId={user.id}
+          isAdmin={isAdmin}
+          onClose={() => {
+            setReclassificacaoSolicitacao(null);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
     </div>
   );
 };
 
+// Helper Components
 const StatCard = ({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color?: string }) => (
   <Card className="border-0 shadow-sm">
-    <CardContent className="py-4 flex items-center gap-3">
-      <span className={color || "text-muted-foreground"}>{icon}</span>
+    <CardContent className="py-4 px-5 flex items-center gap-4">
+      <div className={`${color || "text-primary"}`}>{icon}</div>
       <div>
         <p className="text-2xl font-bold">{value}</p>
         <p className="text-xs text-muted-foreground">{label}</p>
@@ -478,14 +523,13 @@ const StatCard = ({ label, value, icon, color }: { label: string; value: number;
 );
 
 const ApprovalIndicator = ({ approved }: { approved: boolean | null }) => {
-  if (approved === null || approved === undefined) {
-    return <span className="text-xs text-muted-foreground">Pendente</span>;
+  if (approved === null) {
+    return <Badge variant="outline" className="text-muted-foreground">Pendente</Badge>;
   }
-  return approved ? (
-    <CheckCircle2 className="h-4 w-4 text-secondary" />
-  ) : (
-    <XCircle className="h-4 w-4 text-destructive" />
-  );
+  if (approved) {
+    return <Badge className="bg-secondary text-secondary-foreground">Aprovado</Badge>;
+  }
+  return <Badge variant="destructive">Recusado</Badge>;
 };
 
 export default InternoDashboard;

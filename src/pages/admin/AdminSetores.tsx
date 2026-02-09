@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,17 +26,16 @@ interface Servico {
   nome: string;
 }
 
-interface TipoSetor {
-  id: string;
-  nome: string;
-  ativo: boolean;
-}
+// Tipos de setor disponíveis para seleção (MASTER é exclusivo para Admin)
+const TIPOS_SETOR_DISPONIVEIS = [
+  { value: "ADMINISTRATIVO", label: "Administrativo", dbValue: "ADMINISTRATIVO" as const },
+  { value: "OPERACIONAL", label: "Operacional", dbValue: "OPERACIONAL" as const },
+];
 
 const AdminSetores = () => {
   const navigate = useNavigate();
   const [setores, setSetores] = useState<Setor[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
-  const [tiposSetor, setTiposSetor] = useState<TipoSetor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAccessDialog, setShowAccessDialog] = useState(false);
@@ -47,7 +45,7 @@ const AdminSetores = () => {
   const [setorServicosMap, setSetorServicosMap] = useState<Record<string, Set<string>>>({});
   const [formData, setFormData] = useState({
     email_setor: "",
-    setor: "",
+    tiposSetor: [] as string[], // Multi-seleção
     descricao: ""
   });
 
@@ -56,10 +54,9 @@ const AdminSetores = () => {
   }, []);
 
   const fetchData = async () => {
-    const [setoresRes, servicosRes, tiposRes, setorServicosRes] = await Promise.all([
+    const [setoresRes, servicosRes, setorServicosRes] = await Promise.all([
       supabase.from("setor_emails").select("*").order("setor"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
-      supabase.from("tipos_setor").select("id, nome, ativo").eq("ativo", true).order("nome"),
       supabase.from("setor_servicos").select("setor_email_id, servico_id")
     ]);
 
@@ -70,7 +67,6 @@ const AdminSetores = () => {
     }
     
     if (servicosRes.data) setServicos(servicosRes.data);
-    if (tiposRes.data) setTiposSetor(tiposRes.data);
     
     // Map setor_servicos
     if (setorServicosRes.data) {
@@ -92,7 +88,6 @@ const AdminSetores = () => {
       .eq("id", setor.id);
 
     if (error) {
-      console.error("Toggle error:", error);
       toast.error("Erro ao atualizar status: " + error.message);
       return;
     }
@@ -101,63 +96,69 @@ const AdminSetores = () => {
     fetchData();
   };
 
+  const toggleTipoSetor = (tipo: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tiposSetor: prev.tiposSetor.includes(tipo)
+        ? prev.tiposSetor.filter(t => t !== tipo)
+        : [...prev.tiposSetor, tipo]
+    }));
+  };
+
   const handleSave = async () => {
     if (!formData.email_setor.endsWith("@jbsterminais.com.br")) {
       toast.error("E-mail deve ser do domínio @jbsterminais.com.br");
       return;
     }
 
-    if (!formData.setor) {
-      toast.error("Selecione o tipo de setor");
+    if (formData.tiposSetor.length === 0) {
+      toast.error("Selecione pelo menos um tipo de setor");
       return;
     }
 
+    // Mapear tipos selecionados para valor do enum no banco
+    // ADMINISTRATIVO e OPERACIONAL são os valores válidos do enum expandido
+    const tipoToDb: Record<string, string> = {
+      "ADMINISTRATIVO": "ADMINISTRATIVO",
+      "OPERACIONAL": "OPERACIONAL",
+    };
+
+    // Usar o primeiro tipo selecionado como principal (banco aceita apenas um valor)
+    const primaryTipo = formData.tiposSetor[0];
+    let setorValue = tipoToDb[primaryTipo];
+    
+    // Fallback para valores antigos se necessário
+    if (!setorValue) {
+      if (primaryTipo === "COMEX") setorValue = "COMEX";
+      else if (primaryTipo === "ARMAZEM" || primaryTipo === "ARMAZÉM") setorValue = "ARMAZEM";
+      else setorValue = "ADMINISTRATIVO"; // Default
+    }
+
     if (editingSetor) {
-      // Map the tipo to enum value (only COMEX and ARMAZEM are valid in DB)
-      const tipoToSetor: Record<string, "COMEX" | "ARMAZEM"> = {
-        "COMEX": "COMEX",
-        "ARMAZEM": "ARMAZEM",
-        "ARMAZÉM": "ARMAZEM",
-        "MASTER": "COMEX",
-        "ADM": "COMEX"
-      };
-      const setorValue = tipoToSetor[formData.setor.toUpperCase()] || "COMEX";
-      
       const { error } = await supabase
         .from("setor_emails")
         .update({
           email_setor: formData.email_setor,
-          setor: setorValue,
+          setor: setorValue as any,
           descricao: formData.descricao || null
         })
         .eq("id", editingSetor.id);
 
       if (error) {
-        console.error("Update error:", error);
         toast.error("Erro ao atualizar setor: " + error.message);
         return;
       }
       toast.success("Setor atualizado!");
     } else {
-      const tipoToSetor: Record<string, "COMEX" | "ARMAZEM"> = {
-        "COMEX": "COMEX",
-        "ARMAZEM": "ARMAZEM",
-        "ARMAZÉM": "ARMAZEM",
-        "MASTER": "COMEX",
-        "ADM": "COMEX"
-      };
-      const setorValueInsert = tipoToSetor[formData.setor.toUpperCase()] || "COMEX";
-      
       const { error } = await supabase
         .from("setor_emails")
         .insert({
           email_setor: formData.email_setor,
-          setor: setorValueInsert,
+          setor: setorValue as any,
           descricao: formData.descricao || null
         });
 
       if (error) {
-        console.error("Insert error:", error);
         toast.error("Erro ao adicionar setor: " + error.message);
         return;
       }
@@ -166,12 +167,11 @@ const AdminSetores = () => {
 
     setShowAddDialog(false);
     setEditingSetor(null);
-    setFormData({ email_setor: "", setor: "", descricao: "" });
+    setFormData({ email_setor: "", tiposSetor: [], descricao: "" });
     fetchData();
   };
 
   const handleDelete = async (setor: Setor) => {
-    // Check if there are users linked to this sector
     const { data: linkedUsers } = await supabase
       .from("profiles")
       .select("id")
@@ -183,7 +183,6 @@ const AdminSetores = () => {
       return;
     }
 
-    // Delete setor_servicos first
     await supabase.from("setor_servicos").delete().eq("setor_email_id", setor.id);
 
     const { error } = await supabase
@@ -192,7 +191,6 @@ const AdminSetores = () => {
       .eq("id", setor.id);
 
     if (error) {
-      console.error("Delete error:", error);
       toast.error("Erro ao excluir setor: " + error.message);
       return;
     }
@@ -203,9 +201,20 @@ const AdminSetores = () => {
 
   const openEditDialog = (setor: Setor) => {
     setEditingSetor(setor);
+    
+    // Mapear valor do banco para tipos selecionados
+    const dbToTipo: Record<string, string> = {
+      "COMEX": "ADMINISTRATIVO",
+      "ARMAZEM": "OPERACIONAL",
+      "ADMINISTRATIVO": "ADMINISTRATIVO",
+      "OPERACIONAL": "OPERACIONAL",
+    };
+    
+    const tipoMapeado = dbToTipo[setor.setor] || setor.setor;
+    
     setFormData({
       email_setor: setor.email_setor,
-      setor: setor.setor,
+      tiposSetor: [tipoMapeado],
       descricao: setor.descricao || ""
     });
     setShowAddDialog(true);
@@ -213,8 +222,6 @@ const AdminSetores = () => {
 
   const openAccessDialog = async (setor: Setor) => {
     setSelectedSetorForAccess(setor);
-    
-    // Load current permissions from database
     const currentPermissions = setorServicosMap[setor.id] || new Set();
     setSelectedServicos(new Set(currentPermissions));
     setShowAccessDialog(true);
@@ -235,10 +242,8 @@ const AdminSetores = () => {
   const saveAccessPermissions = async () => {
     if (!selectedSetorForAccess) return;
 
-    // Delete existing permissions
     await supabase.from("setor_servicos").delete().eq("setor_email_id", selectedSetorForAccess.id);
 
-    // Insert new permissions
     if (selectedServicos.size > 0) {
       const inserts = Array.from(selectedServicos).map(servicoId => ({
         setor_email_id: selectedSetorForAccess.id,
@@ -252,10 +257,21 @@ const AdminSetores = () => {
       }
     }
 
-    toast.success(`Permissões atualizadas para ${selectedSetorForAccess.setor}`);
+    toast.success(`Permissões atualizadas para ${getSetorLabel(selectedSetorForAccess.setor)}`);
     setShowAccessDialog(false);
     setSelectedSetorForAccess(null);
     fetchData();
+  };
+
+  const getSetorLabel = (setor: string) => {
+    const labels: Record<string, string> = {
+      "COMEX": "Administrativo",
+      "ARMAZEM": "Operacional",
+      "ADMINISTRATIVO": "Administrativo",
+      "OPERACIONAL": "Operacional",
+      "MASTER": "Master"
+    };
+    return labels[setor] || setor;
   };
 
   if (loading) {
@@ -283,7 +299,7 @@ const AdminSetores = () => {
           setShowAddDialog(open);
           if (!open) {
             setEditingSetor(null);
-            setFormData({ email_setor: "", setor: "", descricao: "" });
+            setFormData({ email_setor: "", tiposSetor: [], descricao: "" });
           }
         }}>
           <DialogTrigger asChild>
@@ -306,30 +322,26 @@ const AdminSetores = () => {
                 />
               </div>
               <div>
-                <Label>Tipo de Setor</Label>
-                <Select
-                  value={formData.setor}
-                  onValueChange={(value) => setFormData({ ...formData, setor: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* Opções padrão do enum */}
-                    <SelectItem value="COMEX">COMEX</SelectItem>
-                    <SelectItem value="ARMAZEM">ARMAZEM</SelectItem>
-                    {/* Tipos customizados */}
-                    {tiposSetor
-                      .filter(tipo => !["COMEX", "ARMAZEM", "ARMAZÉM"].includes(tipo.nome.toUpperCase()))
-                      .map(tipo => (
-                        <SelectItem key={tipo.id} value={tipo.nome}>
-                          {tipo.nome}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Para criar novos tipos, acesse Parâmetros &gt; Tipos de Setor
+                <Label>Tipo(s) de Setor</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Selecione um ou mais tipos para este setor
+                </p>
+                <div className="space-y-2">
+                  {TIPOS_SETOR_DISPONIVEIS.map(tipo => (
+                    <div key={tipo.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={tipo.value}
+                        checked={formData.tiposSetor.includes(tipo.value)}
+                        onCheckedChange={() => toggleTipoSetor(tipo.value)}
+                      />
+                      <Label htmlFor={tipo.value} className="cursor-pointer">
+                        {tipo.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Nota: O tipo "Master" é exclusivo para o usuário administrador do sistema
                 </p>
               </div>
               <div>
@@ -353,7 +365,7 @@ const AdminSetores = () => {
       <Dialog open={showAccessDialog} onOpenChange={setShowAccessDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Permissões de Acesso - {selectedSetorForAccess?.setor}</DialogTitle>
+            <DialogTitle>Permissões de Acesso - {selectedSetorForAccess ? getSetorLabel(selectedSetorForAccess.setor) : ""}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <p className="text-sm text-muted-foreground">
@@ -405,7 +417,7 @@ const AdminSetores = () => {
                 return (
                   <TableRow key={setor.id} className={!setor.ativo ? "opacity-50" : ""}>
                     <TableCell className="font-mono">{setor.email_setor}</TableCell>
-                    <TableCell className="font-medium">{setor.setor}</TableCell>
+                    <TableCell className="font-medium">{getSetorLabel(setor.setor)}</TableCell>
                     <TableCell>{setor.descricao || "—"}</TableCell>
                     <TableCell>
                       <span className={servicosCount > 0 ? "text-primary" : "text-muted-foreground"}>

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -11,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface RegraServico {
@@ -39,6 +40,35 @@ interface ProtocolConfig {
   id: string;
   prefixo: string;
   ultimo_numero: number;
+}
+
+interface PageConfig {
+  id: string;
+  config_key: string;
+  config_value: string | null;
+  config_type: string;
+  description: string | null;
+  is_active: boolean;
+}
+
+interface RoutingRule {
+  id: string;
+  servico_id: string;
+  campo_criterio: string;
+  valor_criterio: string;
+  setor_ids: string[];
+  ativo: boolean;
+}
+
+interface FieldMapping {
+  campo_interno: string;
+  campo_externo: string;
+}
+
+interface SetorEmail {
+  id: string;
+  email_setor: string;
+  descricao: string | null;
 }
 
 const DIAS_SEMANA = [
@@ -77,20 +107,46 @@ const AdminParametros = () => {
   // Configuração de Protocolo
   const [protocolConfig, setProtocolConfig] = useState<ProtocolConfig | null>(null);
 
+  // Configuração de Página Externa
+  const [pageConfigs, setPageConfigs] = useState<PageConfig[]>([]);
+  const [editingPageConfig, setEditingPageConfig] = useState<PageConfig | null>(null);
+  const [showPageConfigDialog, setShowPageConfigDialog] = useState(false);
+
+  // Routing Rules
+  const [routingRules, setRoutingRules] = useState<RoutingRule[]>([]);
+  const [showRoutingDialog, setShowRoutingDialog] = useState(false);
+  const [editingRouting, setEditingRouting] = useState<RoutingRule | null>(null);
+  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
+  const [setorEmails, setSetorEmails] = useState<SetorEmail[]>([]);
+  const [routingFormData, setRoutingFormData] = useState({
+    servico_id: "",
+    campo_criterio: "",
+    valor_criterio: "",
+    setor_ids: [] as string[]
+  });
+
   useEffect(() => {
     fetchAllData();
   }, []);
 
   const fetchAllData = async () => {
-    const [regrasRes, servicosRes, protocolRes] = await Promise.all([
+    const [regrasRes, servicosRes, protocolRes, pageConfigRes, routingRes, fieldMappingsRes, setorEmailsRes] = await Promise.all([
       supabase.from("regras_servico").select("*").order("created_at"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
-      supabase.from("protocol_config").select("*").limit(1).single()
+      supabase.from("protocol_config").select("*").limit(1).single(),
+      supabase.from("page_config").select("*").order("config_key"),
+      supabase.from("service_routing_rules").select("*").order("created_at"),
+      supabase.from("field_mappings").select("campo_interno, campo_externo"),
+      supabase.from("setor_emails").select("id, email_setor, descricao").eq("ativo", true)
     ]);
 
     if (regrasRes.data) setRegras(regrasRes.data);
     if (servicosRes.data) setServicos(servicosRes.data);
     if (protocolRes.data) setProtocolConfig(protocolRes.data);
+    if (pageConfigRes.data) setPageConfigs(pageConfigRes.data);
+    if (routingRes.data) setRoutingRules(routingRes.data);
+    if (fieldMappingsRes.data) setFieldMappings(fieldMappingsRes.data);
+    if (setorEmailsRes.data) setSetorEmails(setorEmailsRes.data);
     
     setLoading(false);
   };
@@ -206,7 +262,7 @@ const AdminParametros = () => {
       toast.error("Erro ao excluir regra");
       return;
     }
-    toast.success("Regra excluída! Será aplicado o padrão do sistema.");
+    toast.success("Regra excluída!");
     fetchAllData();
   };
 
@@ -235,6 +291,129 @@ const AdminParametros = () => {
     setSaving(false);
   };
 
+  // ============= PAGE CONFIG =============
+  const openPageConfigDialog = (config: PageConfig) => {
+    setEditingPageConfig(config);
+    setShowPageConfigDialog(true);
+  };
+
+  const savePageConfig = async () => {
+    if (!editingPageConfig) return;
+
+    setSaving(true);
+    const { error } = await supabase
+      .from("page_config")
+      .update({
+        config_value: editingPageConfig.config_value,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", editingPageConfig.id);
+
+    if (error) {
+      toast.error("Erro ao salvar configuração");
+    } else {
+      toast.success("Configuração salva!");
+    }
+    setShowPageConfigDialog(false);
+    setSaving(false);
+    fetchAllData();
+  };
+
+  // ============= ROUTING RULES =============
+  const openRoutingDialog = (rule?: RoutingRule) => {
+    if (rule) {
+      setEditingRouting(rule);
+      setRoutingFormData({
+        servico_id: rule.servico_id,
+        campo_criterio: rule.campo_criterio,
+        valor_criterio: rule.valor_criterio,
+        setor_ids: rule.setor_ids
+      });
+    } else {
+      setEditingRouting(null);
+      setRoutingFormData({
+        servico_id: "",
+        campo_criterio: "",
+        valor_criterio: "",
+        setor_ids: []
+      });
+    }
+    setShowRoutingDialog(true);
+  };
+
+  const toggleSetorForRouting = (setorId: string) => {
+    setRoutingFormData(prev => ({
+      ...prev,
+      setor_ids: prev.setor_ids.includes(setorId)
+        ? prev.setor_ids.filter(id => id !== setorId)
+        : [...prev.setor_ids, setorId]
+    }));
+  };
+
+  const saveRoutingRule = async () => {
+    if (!routingFormData.servico_id || !routingFormData.campo_criterio || routingFormData.setor_ids.length === 0) {
+      toast.error("Preencha todos os campos obrigatórios (serviço, campo critério e pelo menos um setor)");
+      return;
+    }
+
+    const data = {
+      servico_id: routingFormData.servico_id,
+      campo_criterio: routingFormData.campo_criterio,
+      valor_criterio: routingFormData.valor_criterio,
+      setor_ids: routingFormData.setor_ids,
+      updated_at: new Date().toISOString()
+    };
+
+    setSaving(true);
+    if (editingRouting) {
+      const { error } = await supabase
+        .from("service_routing_rules")
+        .update(data)
+        .eq("id", editingRouting.id);
+
+      if (error) {
+        toast.error("Erro ao atualizar regra de roteamento");
+        setSaving(false);
+        return;
+      }
+      toast.success("Regra atualizada!");
+    } else {
+      const { error } = await supabase
+        .from("service_routing_rules")
+        .insert(data);
+
+      if (error) {
+        toast.error("Erro ao criar regra de roteamento");
+        setSaving(false);
+        return;
+      }
+      toast.success("Regra criada!");
+    }
+
+    setShowRoutingDialog(false);
+    setSaving(false);
+    fetchAllData();
+  };
+
+  const deleteRoutingRule = async (rule: RoutingRule) => {
+    const { error } = await supabase
+      .from("service_routing_rules")
+      .delete()
+      .eq("id", rule.id);
+
+    if (error) {
+      toast.error("Erro ao excluir regra");
+      return;
+    }
+    toast.success("Regra excluída!");
+    fetchAllData();
+  };
+
+  const getSetorLabel = (setorId: string) => {
+    const setor = setorEmails.find(s => s.id === setorId);
+    return setor?.descricao || setor?.email_setor || setorId;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -255,8 +434,16 @@ const AdminParametros = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="regras" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs defaultValue="pagina-externa" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="pagina-externa" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Página Externa
+          </TabsTrigger>
+          <TabsTrigger value="visualizacao" className="flex items-center gap-2">
+            <Eye className="h-4 w-4" />
+            Visualização
+          </TabsTrigger>
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Regras de Negócio
@@ -266,6 +453,156 @@ const AdminParametros = () => {
             Protocolo
           </TabsTrigger>
         </TabsList>
+
+        {/* ============= PÁGINA EXTERNA ============= */}
+        <TabsContent value="pagina-externa">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Configurações da Página Externa
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Configure os elementos da página externa: botões, links, iframe do Hashdata.
+              </p>
+
+              {pageConfigs.filter(c => 
+                c.config_key.includes('hashdata') || 
+                c.config_key.includes('botao') ||
+                c.config_key.includes('external')
+              ).map(config => (
+                <div key={config.id} className="flex items-center justify-between border rounded-lg p-4">
+                  <div>
+                    <p className="font-medium">{config.description || config.config_key}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {config.config_type === 'url' && (config.config_value || 'Não configurado')}
+                      {config.config_type === 'boolean' && (config.config_value === 'true' ? 'Sim' : 'Não')}
+                      {config.config_type === 'text' && (config.config_value || 'Não definido')}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => openPageConfigDialog(config)}>
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar
+                  </Button>
+                </div>
+              ))}
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Regras de Roteamento (Subcritérios de Visualização)</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Defina quais setores devem ser notificados para atuar em processos com base em critérios específicos.
+                </p>
+                
+                <div className="flex justify-end mb-3">
+                  <Button onClick={() => openRoutingDialog()}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Regra
+                  </Button>
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Serviço</TableHead>
+                      <TableHead>Campo Critério</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Setores</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {routingRules.map(rule => (
+                      <TableRow key={rule.id}>
+                        <TableCell>{getServicoNome(rule.servico_id)}</TableCell>
+                        <TableCell>{rule.campo_criterio}</TableCell>
+                        <TableCell>{rule.valor_criterio || "Qualquer"}</TableCell>
+                        <TableCell className="text-xs">
+                          {rule.setor_ids.map(id => getSetorLabel(id)).join(", ")}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openRoutingDialog(rule)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Excluir Regra</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir esta regra de roteamento?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteRoutingRule(rule)} className="bg-destructive text-destructive-foreground">
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {routingRules.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          Nenhuma regra configurada.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============= VISUALIZAÇÃO ============= */}
+        <TabsContent value="visualizacao">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Configurações de Visualização
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Configure como os anexos e documentos são exibidos na análise.
+              </p>
+
+              {pageConfigs.filter(c => c.config_key.includes('visualizacao')).map(config => (
+                <div key={config.id} className="flex items-center justify-between border rounded-lg p-4">
+                  <div>
+                    <p className="font-medium">{config.description || config.config_key}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {config.config_value === 'true' ? 'Visualização embutida direto na tela' : 'Botão para visualizar'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={config.config_value === 'true'}
+                    onCheckedChange={async (checked) => {
+                      await supabase
+                        .from("page_config")
+                        .update({ config_value: checked ? 'true' : 'false' })
+                        .eq("id", config.id);
+                      toast.success("Configuração atualizada!");
+                      fetchAllData();
+                    }}
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* ============= REGRAS DE SERVIÇO ============= */}
         <TabsContent value="regras">
@@ -316,7 +653,6 @@ const AdminParametros = () => {
                                 <AlertDialogTitle>Excluir Regra</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   Tem certeza que deseja excluir a regra para <strong>{getServicoNome(regra.servico_id)}</strong>?
-                                  O sistema aplicará as configurações padrão.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -342,84 +678,6 @@ const AdminParametros = () => {
               </Table>
             </CardContent>
           </Card>
-
-          {/* Dialog para Regra */}
-          <Dialog open={showRegraDialog} onOpenChange={setShowRegraDialog}>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{editingRegra ? "Editar Regra" : "Adicionar Regra"}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label>Serviço</Label>
-                  <Select
-                    value={regraFormData.servico_id}
-                    onValueChange={(v) => setRegraFormData(prev => ({ ...prev, servico_id: v }))}
-                    disabled={!!editingRegra}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o serviço" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {servicos.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Hora de Corte</Label>
-                    <Input
-                      type="time"
-                      value={regraFormData.hora_corte}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, hora_corte: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label>Limite por Dia</Label>
-                    <Input
-                      type="number"
-                      value={regraFormData.limite_dia}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_dia: e.target.value }))}
-                      placeholder="Sem limite"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Dias de Operação</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {DIAS_SEMANA.map(dia => (
-                      <div key={dia.key} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={dia.key}
-                          checked={regraFormData.dias_semana.includes(dia.key)}
-                          onCheckedChange={() => toggleDiaSemana(dia.key)}
-                        />
-                        <Label htmlFor={dia.key} className="cursor-pointer text-sm">{dia.label}</Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="aplica_dia_anterior"
-                    checked={regraFormData.aplica_dia_anterior}
-                    onCheckedChange={(c) => setRegraFormData(prev => ({ ...prev, aplica_dia_anterior: !!c }))}
-                  />
-                  <Label htmlFor="aplica_dia_anterior">
-                    Aplicar regra ao dia anterior (pedidos após hora de corte contam para o próximo dia)
-                  </Label>
-                </div>
-              </div>
-              <DialogFooter className="mt-4">
-                <Button onClick={saveRegra} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Salvando..." : "Salvar"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </TabsContent>
 
         {/* ============= PROTOCOLO ============= */}
@@ -443,23 +701,16 @@ const AdminParametros = () => {
                       maxLength={5}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Exemplo: {protocolConfig.prefixo}A000001 (prefixo + letra do serviço + número)
+                      Exemplo: {protocolConfig.prefixo}A000001
                     </p>
                   </div>
                   <div>
                     <Label>Último Número Gerado</Label>
-                    <Input
-                      value={protocolConfig.ultimo_numero}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Este campo é atualizado automaticamente
-                    </p>
+                    <Input value={protocolConfig.ultimo_numero} disabled className="bg-muted" />
                   </div>
                   <Button onClick={saveProtocolConfig} disabled={saving}>
                     <Save className="h-4 w-4 mr-2" />
-                    {saving ? "Salvando..." : "Salvar Configuração"}
+                    {saving ? "Salvando..." : "Salvar"}
                   </Button>
                 </div>
               )}
@@ -467,6 +718,203 @@ const AdminParametros = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog para Regra */}
+      <Dialog open={showRegraDialog} onOpenChange={setShowRegraDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingRegra ? "Editar Regra" : "Adicionar Regra"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Serviço</Label>
+              <Select
+                value={regraFormData.servico_id}
+                onValueChange={(v) => setRegraFormData(prev => ({ ...prev, servico_id: v }))}
+                disabled={!!editingRegra}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o serviço" />
+                </SelectTrigger>
+                <SelectContent>
+                  {servicos.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Hora de Corte</Label>
+                <Input
+                  type="time"
+                  value={regraFormData.hora_corte}
+                  onChange={(e) => setRegraFormData(prev => ({ ...prev, hora_corte: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Limite por Dia</Label>
+                <Input
+                  type="number"
+                  value={regraFormData.limite_dia}
+                  onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_dia: e.target.value }))}
+                  placeholder="Sem limite"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Dias de Operação</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {DIAS_SEMANA.map(dia => (
+                  <div key={dia.key} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={dia.key}
+                      checked={regraFormData.dias_semana.includes(dia.key)}
+                      onCheckedChange={() => toggleDiaSemana(dia.key)}
+                    />
+                    <Label htmlFor={dia.key} className="cursor-pointer text-sm">{dia.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="aplica_dia_anterior"
+                checked={regraFormData.aplica_dia_anterior}
+                onCheckedChange={(c) => setRegraFormData(prev => ({ ...prev, aplica_dia_anterior: !!c }))}
+              />
+              <Label htmlFor="aplica_dia_anterior">
+                Aplicar regra ao dia anterior
+              </Label>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={saveRegra} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Page Config */}
+      <Dialog open={showPageConfigDialog} onOpenChange={setShowPageConfigDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Configuração</DialogTitle>
+          </DialogHeader>
+          {editingPageConfig && (
+            <div className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">{editingPageConfig.description}</p>
+              
+              {editingPageConfig.config_type === 'boolean' ? (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={editingPageConfig.config_value === 'true'}
+                    onCheckedChange={(checked) => setEditingPageConfig({
+                      ...editingPageConfig,
+                      config_value: checked ? 'true' : 'false'
+                    })}
+                  />
+                  <Label>{editingPageConfig.config_value === 'true' ? 'Sim' : 'Não'}</Label>
+                </div>
+              ) : (
+                <Input
+                  value={editingPageConfig.config_value || ''}
+                  onChange={(e) => setEditingPageConfig({
+                    ...editingPageConfig,
+                    config_value: e.target.value
+                  })}
+                  placeholder={editingPageConfig.config_type === 'url' ? 'https://...' : 'Valor'}
+                />
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={savePageConfig} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Routing Rule */}
+      <Dialog open={showRoutingDialog} onOpenChange={setShowRoutingDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingRouting ? "Editar Regra" : "Adicionar Regra de Roteamento"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Serviço</Label>
+              <Select
+                value={routingFormData.servico_id}
+                onValueChange={(v) => setRoutingFormData(prev => ({ ...prev, servico_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o serviço" />
+                </SelectTrigger>
+                <SelectContent>
+                  {servicos.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Campo Critério (do Mapeamento de Campos)</Label>
+              <Select
+                value={routingFormData.campo_criterio}
+                onValueChange={(v) => setRoutingFormData(prev => ({ ...prev, campo_criterio: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o campo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fieldMappings.map(fm => (
+                    <SelectItem key={fm.campo_interno} value={fm.campo_interno}>
+                      {fm.campo_interno} ({fm.campo_externo})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Valor do Critério (opcional)</Label>
+              <Input
+                value={routingFormData.valor_criterio}
+                onChange={(e) => setRoutingFormData(prev => ({ ...prev, valor_criterio: e.target.value }))}
+                placeholder="Deixe vazio para qualquer valor"
+              />
+            </div>
+            <div>
+              <Label>Setores que devem ser notificados *</Label>
+              <p className="text-xs text-muted-foreground mb-2">Selecione pelo menos um setor</p>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
+                {setorEmails.map(setor => (
+                  <div key={setor.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`setor-${setor.id}`}
+                      checked={routingFormData.setor_ids.includes(setor.id)}
+                      onCheckedChange={() => toggleSetorForRouting(setor.id)}
+                    />
+                    <Label htmlFor={`setor-${setor.id}`} className="cursor-pointer text-sm">
+                      {setor.descricao || setor.email_setor}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={saveRoutingRule} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

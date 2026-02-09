@@ -30,7 +30,8 @@ interface DeferimentoDocument {
   id: string;
   file_name: string;
   file_url: string;
-  status?: string; // 'pendente', 'aceito', 'recusado'
+  status: string | null;
+  motivo_recusa: string | null;
   created_at: string;
 }
 
@@ -111,6 +112,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
           solicitacao_id: solicitacao.id,
           file_name: previewFile.file.name,
           file_url: urlData.publicUrl,
+          status: 'pendente'
         });
 
       if (dbError) throw dbError;
@@ -135,12 +137,116 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
   };
 
   // Verificar se pode enviar deferimento
-  const isExportacao = solicitacao.tipo_operacao?.toLowerCase().includes("export");
   const vistoriaFinalizada = solicitacao.status_vistoria === "Vistoria Finalizada";
-  const canUpload = vistoriaFinalizada && !existingDoc;
-  const docPendente = existingDoc && !existingDoc.status;
-  const docAceito = existingDoc?.status === "aceito";
-  const docRecusado = existingDoc?.status === "recusado";
+  const docPendente = existingDoc?.status === 'pendente';
+  const docAceito = existingDoc?.status === 'aceito';
+  const docRecusado = existingDoc?.status === 'recusado';
+  
+  // Pode enviar se: vistoria finalizada E (não tem doc OU doc foi recusado)
+  const canUpload = vistoriaFinalizada && (!existingDoc || docRecusado);
+
+  // Status do deferimento com cores
+  const getDeferimentoStatusSection = () => {
+    if (loadingDocs) {
+      return (
+        <div className="text-center py-4 text-muted-foreground">
+          Verificando documentos...
+        </div>
+      );
+    }
+
+    if (docAceito) {
+      return (
+        <Alert className="border-green-500 bg-green-50">
+          <Check className="h-4 w-4 text-green-600" />
+          <AlertDescription className="ml-2">
+            <span className="font-semibold text-green-700">Deferimento Aceito</span>
+            <p className="text-sm text-green-600 mt-1">
+              Documento recebido e aprovado.
+            </p>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (docPendente) {
+      return (
+        <Alert className="border-yellow-500 bg-yellow-50">
+          <Clock className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="ml-2">
+            <span className="font-semibold text-yellow-700">Aguardando Confirmação</span>
+            <p className="text-sm text-yellow-600 mt-1">
+              Documento enviado em {new Date(existingDoc!.created_at).toLocaleDateString("pt-BR")}. 
+              Aguardando análise.
+            </p>
+            {existingDoc && (
+              <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-yellow-700" asChild>
+                <a href={existingDoc.file_url} target="_blank" rel="noopener noreferrer">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Visualizar documento enviado
+                </a>
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (docRecusado) {
+      return (
+        <div className="space-y-3">
+          <Alert className="border-red-500 bg-red-50">
+            <X className="h-4 w-4 text-red-600" />
+            <AlertDescription className="ml-2">
+              <span className="font-semibold text-red-700">Deferimento Recusado - Reenviar Anexo</span>
+              {existingDoc?.motivo_recusa && (
+                <p className="text-sm text-red-600 mt-1">
+                  <strong>Motivo:</strong> {existingDoc.motivo_recusa}
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+          
+          <div className="bg-muted/30 border rounded-lg p-4">
+            <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Upload className="h-4 w-4 text-primary" />
+              Reenviar Deferimento
+            </p>
+            <Input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileSelect}
+              disabled={uploading}
+              className="text-sm"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (canUpload) {
+      return (
+        <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-4">
+          <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Upload className="h-4 w-4 text-secondary" />
+            Upload de Deferimento de Liberação
+          </p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Envie o deferimento de liberação do órgão (PDF, JPG ou PNG).
+          </p>
+          <Input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={handleFileSelect}
+            disabled={uploading}
+            className="text-sm"
+          />
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <>
@@ -189,88 +295,11 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
             </>
           )}
 
-          {/* Seção de Deferimento - Só aparece para Exportação com vistoria finalizada */}
-          {isExportacao && vistoriaFinalizada && (
+          {/* Seção de Deferimento - Só aparece com vistoria finalizada */}
+          {vistoriaFinalizada && (
             <>
               <Separator />
-              
-              {loadingDocs ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  Verificando documentos...
-                </div>
-              ) : docAceito ? (
-                <Alert className="border-secondary bg-secondary/10">
-                  <Check className="h-4 w-4 text-secondary" />
-                  <AlertDescription className="ml-2">
-                    <span className="font-semibold text-secondary">Deferimento Recebido</span>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Documento aceito e registrado no sistema.
-                    </p>
-                  </AlertDescription>
-                </Alert>
-              ) : docRecusado ? (
-                <div className="space-y-3">
-                  <Alert variant="destructive">
-                    <X className="h-4 w-4" />
-                    <AlertDescription className="ml-2">
-                      <span className="font-semibold">Deferimento Recusado</span>
-                      <p className="text-sm mt-1">
-                        O documento enviado foi recusado. Por favor, envie novamente.
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-                  
-                  <div className="bg-muted/30 border rounded-lg p-4">
-                    <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <Upload className="h-4 w-4 text-primary" />
-                      Reenviar Deferimento
-                    </p>
-                    <Input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={handleFileSelect}
-                      disabled={uploading}
-                      className="text-sm"
-                    />
-                  </div>
-                </div>
-              ) : docPendente || existingDoc ? (
-                <Alert className="border-yellow-500 bg-yellow-50">
-                  <Clock className="h-4 w-4 text-yellow-600" />
-                  <AlertDescription className="ml-2">
-                    <span className="font-semibold text-yellow-700">Aguardando Confirmação</span>
-                    <p className="text-sm text-yellow-600 mt-1">
-                      Documento enviado em {new Date(existingDoc!.created_at).toLocaleDateString("pt-BR")}. 
-                      Aguardando análise.
-                    </p>
-                    {existingDoc && (
-                      <Button variant="link" size="sm" className="p-0 h-auto mt-2" asChild>
-                        <a href={existingDoc.file_url} target="_blank" rel="noopener noreferrer">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Visualizar documento enviado
-                        </a>
-                      </Button>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              ) : canUpload ? (
-                <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Upload className="h-4 w-4 text-secondary" />
-                    Upload de Deferimento de Liberação
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Envie o deferimento de liberação do órgão (PDF, JPG ou PNG).
-                  </p>
-                  <Input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleFileSelect}
-                    disabled={uploading}
-                    className="text-sm"
-                  />
-                </div>
-              ) : null}
+              {getDeferimentoStatusSection()}
             </>
           )}
         </CardContent>

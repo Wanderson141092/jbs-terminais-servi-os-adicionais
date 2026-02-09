@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_accounts: {
+        Row: {
+          ativo: boolean | null
+          cpf: string
+          created_at: string | null
+          id: string
+          nome: string
+          senha_hash: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cpf: string
+          created_at?: string | null
+          id?: string
+          nome: string
+          senha_hash: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cpf?: string
+          created_at?: string | null
+          id?: string
+          nome?: string
+          senha_hash?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           acao: string
@@ -61,21 +91,27 @@ export type Database = {
           file_name: string
           file_url: string
           id: string
+          motivo_recusa: string | null
           solicitacao_id: string
+          status: string | null
         }
         Insert: {
           created_at?: string
           file_name: string
           file_url: string
           id?: string
+          motivo_recusa?: string | null
           solicitacao_id: string
+          status?: string | null
         }
         Update: {
           created_at?: string
           file_name?: string
           file_url?: string
           id?: string
+          motivo_recusa?: string | null
           solicitacao_id?: string
+          status?: string | null
         }
         Relationships: [
           {
@@ -161,6 +197,50 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_history: {
+        Row: {
+          created_at: string | null
+          detalhes: string | null
+          id: string
+          integracao_nome: string
+          payload: Json | null
+          response: Json | null
+          solicitacao_id: string | null
+          status: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string | null
+          detalhes?: string | null
+          id?: string
+          integracao_nome: string
+          payload?: Json | null
+          response?: Json | null
+          solicitacao_id?: string | null
+          status: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string | null
+          detalhes?: string | null
+          id?: string
+          integracao_nome?: string
+          payload?: Json | null
+          response?: Json | null
+          solicitacao_id?: string | null
+          status?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_history_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -198,6 +278,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      page_config: {
+        Row: {
+          config_key: string
+          config_type: string | null
+          config_value: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          config_key: string
+          config_type?: string | null
+          config_value?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_type?: string | null
+          config_value?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -326,6 +439,47 @@ export type Database = {
           },
         ]
       }
+      service_routing_rules: {
+        Row: {
+          ativo: boolean | null
+          campo_criterio: string
+          created_at: string | null
+          id: string
+          servico_id: string | null
+          setor_ids: string[]
+          updated_at: string | null
+          valor_criterio: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          campo_criterio: string
+          created_at?: string | null
+          id?: string
+          servico_id?: string | null
+          setor_ids?: string[]
+          updated_at?: string | null
+          valor_criterio: string
+        }
+        Update: {
+          ativo?: boolean | null
+          campo_criterio?: string
+          created_at?: string | null
+          id?: string
+          servico_id?: string | null
+          setor_ids?: string[]
+          updated_at?: string | null
+          valor_criterio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_routing_rules_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servicos: {
         Row: {
           ativo: boolean
@@ -334,6 +488,7 @@ export type Database = {
           descricao: string | null
           id: string
           nome: string
+          status_confirmacao_lancamento: string[] | null
           updated_at: string
         }
         Insert: {
@@ -343,6 +498,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           nome: string
+          status_confirmacao_lancamento?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -352,6 +508,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           nome?: string
+          status_confirmacao_lancamento?: string[] | null
           updated_at?: string
         }
         Relationships: []
@@ -363,6 +520,7 @@ export type Database = {
           descricao: string | null
           email_setor: string
           id: string
+          perfis: string[] | null
           setor: Database["public"]["Enums"]["setor_tipo"]
         }
         Insert: {
@@ -371,6 +529,7 @@ export type Database = {
           descricao?: string | null
           email_setor: string
           id?: string
+          perfis?: string[] | null
           setor: Database["public"]["Enums"]["setor_tipo"]
         }
         Update: {
@@ -379,6 +538,7 @@ export type Database = {
           descricao?: string | null
           email_setor?: string
           id?: string
+          perfis?: string[] | null
           setor?: Database["public"]["Enums"]["setor_tipo"]
         }
         Relationships: []
@@ -434,6 +594,9 @@ export type Database = {
           created_at: string
           data_posicionamento: string | null
           id: string
+          lancamento_confirmado: boolean | null
+          lancamento_confirmado_data: string | null
+          lancamento_confirmado_por: string | null
           lpco: string | null
           numero_conteiner: string | null
           observacoes: string | null
@@ -458,6 +621,9 @@ export type Database = {
           created_at?: string
           data_posicionamento?: string | null
           id?: string
+          lancamento_confirmado?: boolean | null
+          lancamento_confirmado_data?: string | null
+          lancamento_confirmado_por?: string | null
           lpco?: string | null
           numero_conteiner?: string | null
           observacoes?: string | null
@@ -482,6 +648,9 @@ export type Database = {
           created_at?: string
           data_posicionamento?: string | null
           id?: string
+          lancamento_confirmado?: boolean | null
+          lancamento_confirmado_data?: string | null
+          lancamento_confirmado_por?: string | null
           lpco?: string | null
           numero_conteiner?: string | null
           observacoes?: string | null

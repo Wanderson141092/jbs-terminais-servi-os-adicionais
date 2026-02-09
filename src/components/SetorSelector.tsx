@@ -35,8 +35,9 @@ const SetorSelector = ({ userId, onComplete }: SetorSelectorProps) => {
     // Check if this sector email exists in the mapping table
     const { data: setorData, error: setorError } = await supabase
       .from("setor_emails")
-      .select("setor")
+      .select("setor, descricao, email_setor")
       .eq("email_setor", emailLower)
+      .eq("ativo", true)
       .maybeSingle();
 
     if (setorError) {
@@ -63,7 +64,9 @@ const SetorSelector = ({ userId, onComplete }: SetorSelectorProps) => {
     if (error) {
       toast.error("Erro ao salvar setor: " + error.message);
     } else {
-      toast.success(`Setor ${setorData.setor} configurado com sucesso!`);
+      // Show sector name/description in success message, not the type
+      const setorNome = setorData.descricao || setorData.email_setor.split("@")[0];
+      toast.success(`Setor ${setorNome} configurado com sucesso!`);
       onComplete();
     }
     setLoading(false);
@@ -96,18 +99,8 @@ const SetorSelector = ({ userId, onComplete }: SetorSelectorProps) => {
               placeholder="setor@jbsterminais.com.br"
             />
             <p className="text-xs text-muted-foreground mt-2">
-              Exemplos: comex@jbsterminais.com.br, armazem@jbsterminais.com.br
+              Informe o e-mail do setor ao qual você pertence.
             </p>
-          </div>
-
-          <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
-            <p className="font-medium mb-1">Setores disponíveis:</p>
-            <ul className="text-xs space-y-1">
-              <li>• comex@jbsterminais.com.br (COMEX)</li>
-              <li>• exportacao@jbsterminais.com.br (COMEX)</li>
-              <li>• importacao@jbsterminais.com.br (COMEX)</li>
-              <li>• armazem@jbsterminais.com.br (ARMAZÉM)</li>
-            </ul>
           </div>
 
           <Button onClick={handleSave} disabled={loading} className="w-full jbs-btn-primary">

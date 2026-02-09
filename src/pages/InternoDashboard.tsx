@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,8 @@ import AnaliseDialog from "@/components/AnaliseDialog";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import ReclassificacaoDialog from "@/components/ReclassificacaoDialog";
 import SetorSelector from "@/components/SetorSelector";
+import BatchApprovalDialog from "@/components/BatchApprovalDialog";
+import BatchStatusDialog from "@/components/BatchStatusDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
@@ -30,12 +33,14 @@ import jbsLogo from "@/assets/jbs-terminais-logo.png";
 import { startOfWeek, addDays, format, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
+import useNotifications from "@/hooks/useNotifications";
 
 interface Servico {
   id: string;
   nome: string;
   codigo_prefixo: string;
   ativo: boolean;
+  status_confirmacao_lancamento?: string[];
 }
 
 const InternoDashboard = () => {
@@ -55,8 +60,15 @@ const InternoDashboard = () => {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [showSetorSelector, setShowSetorSelector] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBatchApproval, setShowBatchApproval] = useState(false);
+  const [showBatchStatus, setShowBatchStatus] = useState(false);
+  const [userPerfis, setUserPerfis] = useState<string[]>([]);
   
   const { isAdmin } = useAdminCheck(user?.id || null);
+  
+  // Initialize native notifications
+  useNotifications(user?.id || null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -78,16 +90,21 @@ const InternoDashboard = () => {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("*")
+      .select("*, setor_emails(perfis, descricao)")
       .eq("id", user.id)
       .maybeSingle();
     setProfile(data);
+    
+    // Get perfis from setor_emails
+    if (data?.setor_emails?.perfis) {
+      setUserPerfis(data.setor_emails.perfis);
+    }
   }, [user]);
 
   const fetchServicos = useCallback(async () => {
     const { data } = await supabase
       .from("servicos")
-      .select("*")
+      .select("*, status_confirmacao_lancamento")
       .eq("ativo", true)
       .order("nome");
     setServicos(data || []);
@@ -211,6 +228,57 @@ const InternoDashboard = () => {
       "MASTER": "Master"
     };
     return labels[setor] || setor;
+  };
+
+  // Check if user has Operacional profile for batch approval
+  const hasOperacionalProfile = userPerfis.includes("OPERACIONAL") || profile?.setor === "ARMAZEM" || isAdmin;
+
+  // Get processes eligible for batch approval (pending armazem approval)
+  const selectedForBatchApproval = filtered.filter(s => 
+    selectedIds.includes(s.id) && 
+    s.status === "aguardando_confirmacao" && 
+    s.armazem_aprovado === null
+  );
+
+  // Get processes eligible for batch status update (already approved)
+  const selectedForBatchStatus = filtered.filter(s => 
+    selectedIds.includes(s.id) && 
+    (s.status === "confirmado_aguardando_vistoria" || s.comex_aprovado || s.armazem_aprovado)
+  );
+
+  // Toggle selection
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filtered.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map(s => s.id));
+    }
+  };
+
+  // Calculate launch counters
+  const lancamentoPendente = solicitacoes.filter(s => {
+    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    if (!servico?.status_confirmacao_lancamento?.length) return false;
+    return servico.status_confirmacao_lancamento.includes(s.status) && !s.lancamento_confirmado;
+  }).length;
+
+  const lancamentoConfirmado = solicitacoes.filter(s => {
+    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    if (!servico?.status_confirmacao_lancamento?.length) return false;
+    return servico.status_confirmacao_lancamento.includes(s.status) && s.lancamento_confirmado === true;
+  }).length;
+
+  // Check if process needs launch confirmation
+  const needsLaunchConfirmation = (s: any) => {
+    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    if (!servico?.status_confirmacao_lancamento?.length) return false;
+    return servico.status_confirmacao_lancamento.includes(s.status);
   };
 
   return (
@@ -375,6 +443,24 @@ const InternoDashboard = () => {
           <StatCard label="Recusados" value={statusCounts["recusado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
         </div>
 
+        {/* Launch Counters */}
+        {(lancamentoPendente > 0 || lancamentoConfirmado > 0) && (
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <StatCard 
+              label="Lançamento Pendente" 
+              value={lancamentoPendente} 
+              icon={<DollarSign className="h-5 w-5" />} 
+              color="text-destructive" 
+            />
+            <StatCard 
+              label="Lançamento Confirmado" 
+              value={lancamentoConfirmado} 
+              icon={<DollarSign className="h-5 w-5" />} 
+              color="text-muted-foreground" 
+            />
+          </div>
+        )}
+
         {/* Status breakdown */}
         <div className="flex flex-wrap gap-2 mb-6">
           {Object.entries(STATUS_LABELS).map(([key, label]) => (
@@ -417,6 +503,32 @@ const InternoDashboard = () => {
               <Button variant="outline" size="sm" onClick={fetchSolicitacoes}>
                 Atualizar
               </Button>
+              
+              {/* Batch Action Buttons */}
+              {selectedIds.length > 0 && (
+                <div className="flex gap-2">
+                  {hasOperacionalProfile && selectedForBatchApproval.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                      onClick={() => setShowBatchApproval(true)}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      Aprovar ({selectedForBatchApproval.length})
+                    </Button>
+                  )}
+                  {selectedForBatchStatus.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setShowBatchStatus(true)}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Atualizar Status ({selectedForBatchStatus.length})
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -427,7 +539,15 @@ const InternoDashboard = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-primary text-primary-foreground">
+                  <TableHead className="text-primary-foreground w-[40px]">
+                    <Checkbox
+                      checked={selectedIds.length === filtered.length && filtered.length > 0}
+                      onCheckedChange={() => toggleSelectAll()}
+                      className="border-primary-foreground/50"
+                    />
+                  </TableHead>
                   <TableHead className="text-primary-foreground w-[100px]">Ações</TableHead>
+                  <TableHead className="text-primary-foreground w-[50px]">$</TableHead>
                   <TableHead className="text-primary-foreground">Protocolo</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Contêiner</TableHead>
@@ -440,19 +560,25 @@ const InternoDashboard = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                       Nenhuma solicitação encontrada.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((s) => (
                     <TableRow key={s.id} className="hover:bg-muted/30">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.includes(s.id)}
+                          onCheckedChange={() => toggleSelection(s.id)}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
@@ -475,6 +601,19 @@ const InternoDashboard = () => {
                             </Button>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {needsLaunchConfirmation(s) ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedSolicitacao(s)}
+                            title={s.lancamento_confirmado ? "Lançamento Confirmado" : "Aguardando confirmação de lançamento"}
+                            className={s.lancamento_confirmado ? "text-muted-foreground" : "text-destructive"}
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </Button>
+                        ) : null}
                       </TableCell>
                       <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
@@ -525,6 +664,34 @@ const InternoDashboard = () => {
           isAdmin={isAdmin}
           onClose={() => {
             setReclassificacaoSolicitacao(null);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
+
+      {/* Batch Approval Dialog */}
+      {showBatchApproval && user && (
+        <BatchApprovalDialog
+          solicitacoes={selectedForBatchApproval}
+          userId={user.id}
+          onClose={() => setShowBatchApproval(false)}
+          onSuccess={() => {
+            setShowBatchApproval(false);
+            setSelectedIds([]);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
+
+      {/* Batch Status Dialog */}
+      {showBatchStatus && user && (
+        <BatchStatusDialog
+          solicitacoes={selectedForBatchStatus}
+          userId={user.id}
+          onClose={() => setShowBatchStatus(false)}
+          onSuccess={() => {
+            setShowBatchStatus(false);
+            setSelectedIds([]);
             fetchSolicitacoes();
           }}
         />

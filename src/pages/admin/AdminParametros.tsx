@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 
 interface RegraServico {
   id: string;
@@ -456,40 +457,7 @@ const AdminParametros = () => {
 
         {/* ============= PÁGINA EXTERNA ============= */}
         <TabsContent value="pagina-externa">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                Configurações da Página Externa
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <p className="text-sm text-muted-foreground">
-                Configure os elementos da página externa: botões, links, iframe do Hashdata.
-              </p>
-
-              {pageConfigs.filter(c => 
-                c.config_key.includes('hashdata') || 
-                c.config_key.includes('botao') ||
-                c.config_key.includes('external')
-              ).map(config => (
-                <div key={config.id} className="flex items-center justify-between border rounded-lg p-4">
-                  <div>
-                    <p className="font-medium">{config.description || config.config_key}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {config.config_type === 'url' && (config.config_value || 'Não configurado')}
-                      {config.config_type === 'boolean' && (config.config_value === 'true' ? 'Sim' : 'Não')}
-                      {config.config_type === 'text' && (config.config_value || 'Não definido')}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => openPageConfigDialog(config)}>
-                    <Edit className="h-4 w-4 mr-1" />
-                    Editar
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <ExternalButtonsManager />
         </TabsContent>
 
         {/* ============= PÁGINA INTERNA ============= */}

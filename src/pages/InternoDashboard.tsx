@@ -359,6 +359,10 @@ const InternoDashboard = () => {
                     <ClipboardList className="h-4 w-4 mr-2" />
                     Serviços
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/formularios")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Formulários
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("/interno/admin/admins")}>
                     <Users className="h-4 w-4 mr-2" />

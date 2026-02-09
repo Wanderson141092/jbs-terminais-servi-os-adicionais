@@ -1,35 +1,58 @@
 import { useState, useCallback, useEffect } from "react";
-import { FileText, ExternalLink } from "lucide-react";
+import { FileText, ExternalLink, Layout, Send, Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ExternalHeader from "@/components/ExternalHeader";
 import ConsultaForm from "@/components/ConsultaForm";
 import ConsultaResultado from "@/components/ConsultaResultado";
+import FormRenderer from "@/components/FormRenderer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+interface ExternalButton {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  icone: string | null;
+  tipo: string;
+  url: string | null;
+  formulario_id: string | null;
+  ordem: number;
+  ativo: boolean;
+  abrir_nova_aba: boolean | null;
+}
+
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  FileText,
+  ExternalLink,
+  Layout,
+  Send,
+  Search,
+  Settings,
+};
 
 const Index = () => {
   const [resultado, setResultado] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [hashdataUrl, setHashdataUrl] = useState<string | null>(null);
-  const [showIframe, setShowIframe] = useState(false);
+  const [buttons, setButtons] = useState<ExternalButton[]>([]);
+  const [activeDialog, setActiveDialog] = useState<{ type: "iframe" | "form"; data: ExternalButton } | null>(null);
 
-  // Carregar URL do iframe do Hashdata
+  // Carregar botões externos
   useEffect(() => {
-    const fetchHashdataUrl = async () => {
+    const fetchButtons = async () => {
       const { data } = await supabase
-        .from("page_config")
-        .select("config_value")
-        .eq("config_key", "hashdata_iframe_url")
-        .single();
+        .from("external_buttons")
+        .select("*")
+        .eq("ativo", true)
+        .order("ordem");
       
-      if (data?.config_value) {
-        setHashdataUrl(data.config_value);
+      if (data) {
+        setButtons(data);
       }
     };
-    fetchHashdataUrl();
+    fetchButtons();
   }, []);
 
   // Recebe servicoId (id do serviço) e valor (protocolo/conteiner/lpco)
@@ -102,6 +125,25 @@ const Index = () => {
     }
   }, []);
 
+  const handleButtonClick = (button: ExternalButton) => {
+    if (button.tipo === "link" && button.url) {
+      if (button.abrir_nova_aba) {
+        window.open(button.url, "_blank");
+      } else {
+        window.location.href = button.url;
+      }
+    } else if (button.tipo === "iframe") {
+      setActiveDialog({ type: "iframe", data: button });
+    } else if (button.tipo === "formulario") {
+      setActiveDialog({ type: "form", data: button });
+    }
+  };
+
+  const getIcon = (iconName: string | null) => {
+    const IconComponent = ICONS[iconName || "FileText"] || FileText;
+    return <IconComponent className="h-7 w-7 text-secondary" />;
+  };
+
   return (
     <div className="min-h-screen bg-primary">
       <ExternalHeader />
@@ -117,53 +159,36 @@ const Index = () => {
             <p className="text-muted-foreground">Status da solicitação</p>
           </div>
 
-          {/* Action Card - Solicitar/Cancelar */}
-          <Dialog open={showIframe} onOpenChange={setShowIframe}>
-            <DialogTrigger asChild>
-              <Card className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer mb-8">
+          {/* Action Buttons - Dynamic */}
+          <div className="grid gap-4 mb-8">
+            {buttons.map((button) => (
+              <Card
+                key={button.id}
+                className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer"
+                onClick={() => handleButtonClick(button)}
+              >
                 <CardHeader className="pb-2 text-center">
                   <div className="w-14 h-14 rounded-xl bg-secondary/20 flex items-center justify-center mb-3 mx-auto">
-                    <FileText className="h-7 w-7 text-secondary" />
+                    {getIcon(button.icone)}
                   </div>
-                  <CardTitle className="text-xl text-primary font-bold">Serviço Adicional</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">Solicitar ou Cancelar</p>
+                  <CardTitle className="text-xl text-primary font-bold">{button.titulo}</CardTitle>
+                  {button.descricao && (
+                    <p className="text-sm text-muted-foreground mt-1">{button.descricao}</p>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Acesse o formulário para nova solicitação ou cancelamento
+              </Card>
+            ))}
+
+            {buttons.length === 0 && (
+              <Card className="border-2 border-dashed border-muted">
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground">
+                    Nenhum botão configurado. Configure em Parâmetros → Página Externa.
                   </p>
                 </CardContent>
               </Card>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle>Serviço Adicional - Solicitação ou Cancelamento</DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                {hashdataUrl ? (
-                  <iframe 
-                    src={hashdataUrl}
-                    className="w-full min-h-[500px] rounded-lg border"
-                    title="Formulário Hashdata"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : (
-                  <div className="bg-muted/50 rounded-lg p-8 text-center min-h-[400px] flex items-center justify-center">
-                    <div>
-                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">
-                        URL do formulário Hashdata não configurada
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Configure em Parâmetros → Página Externa
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+            )}
+          </div>
 
           {/* Consultation Section */}
           <div className="space-y-6">
@@ -204,6 +229,40 @@ const Index = () => {
           © {new Date().getFullYear()} JBS Terminais — Serviços Adicionais
         </p>
       </footer>
+
+      {/* Dialog for iframe/form */}
+      <Dialog open={!!activeDialog} onOpenChange={() => setActiveDialog(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>{activeDialog?.data.titulo}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {activeDialog?.type === "iframe" && activeDialog.data.url ? (
+              <iframe 
+                src={activeDialog.data.url}
+                className="w-full min-h-[500px] rounded-lg border"
+                title={activeDialog.data.titulo}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : activeDialog?.type === "form" && activeDialog.data.formulario_id ? (
+              <FormRenderer 
+                formularioId={activeDialog.data.formulario_id} 
+                onSuccess={() => setActiveDialog(null)}
+              />
+            ) : (
+              <div className="bg-muted/50 rounded-lg p-8 text-center min-h-[400px] flex items-center justify-center">
+                <div>
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    Conteúdo não configurado
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

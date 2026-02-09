@@ -126,6 +126,59 @@ export type Database = {
           },
         ]
       }
+      external_buttons: {
+        Row: {
+          abrir_nova_aba: boolean | null
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          formulario_id: string | null
+          icone: string | null
+          id: string
+          ordem: number
+          tipo: string
+          titulo: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          abrir_nova_aba?: boolean | null
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          formulario_id?: string | null
+          icone?: string | null
+          id?: string
+          ordem?: number
+          tipo?: string
+          titulo: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          abrir_nova_aba?: boolean | null
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          formulario_id?: string | null
+          icone?: string | null
+          id?: string
+          ordem?: number
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_buttons_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_mappings: {
         Row: {
           campo_externo: string
@@ -163,6 +216,115 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      formulario_campos: {
+        Row: {
+          condicao: Json | null
+          created_at: string
+          formulario_id: string
+          id: string
+          obrigatorio: boolean
+          opcoes: Json | null
+          ordem: number
+          placeholder: string | null
+          rotulo: string
+          tipo: string
+        }
+        Insert: {
+          condicao?: Json | null
+          created_at?: string
+          formulario_id: string
+          id?: string
+          obrigatorio?: boolean
+          opcoes?: Json | null
+          ordem?: number
+          placeholder?: string | null
+          rotulo: string
+          tipo: string
+        }
+        Update: {
+          condicao?: Json | null
+          created_at?: string
+          formulario_id?: string
+          id?: string
+          obrigatorio?: boolean
+          opcoes?: Json | null
+          ordem?: number
+          placeholder?: string | null
+          rotulo?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formulario_campos_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formulario_respostas: {
+        Row: {
+          arquivos: Json | null
+          created_at: string
+          formulario_id: string
+          id: string
+          ip_address: string | null
+          respostas: Json
+        }
+        Insert: {
+          arquivos?: Json | null
+          created_at?: string
+          formulario_id: string
+          id?: string
+          ip_address?: string | null
+          respostas: Json
+        }
+        Update: {
+          arquivos?: Json | null
+          created_at?: string
+          formulario_id?: string
+          id?: string
+          ip_address?: string | null
+          respostas?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formulario_respostas_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formularios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       integracoes: {
         Row: {

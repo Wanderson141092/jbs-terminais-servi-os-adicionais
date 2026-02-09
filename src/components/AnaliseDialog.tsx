@@ -20,42 +20,51 @@ interface AnaliseDialogProps {
   onClose: () => void;
 }
 
+interface ServicoConfig {
+  id: string;
+  nome: string;
+  tipo_agendamento: string | null;
+  anexos_embutidos: boolean | null;
+}
+
 const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
   const [showAlteracaoConfirm, setShowAlteracaoConfirm] = useState(false);
-  const [statusVistoria, setStatusVistoria] = useState(solicitacao.status_vistoria || "");
   const [selectedStatus, setSelectedStatus] = useState(solicitacao.status || "");
   const [loading, setLoading] = useState(false);
   const [adminSelectedSetor, setAdminSelectedSetor] = useState<"COMEX" | "ARMAZEM" | null>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showEmbeddedPreview, setShowEmbeddedPreview] = useState(true);
   const [showDeferimentoAction, setShowDeferimentoAction] = useState<string | null>(null);
   const [motivoRecusaDeferimento, setMotivoRecusaDeferimento] = useState("");
   const [showLancamentoDialog, setShowLancamentoDialog] = useState(false);
+  const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
 
   useEffect(() => {
-    const fetchAttachments = async () => {
-      const { data } = await supabase
+    const fetchData = async () => {
+      // Buscar anexos de deferimento
+      const { data: attachData } = await supabase
         .from("deferimento_documents")
         .select("*")
         .eq("solicitacao_id", solicitacao.id);
-      setAttachments(data || []);
+      setAttachments(attachData || []);
+      
+      // Buscar configurações do serviço
+      const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
+      const { data: servicoData } = await supabase
+        .from("servicos")
+        .select("id, nome, tipo_agendamento, anexos_embutidos")
+        .eq("nome", tipoOperacao)
+        .maybeSingle();
+      
+      if (servicoData) {
+        setServicoConfig(servicoData);
+      }
     };
     
-    const fetchDisplayConfig = async () => {
-      const { data } = await supabase
-        .from("page_config")
-        .select("config_value")
-        .eq("config_key", "visualizacao_anexos_embutida")
-        .single();
-      setShowEmbeddedPreview(data?.config_value === 'true');
-    };
-    
-    fetchAttachments();
-    fetchDisplayConfig();
-  }, [solicitacao.id]);
+    fetchData();
+  }, [solicitacao.id, solicitacao.tipo_operacao]);
 
   const setor = isAdmin ? adminSelectedSetor : profile.setor;
   const isComex = setor === "COMEX";
@@ -75,6 +84,22 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const canDecide = solicitacao.status === "aguardando_confirmacao" && !alreadyApproved && setor !== null;
   const canChangeRefusal = wasRefused && solicitacao.status !== "recusado";
+
+  // Determinar labels de data baseado no serviço
+  const isPositionamento = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
+  const isAgendamento = servicoConfig?.tipo_agendamento === "data_horario";
+  
+  const getDateLabel = () => {
+    if (isPositionamento) return "Posicionar dia";
+    if (isAgendamento) return "Agendar para";
+    return "Data do serviço";
+  };
+
+  // Usar anexos embutidos baseado na configuração do serviço
+  const showEmbeddedPreview = servicoConfig?.anexos_embutidos ?? true;
+
+  // Verificar se é serviço de posicionamento (apenas ele tem deferimento)
+  const hasDeferimento = isPositionamento;
 
   const handleAprovar = async () => {
     if (wasRefused) {
@@ -169,25 +194,27 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const handleUpdateStatus = async () => {
     if (!selectedStatus) return;
-    setLoading(true);
-    
-    // Map status to vistoria label if needed
-    let statusVistoriaLabel = null;
-    if (selectedStatus === "vistoria_finalizada") {
-      statusVistoriaLabel = "Vistoria Finalizada";
-    } else if (selectedStatus === "vistoriado_com_pendencia") {
-      statusVistoriaLabel = "Vistoriado com Pendência";
-    } else if (selectedStatus === "nao_vistoriado") {
-      statusVistoriaLabel = "Não Vistoriado";
+    if (selectedStatus === solicitacao.status) {
+      toast.info("O status selecionado é igual ao atual.");
+      return;
     }
+    
+    setLoading(true);
     
     const updateData: any = {
       status: selectedStatus,
       updated_at: new Date().toISOString()
     };
     
-    if (statusVistoriaLabel) {
-      updateData.status_vistoria = statusVistoriaLabel;
+    // Map status to vistoria label if needed
+    if (selectedStatus === "vistoria_finalizada") {
+      updateData.status_vistoria = "Vistoria Finalizada";
+    } else if (selectedStatus === "vistoriado_com_pendencia") {
+      updateData.status_vistoria = "Vistoriado com Pendência";
+    } else if (selectedStatus === "nao_vistoriado") {
+      updateData.status_vistoria = "Não Vistoriado";
+    } else if (selectedStatus === "confirmado_aguardando_vistoria") {
+      updateData.status_vistoria = null;
     }
     
     const { error } = await supabase
@@ -197,43 +224,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
     if (error) {
       toast.error("Erro ao atualizar status: " + error.message);
-    } else {
-      const statusLabel = STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label || selectedStatus;
-      await logAudit("status", `Status atualizado para: ${statusLabel}`);
-      await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
-      toast.success("Status atualizado!");
-      onClose();
+      setLoading(false);
+      return;
     }
+    
+    const statusLabel = STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label || selectedStatus;
+    await logAudit("status", `Status atualizado para: ${statusLabel}`);
+    await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
+    
+    toast.success("Status atualizado com sucesso!");
     setLoading(false);
-  };
-
-  const handleUpdateVistoria = async () => {
-    if (!statusVistoria) return;
-    setLoading(true);
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update({
-        status_vistoria: statusVistoria,
-        status: statusVistoria === "Vistoria Finalizada"
-          ? "vistoria_finalizada" as any
-          : statusVistoria === "Vistoriado com Pendência"
-          ? "vistoriado_com_pendencia" as any
-          : statusVistoria === "Não Vistoriado"
-          ? "nao_vistoriado" as any
-          : solicitacao.status,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", solicitacao.id);
-
-    if (error) {
-      toast.error("Erro ao atualizar vistoria: " + error.message);
-    } else {
-      await logAudit("vistoria", `Status de vistoria atualizado para: ${statusVistoria}`);
-      await createNotification(`Vistoria da solicitação ${solicitacao.protocolo}: ${statusVistoria}`, "vistoria");
-      toast.success("Status atualizado!");
-      onClose();
-    }
-    setLoading(false);
+    onClose();
   };
 
   const STATUS_OPTIONS = [
@@ -247,6 +248,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   ];
 
   const handleDeferimentoDecision = async (docId: string, aceito: boolean) => {
+    setLoading(true);
+    
     const updateData: any = { status: aceito ? 'aceito' : 'recusado' };
     if (!aceito) {
       updateData.motivo_recusa = motivoRecusaDeferimento;
@@ -259,13 +262,20 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
     if (error) {
       toast.error("Erro ao atualizar status do deferimento");
+      setLoading(false);
       return;
     }
 
-    await logAudit("deferimento", `Deferimento ${aceito ? 'aceito' : 'recusado'}${!aceito ? ': ' + motivoRecusaDeferimento : ''}`);
+    const logDetalhes = aceito 
+      ? "Deferimento aceito - Status alterado para 'Recebido'" 
+      : `Deferimento recusado: ${motivoRecusaDeferimento}`;
+    await logAudit("deferimento", logDetalhes);
+    await createNotification(`Deferimento ${aceito ? 'aceito' : 'recusado'} para ${solicitacao.protocolo}`, "deferimento");
+    
     toast.success(aceito ? "Deferimento aceito!" : "Deferimento recusado!");
     setShowDeferimentoAction(null);
     setMotivoRecusaDeferimento("");
+    setLoading(false);
     
     // Refresh attachments
     const { data } = await supabase
@@ -333,9 +343,26 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">Aguardando análise</Badge>;
     }
     if (status === 'aceito') {
-      return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">Aceito</Badge>;
+      return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">Recebido</Badge>;
     }
     return <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">Recusado</Badge>;
+  };
+
+  // Formatar data baseado no tipo de serviço
+  const formatDateValue = () => {
+    if (isAgendamento && solicitacao.data_agendamento) {
+      return new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+    if (solicitacao.data_posicionamento) {
+      return new Date(solicitacao.data_posicionamento + 'T00:00:00').toLocaleDateString("pt-BR");
+    }
+    return "—";
   };
 
   return (
@@ -348,7 +375,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               Análise — {solicitacao.protocolo}
             </DialogTitle>
             <DialogDescription>
-              Análise e decisão sobre a solicitação de posicionamento
+              Análise e decisão sobre a solicitação
             </DialogDescription>
           </DialogHeader>
 
@@ -357,8 +384,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <InfoItem icon={<User className="h-4 w-4" />} label="Cliente" value={solicitacao.cliente_nome} />
               <InfoItem icon={<Package className="h-4 w-4" />} label="Contêiner" value={solicitacao.numero_conteiner || "—"} />
               <InfoItem icon={<FileText className="h-4 w-4" />} label="LPCO" value={solicitacao.lpco || "—"} />
-              <InfoItem icon={<Calendar className="h-4 w-4" />} label="Data Posicionamento" value={solicitacao.data_posicionamento || "—"} />
-              <InfoItem icon={<Clock className="h-4 w-4" />} label="Tipo Operação" value={solicitacao.tipo_operacao || "Posicionamento"} />
+              <InfoItem icon={<Calendar className="h-4 w-4" />} label={getDateLabel()} value={formatDateValue()} />
+              <InfoItem icon={<Clock className="h-4 w-4" />} label="Serviço Adicional" value={solicitacao.tipo_operacao || "Posicionamento"} />
               <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={solicitacao.tipo_carga || "—"} />
             </div>
 
@@ -534,47 +561,24 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {/* Anexos */}
-            <Separator />
-            <div className="space-y-3">
-              <p className="text-sm font-semibold flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Anexos e Documentos ({attachments.length})
-              </p>
-              {attachments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum anexo disponível</p>
-              ) : (
-                <div className="space-y-4">
-                  {attachments.map((att) => (
-                    <div key={att.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{att.file_name}</span>
-                          {getDeferimentoStatusBadge(att.status)}
-                        </div>
+            {/* Anexos - Separado de Deferimento */}
+            {solicitacao.status === "vistoria_finalizada" && attachments.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Anexos
+                  </p>
+                  <div className="space-y-2">
+                    {attachments.map((att) => (
+                      <div key={att.id} className="border rounded-lg p-3 flex items-center justify-between">
+                        <span className="text-sm">{att.file_name}</span>
                         <div className="flex gap-2">
-                          {(!att.status || att.status === 'pendente') && (
-                            <>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="text-green-600 border-green-300"
-                                onClick={() => handleDeferimentoDecision(att.id, true)}
-                              >
-                                <Check className="h-4 w-4 mr-1" />
-                                Aceitar
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="text-red-600 border-red-300"
-                                onClick={() => setShowDeferimentoAction(att.id)}
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Recusar
-                              </Button>
-                            </>
-                          )}
+                          <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            Visualizar
+                          </Button>
                           <Button variant="ghost" size="sm" asChild>
                             <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
                               <Download className="h-4 w-4 mr-1" />
@@ -583,35 +587,99 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           </Button>
                         </div>
                       </div>
-                      
-                      {/* Preview embutido ou botão conforme configuração */}
-                      {showEmbeddedPreview ? (
-                        <div className="bg-muted/30 rounded overflow-hidden">
-                          {att.file_url.toLowerCase().endsWith('.pdf') ? (
-                            <iframe 
-                              src={att.file_url} 
-                              className="w-full h-[300px]" 
-                              title={att.file_name}
-                            />
-                          ) : (
-                            <img 
-                              src={att.file_url} 
-                              alt={att.file_name} 
-                              className="max-w-full max-h-[300px] mx-auto"
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          Visualizar
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              )}
-            </div>
+              </>
+            )}
+
+            {/* Deferimento - Somente para Posicionamento e quando há anexos */}
+            {hasDeferimento && attachments.length > 0 && solicitacao.status !== "vistoria_finalizada" && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Deferimento
+                  </p>
+                  <div className="space-y-4">
+                    {attachments.map((att) => (
+                      <div key={att.id} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{att.file_name}</span>
+                            {getDeferimentoStatusBadge(att.status)}
+                          </div>
+                          <div className="flex gap-2">
+                            {(!att.status || att.status === 'pendente') && (
+                              <>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-green-600 border-green-300"
+                                  onClick={() => handleDeferimentoDecision(att.id, true)}
+                                  disabled={loading}
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Aceitar
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-red-600 border-red-300"
+                                  onClick={() => setShowDeferimentoAction(att.id)}
+                                  disabled={loading}
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  Recusar
+                                </Button>
+                              </>
+                            )}
+                            <Button variant="ghost" size="sm" asChild>
+                              <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
+                                <Download className="h-4 w-4 mr-1" />
+                                Baixar
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Preview embutido ou botão conforme configuração do serviço */}
+                        {showEmbeddedPreview ? (
+                          <div className="bg-muted/30 rounded overflow-hidden">
+                            {att.file_url.toLowerCase().endsWith('.pdf') ? (
+                              <iframe 
+                                src={att.file_url} 
+                                className="w-full h-[300px]" 
+                                title={att.file_name}
+                              />
+                            ) : (
+                              <img 
+                                src={att.file_url} 
+                                alt={att.file_name} 
+                                className="max-w-full max-h-[300px] mx-auto"
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            Visualizar
+                          </Button>
+                        )}
+
+                        {/* Motivo de recusa se recusado */}
+                        {att.status === 'recusado' && att.motivo_recusa && (
+                          <div className="bg-red-50 rounded p-2 text-sm text-red-600">
+                            <strong>Motivo:</strong> {att.motivo_recusa}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <DialogFooter>
@@ -668,7 +736,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             <Button 
               variant="destructive" 
               onClick={() => showDeferimentoAction && handleDeferimentoDecision(showDeferimentoAction, false)}
-              disabled={!motivoRecusaDeferimento.trim()}
+              disabled={!motivoRecusaDeferimento.trim() || loading}
             >
               Confirmar Recusa
             </Button>
@@ -714,7 +782,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
-                Esta ação irá <strong>recusar</strong> o pedido de posicionamento e interromper o fluxo do processo.
+                Esta ação irá <strong>recusar</strong> o pedido e interromper o fluxo do processo.
               </p>
               <div className="bg-muted p-3 rounded text-sm">
                 <strong>Protocolo:</strong> {solicitacao.protocolo}<br />

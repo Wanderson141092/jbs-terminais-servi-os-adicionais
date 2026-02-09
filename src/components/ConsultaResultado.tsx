@@ -53,21 +53,24 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
 
-  // Verificar se já existe um documento de deferimento
+  const [allDocs, setAllDocs] = useState<DeferimentoDocument[]>([]);
+
+  // Verificar todos os documentos de deferimento
   useEffect(() => {
-    const fetchExistingDoc = async () => {
+    const fetchExistingDocs = async () => {
       setLoadingDocs(true);
       const { data } = await supabase
         .from("deferimento_documents")
         .select("*")
         .eq("solicitacao_id", solicitacao.id)
         .eq("document_type", "deferimento")
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
 
       if (data && data.length > 0) {
-        setExistingDoc(data[0]);
+        setAllDocs(data);
+        setExistingDoc(data[0]); // O mais recente
       } else {
+        setAllDocs([]);
         setExistingDoc(null);
       }
       setLoadingDocs(false);
@@ -83,9 +86,23 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       setServicoConfig(data);
     };
 
-    fetchExistingDoc();
+    fetchExistingDocs();
     fetchServicoConfig();
   }, [solicitacao.id, solicitacao.tipo_operacao]);
+
+  // Calcula o status geral do deferimento baseado em todos os documentos
+  const getGeneralDeferimentoStatus = (): "recebido" | "recusado" | "aguardando" | null => {
+    if (allDocs.length === 0) return null;
+    
+    const hasRecusado = allDocs.some(d => d.status === "recusado");
+    const allAceitos = allDocs.every(d => d.status === "aceito");
+    
+    if (hasRecusado) return "recusado";
+    if (allAceitos) return "recebido";
+    return "aguardando";
+  };
+
+  const generalStatus = getGeneralDeferimentoStatus();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -156,14 +173,11 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
 
   // Verificar se pode enviar deferimento
   const vistoriaFinalizada = solicitacao.status_vistoria === "Vistoria Finalizada";
-  const docPendente = existingDoc?.status === 'pendente';
-  const docAceito = existingDoc?.status === 'aceito';
-  const docRecusado = existingDoc?.status === 'recusado';
   
-  // Pode enviar se: vistoria finalizada E (não tem doc OU doc foi recusado)
-  const canUpload = vistoriaFinalizada && (!existingDoc || docRecusado);
+  // Pode enviar se: vistoria finalizada E (não tem doc OU status geral é recusado)
+  const canUpload = vistoriaFinalizada && (allDocs.length === 0 || generalStatus === "recusado");
 
-  // Status do deferimento com cores
+  // Status do deferimento com cores baseado no status geral
   const getDeferimentoStatusSection = () => {
     if (loadingDocs) {
       return (
@@ -173,53 +187,33 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       );
     }
 
-    if (docAceito) {
+    // Status RECEBIDO - todos aceitos
+    if (generalStatus === "recebido") {
       return (
         <Alert className="border-green-500 bg-green-50">
           <Check className="h-4 w-4 text-green-600" />
           <AlertDescription className="ml-2">
-            <span className="font-semibold text-green-700">Deferimento Aceito</span>
+            <span className="font-semibold text-green-700">Deferimento Recebido</span>
             <p className="text-sm text-green-600 mt-1">
-              Documento recebido e aprovado.
+              Todos os documentos foram recebidos e aprovados.
             </p>
           </AlertDescription>
         </Alert>
       );
     }
 
-    if (docPendente) {
-      return (
-        <Alert className="border-yellow-500 bg-yellow-50">
-          <Clock className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="ml-2">
-            <span className="font-semibold text-yellow-700">Aguardando Confirmação</span>
-            <p className="text-sm text-yellow-600 mt-1">
-              Documento enviado em {new Date(existingDoc!.created_at).toLocaleDateString("pt-BR")}. 
-              Aguardando análise.
-            </p>
-            {existingDoc && (
-              <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-yellow-700" asChild>
-                <a href={existingDoc.file_url} target="_blank" rel="noopener noreferrer">
-                  <Eye className="h-3 w-3 mr-1" />
-                  Visualizar documento enviado
-                </a>
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
-      );
-    }
-
-    if (docRecusado) {
+    // Status RECUSADO - algum recusado, libera campo para reenvio
+    if (generalStatus === "recusado") {
+      const recusedDoc = allDocs.find(d => d.status === "recusado");
       return (
         <div className="space-y-3">
           <Alert className="border-red-500 bg-red-50">
             <X className="h-4 w-4 text-red-600" />
             <AlertDescription className="ml-2">
               <span className="font-semibold text-red-700">Deferimento Recusado - Reenviar Anexo</span>
-              {existingDoc?.motivo_recusa && (
+              {recusedDoc?.motivo_recusa && (
                 <p className="text-sm text-red-600 mt-1">
-                  <strong>Motivo:</strong> {existingDoc.motivo_recusa}
+                  <strong>Motivo:</strong> {recusedDoc.motivo_recusa}
                 </p>
               )}
             </AlertDescription>
@@ -242,6 +236,30 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       );
     }
 
+    // Status AGUARDANDO - tem docs pendentes
+    if (generalStatus === "aguardando") {
+      return (
+        <Alert className="border-yellow-500 bg-yellow-50">
+          <Clock className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="ml-2">
+            <span className="font-semibold text-yellow-700">Aguardando Atendimento</span>
+            <p className="text-sm text-yellow-600 mt-1">
+              Documento(s) enviado(s). Aguardando análise pela equipe.
+            </p>
+            {existingDoc && (
+              <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-yellow-700" asChild>
+                <a href={existingDoc.file_url} target="_blank" rel="noopener noreferrer">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Visualizar documento enviado
+                </a>
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    // Nenhum documento ainda - permitir upload
     if (canUpload) {
       return (
         <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-4">

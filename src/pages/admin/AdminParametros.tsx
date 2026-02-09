@@ -94,6 +94,7 @@ const AdminParametros = () => {
   const [regraFormData, setRegraFormData] = useState({
     servico_id: "",
     hora_corte: "17:00",
+    tipo_limite: "nenhum" as "nenhum" | "fixo" | "por_dia",
     limite_dia: "",
     dias_semana: ["seg", "ter", "qua", "qui", "sex"],
     limite_seg: "",
@@ -155,10 +156,19 @@ const AdminParametros = () => {
   // ============= REGRAS DE SERVIÇO =============
   const openRegraDialog = (regra?: RegraServico) => {
     if (regra) {
+      // Determinar tipo de limite com base nos dados
+      let tipoLimite: "nenhum" | "fixo" | "por_dia" = "nenhum";
+      if (regra.limite_dia) {
+        tipoLimite = "fixo";
+      } else if (regra.limite_seg || regra.limite_ter || regra.limite_qua || regra.limite_qui || regra.limite_sex || regra.limite_sab) {
+        tipoLimite = "por_dia";
+      }
+      
       setEditingRegra(regra);
       setRegraFormData({
         servico_id: regra.servico_id,
         hora_corte: regra.hora_corte,
+        tipo_limite: tipoLimite,
         limite_dia: regra.limite_dia?.toString() || "",
         dias_semana: regra.dias_semana,
         limite_seg: regra.limite_seg?.toString() || "",
@@ -174,6 +184,7 @@ const AdminParametros = () => {
       setRegraFormData({
         servico_id: "",
         hora_corte: "17:00",
+        tipo_limite: "nenhum",
         limite_dia: "",
         dias_semana: ["seg", "ter", "qua", "qui", "sex"],
         limite_seg: "",
@@ -747,22 +758,25 @@ const AdminParametros = () => {
             <div className="border-t pt-4">
               <Label className="mb-2 block">Tipo de Limite de Quantidade</Label>
               <Select
-                value={regraFormData.limite_dia ? "fixo" : (
-                  regraFormData.limite_seg || regraFormData.limite_ter || regraFormData.limite_qua || 
-                  regraFormData.limite_qui || regraFormData.limite_sex || regraFormData.limite_sab
-                ) ? "por_dia" : "nenhum"}
-                onValueChange={(v) => {
+                value={regraFormData.tipo_limite}
+                onValueChange={(v: "nenhum" | "fixo" | "por_dia") => {
                   if (v === "fixo") {
                     setRegraFormData(prev => ({
                       ...prev,
+                      tipo_limite: "fixo",
                       limite_seg: "", limite_ter: "", limite_qua: "", 
                       limite_qui: "", limite_sex: "", limite_sab: ""
                     }));
                   } else if (v === "por_dia") {
-                    setRegraFormData(prev => ({ ...prev, limite_dia: "" }));
+                    setRegraFormData(prev => ({ 
+                      ...prev, 
+                      tipo_limite: "por_dia",
+                      limite_dia: "" 
+                    }));
                   } else {
                     setRegraFormData(prev => ({
                       ...prev,
+                      tipo_limite: "nenhum",
                       limite_dia: "",
                       limite_seg: "", limite_ter: "", limite_qua: "", 
                       limite_qui: "", limite_sex: "", limite_sab: ""
@@ -782,7 +796,7 @@ const AdminParametros = () => {
             </div>
 
             {/* Limite diário fixo */}
-            {regraFormData.limite_dia !== "" && (
+            {regraFormData.tipo_limite === "fixo" && (
               <div>
                 <Label>Limite Diário (todos os dias)</Label>
                 <Input
@@ -790,69 +804,81 @@ const AdminParametros = () => {
                   value={regraFormData.limite_dia}
                   onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_dia: e.target.value }))}
                   placeholder="Ex: 10"
+                  min="1"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Quantidade máxima de solicitações permitidas por dia para este serviço
+                </p>
               </div>
             )}
 
             {/* Limites por dia da semana */}
-            {(regraFormData.limite_seg !== "" || regraFormData.limite_ter !== "" || 
-              regraFormData.limite_qua !== "" || regraFormData.limite_qui !== "" || 
-              regraFormData.limite_sex !== "" || regraFormData.limite_sab !== "" ||
-              (!regraFormData.limite_dia && regraFormData.limite_dia !== "")) && (
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label className="text-xs">Segunda</Label>
-                  <Input
-                    type="number"
-                    value={regraFormData.limite_seg}
-                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_seg: e.target.value }))}
-                    placeholder="—"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Terça</Label>
-                  <Input
-                    type="number"
-                    value={regraFormData.limite_ter}
-                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_ter: e.target.value }))}
-                    placeholder="—"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Quarta</Label>
-                  <Input
-                    type="number"
-                    value={regraFormData.limite_qua}
-                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qua: e.target.value }))}
-                    placeholder="—"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Quinta</Label>
-                  <Input
-                    type="number"
-                    value={regraFormData.limite_qui}
-                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qui: e.target.value }))}
-                    placeholder="—"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Sexta</Label>
-                  <Input
-                    type="number"
-                    value={regraFormData.limite_sex}
-                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sex: e.target.value }))}
-                    placeholder="—"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Sábado</Label>
-                  <Input
-                    type="number"
-                    value={regraFormData.limite_sab}
-                    onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sab: e.target.value }))}
-                    placeholder="—"
-                  />
+            {regraFormData.tipo_limite === "por_dia" && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Defina a quantidade máxima de solicitações para cada dia da semana. Deixe em branco para sem limite naquele dia.
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">Segunda</Label>
+                    <Input
+                      type="number"
+                      value={regraFormData.limite_seg}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_seg: e.target.value }))}
+                      placeholder="—"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Terça</Label>
+                    <Input
+                      type="number"
+                      value={regraFormData.limite_ter}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_ter: e.target.value }))}
+                      placeholder="—"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Quarta</Label>
+                    <Input
+                      type="number"
+                      value={regraFormData.limite_qua}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qua: e.target.value }))}
+                      placeholder="—"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Quinta</Label>
+                    <Input
+                      type="number"
+                      value={regraFormData.limite_qui}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qui: e.target.value }))}
+                      placeholder="—"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Sexta</Label>
+                    <Input
+                      type="number"
+                      value={regraFormData.limite_sex}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sex: e.target.value }))}
+                      placeholder="—"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Sábado</Label>
+                    <Input
+                      type="number"
+                      value={regraFormData.limite_sab}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sab: e.target.value }))}
+                      placeholder="—"
+                      min="0"
+                    />
+                  </div>
                 </div>
               </div>
             )}

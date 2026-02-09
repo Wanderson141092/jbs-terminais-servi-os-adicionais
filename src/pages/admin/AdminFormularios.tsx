@@ -81,6 +81,40 @@ interface Resposta {
   created_at: string;
 }
 
+// Estilos de formulário disponíveis
+const FORM_STYLES = [
+  { 
+    value: "jbs", 
+    label: "JBS Terminais (Padrão)", 
+    description: "Design institucional JBS com cores e tipografia padrão",
+    features: ["Campos básicos", "Upload de arquivos", "Lógica condicional", "Validação em tempo real"]
+  },
+  { 
+    value: "hashdata", 
+    label: "Hashdata", 
+    description: "Estilo inspirado no sistema Hashdata com layout corporativo",
+    features: ["Layout em grid", "Seções colapsáveis", "Campos agrupados", "Progresso visual"]
+  },
+  { 
+    value: "google", 
+    label: "Google Forms", 
+    description: "Design minimalista inspirado no Google Forms",
+    features: ["Layout vertical", "Respostas opcionais", "Múltiplas seções", "Tema claro/escuro"]
+  },
+  { 
+    value: "jotform", 
+    label: "Jotform", 
+    description: "Layout moderno com cards e animações suaves",
+    features: ["Cards por campo", "Animações", "Temas personalizáveis", "Progresso por etapas"]
+  },
+  { 
+    value: "formstack", 
+    label: "Formstack", 
+    description: "Formulário empresarial com layout profissional",
+    features: ["Campos inline", "Validação avançada", "Integração de pagamentos", "Assinaturas digitais"]
+  },
+];
+
 const FIELD_TYPES = [
   { value: "texto", label: "Texto Curto" },
   { value: "texto_longo", label: "Texto Longo" },
@@ -102,7 +136,8 @@ const AdminFormularios = () => {
   // Form dialog
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [editingForm, setEditingForm] = useState<Formulario | null>(null);
-  const [formData, setFormData] = useState({ titulo: "", descricao: "" });
+  const [formData, setFormData] = useState({ titulo: "", descricao: "", estilo: "jbs" });
+  const [selectedStyle, setSelectedStyle] = useState("jbs");
 
   // Fields dialog
   const [showFieldsDialog, setShowFieldsDialog] = useState(false);
@@ -156,10 +191,12 @@ const AdminFormularios = () => {
   const openFormDialog = (form?: Formulario) => {
     if (form) {
       setEditingForm(form);
-      setFormData({ titulo: form.titulo, descricao: form.descricao || "" });
+      setFormData({ titulo: form.titulo, descricao: form.descricao || "", estilo: "jbs" });
+      setSelectedStyle("jbs");
     } else {
       setEditingForm(null);
-      setFormData({ titulo: "", descricao: "" });
+      setFormData({ titulo: "", descricao: "", estilo: "jbs" });
+      setSelectedStyle("jbs");
     }
     setShowFormDialog(true);
   };
@@ -448,12 +485,12 @@ const AdminFormularios = () => {
 
       {/* Form Dialog */}
       <Dialog open={showFormDialog} onOpenChange={setShowFormDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>{editingForm ? "Editar Formulário" : "Novo Formulário"}</DialogTitle>
-            <DialogDescription>Configure as informações básicas do formulário</DialogDescription>
+            <DialogDescription>Configure as informações básicas e o estilo do formulário</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
               <Label>Título</Label>
               <Input value={formData.titulo} onChange={(e) => setFormData({ ...formData, titulo: e.target.value })} placeholder="Nome do formulário" />
@@ -462,8 +499,57 @@ const AdminFormularios = () => {
               <Label>Descrição</Label>
               <Textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} placeholder="Descrição opcional" />
             </div>
+            
+            {/* Seletor de Estilo */}
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold mb-3 block">Estilo do Formulário</Label>
+              <p className="text-sm text-muted-foreground mb-4">
+                Escolha o estilo visual e funcional do formulário. O design seguirá o padrão JBS Terminais com as características do estilo selecionado.
+              </p>
+              <div className="grid grid-cols-1 gap-3">
+                {FORM_STYLES.map((style) => (
+                  <div 
+                    key={style.value}
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      selectedStyle === style.value 
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
+                        : "border-border hover:border-muted-foreground"
+                    }`}
+                    onClick={() => {
+                      setSelectedStyle(style.value);
+                      setFormData({ ...formData, estilo: style.value });
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 ${
+                        selectedStyle === style.value 
+                          ? "border-primary bg-primary" 
+                          : "border-muted-foreground"
+                      }`}>
+                        {selectedStyle === style.value && (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-primary-foreground rounded-full"></div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">{style.label}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">{style.description}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {style.features.map((feature, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {feature}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setShowFormDialog(false)}>
               Cancelar
             </Button>

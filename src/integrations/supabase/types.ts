@@ -477,6 +477,39 @@ export type Database = {
         }
         Relationships: []
       }
+      parametros_campos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          grupo: string
+          id: string
+          ordem: number
+          sigla: string | null
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          grupo: string
+          id?: string
+          ordem?: number
+          sigla?: string | null
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          grupo?: string
+          id?: string
+          ordem?: number
+          sigla?: string | null
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           bloqueado: boolean
@@ -759,6 +792,7 @@ export type Database = {
           armazem_data: string | null
           armazem_justificativa: string | null
           armazem_usuario_id: string | null
+          categoria: string | null
           cliente_email: string
           cliente_nome: string
           comex_aprovado: boolean | null
@@ -787,6 +821,7 @@ export type Database = {
           armazem_data?: string | null
           armazem_justificativa?: string | null
           armazem_usuario_id?: string | null
+          categoria?: string | null
           cliente_email: string
           cliente_nome: string
           comex_aprovado?: boolean | null
@@ -815,6 +850,7 @@ export type Database = {
           armazem_data?: string | null
           armazem_justificativa?: string | null
           armazem_usuario_id?: string | null
+          categoria?: string | null
           cliente_email?: string
           cliente_nome?: string
           comex_aprovado?: boolean | null

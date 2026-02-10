@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
@@ -48,6 +48,8 @@ interface Servico {
   status_confirmacao_lancamento?: string[];
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const InternoDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -58,6 +60,7 @@ const InternoDashboard = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [tipoServicoFilter, setTipoServicoFilter] = useState("Todos");
   const [lancamentoFilter, setLancamentoFilter] = useState<"all" | "pendente" | "confirmado">("all");
+  const [aprovacaoFilter, setAprovacaoFilter] = useState<"all" | "pendente" | "aprovado" | "reprovado">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<any>(null);
   const [reclassificacaoSolicitacao, setReclassificacaoSolicitacao] = useState<any>(null);
@@ -72,6 +75,8 @@ const InternoDashboard = () => {
   const [userPerfis, setUserPerfis] = useState<string[]>([]);
   const [deferimentoSolicitacao, setDeferimentoSolicitacao] = useState<any>(null);
   const [showExcelExport, setShowExcelExport] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0, recusado: 0, recebido: 0 });
   
   const { isAdmin } = useAdminCheck(user?.id || null);
   
@@ -103,7 +108,6 @@ const InternoDashboard = () => {
       .maybeSingle();
     setProfile(data);
     
-    // Get perfis from setor_emails
     if (data?.setor_emails?.perfis) {
       setUserPerfis(data.setor_emails.perfis);
     }
@@ -121,24 +125,13 @@ const InternoDashboard = () => {
   const fetchSolicitacoes = useCallback(async () => {
     setLoading(true);
     
-    // By default, don't load old completed records - user must filter
     let query = supabase
       .from("solicitacoes")
       .select("*")
       .order("created_at", { ascending: false });
     
-    // Filter logic:
-    // - If service=todos AND lançamento=todos AND tipoServico=Todos: don't load data
-    // - If service=todos AND lançamento=pendente/confirmado: include vistoria_finalizada (need them for launch filter)
-    // - If specific service: that's the primary filter
-    if (tipoServicoFilter === "Todos" && lancamentoFilter === "all") {
-      // Return empty - user must select at least one filter
-      setSolicitacoes([]);
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await query.limit(200);
+    // Always load data now - filters work on the table only
+    const { data, error } = await query.limit(500);
 
     if (error) {
       toast.error("Erro ao carregar solicitações.");
@@ -146,7 +139,27 @@ const InternoDashboard = () => {
       setSolicitacoes(data || []);
     }
     setLoading(false);
-  }, [statusFilter, lancamentoFilter, tipoServicoFilter]);
+  }, []);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, tipoServicoFilter, lancamentoFilter, aprovacaoFilter, searchTerm]);
+
+  const fetchDeferimentoCounts = useCallback(async () => {
+    // Count deferimento documents for Posicionamento processes with vistoria_finalizada
+    const { data: docs } = await supabase
+      .from("deferimento_documents")
+      .select("status, solicitacao_id")
+      .eq("document_type", "deferimento");
+    
+    if (docs) {
+      const pendente = docs.filter(d => !d.status || d.status === "pendente").length;
+      const recusado = docs.filter(d => d.status === "recusado").length;
+      const recebido = docs.filter(d => d.status === "aceito").length;
+      setDeferimentoCounts({ pendente, recusado, recebido });
+    }
+  }, []);
 
   const fetchUnread = useCallback(async () => {
     if (!user) return;
@@ -164,28 +177,22 @@ const InternoDashboard = () => {
       fetchSolicitacoes();
       fetchUnread();
       fetchServicos();
+      fetchDeferimentoCounts();
     }
-  }, [user, fetchProfile, fetchSolicitacoes, fetchUnread, fetchServicos]);
+  }, [user, fetchProfile, fetchSolicitacoes, fetchUnread, fetchServicos, fetchDeferimentoCounts]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/interno");
   };
 
-  // Verifica se precisa mostrar SetorSelector:
-  // - Não é admin
-  // - Não logou como admin (admin@jbsterminais.com.br)
-  // - Profile existe mas não tem setor definido
-  // - Email é do domínio @jbsterminais.com.br
   useEffect(() => {
-    // Admins (role ou email admin@jbsterminais.com.br) NUNCA veem o SetorSelector
     const isAdminEmail = profile?.email === "admin@jbsterminais.com.br";
     if (isAdmin || isAdminEmail) {
       setShowSetorSelector(false);
       return;
     }
     
-    // Só mostra SetorSelector se não tem setor e é email corporativo
     if (profile && !profile.setor && !profile.email_setor && profile.email?.endsWith("@jbsterminais.com.br")) {
       setShowSetorSelector(true);
     } else {
@@ -193,7 +200,6 @@ const InternoDashboard = () => {
     }
   }, [profile, isAdmin]);
 
-  // Se precisa configurar setor, mostra SetorSelector
   if (showSetorSelector && user) {
     return (
       <SetorSelector 
@@ -209,6 +215,12 @@ const InternoDashboard = () => {
   // Week days for dashboard
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeekStart, i));
 
+  // Dashboard counts use ALL solicitacoes (filtered by service for dashboard only)
+  const dashboardFiltered = solicitacoes.filter((s) => {
+    return tipoServicoFilter === "Todos" || s.tipo_operacao === tipoServicoFilter;
+  });
+
+  // Table filters (separate from dashboard)
   const filtered = solicitacoes.filter((s) => {
     const matchesStatus = statusFilter === "all" || s.status === statusFilter;
     const matchesTipo = tipoServicoFilter === "Todos" || s.tipo_operacao === tipoServicoFilter;
@@ -235,24 +247,35 @@ const InternoDashboard = () => {
       }
     }
 
-    // Se serviço=todos E lançamento=todos, não mostrar nada (query já exclui vistoria_finalizada)
-    // Se serviço=todos E lançamento=pendente/confirmado, mostrar apenas os com lançamento matching
-    if (tipoServicoFilter === "Todos" && lancamentoFilter === "all") {
-      // Comportamento padrão - query já filtrou vistoria_finalizada
+    // Filtro de aprovação
+    let matchesAprovacao = true;
+    if (aprovacaoFilter !== "all") {
+      if (aprovacaoFilter === "pendente") {
+        matchesAprovacao = s.comex_aprovado === null || s.armazem_aprovado === null;
+      } else if (aprovacaoFilter === "aprovado") {
+        matchesAprovacao = s.comex_aprovado === true && s.armazem_aprovado === true;
+      } else if (aprovacaoFilter === "reprovado") {
+        matchesAprovacao = s.comex_aprovado === false || s.armazem_aprovado === false;
+      }
     }
     
-    return matchesStatus && matchesTipo && matchesSearch && matchesLancamento;
+    return matchesStatus && matchesTipo && matchesSearch && matchesLancamento && matchesAprovacao;
   });
 
-  const statusCounts = filtered.reduce((acc: Record<string, number>, s) => {
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paginatedFiltered = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Dashboard counts use dashboardFiltered (only service filter applies)
+  const dashboardStatusCounts = dashboardFiltered.reduce((acc: Record<string, number>, s) => {
     acc[s.status] = (acc[s.status] || 0) + 1;
     return acc;
   }, {});
 
-  // Group by date for weekly view (filtered by service type)
+  // Group by date for weekly view
   const getCountForDay = (day: Date, status?: string) => {
     const dayStr = format(day, "yyyy-MM-dd");
-    return filtered.filter(s => {
+    return dashboardFiltered.filter(s => {
       const matches = s.data_posicionamento === dayStr;
       if (status) {
         return matches && s.status === status;
@@ -263,7 +286,6 @@ const InternoDashboard = () => {
 
   const tipoServicosOptions = ["Todos", ...servicos.map(s => s.nome)];
 
-  // Mapeamento de labels para exibição
   const getSetorLabel = (setor: string | null) => {
     if (!setor) return "—";
     const labels: Record<string, string> = {
@@ -276,23 +298,19 @@ const InternoDashboard = () => {
     return labels[setor] || setor;
   };
 
-  // Check if user has Operacional profile for batch approval
   const hasOperacionalProfile = userPerfis.includes("OPERACIONAL") || profile?.setor === "ARMAZEM" || isAdmin;
 
-  // Get processes eligible for batch approval (pending armazem approval)
   const selectedForBatchApproval = filtered.filter(s => 
     selectedIds.includes(s.id) && 
     s.status === "aguardando_confirmacao" && 
     s.armazem_aprovado === null
   );
 
-  // Get processes eligible for batch status update (already approved)
   const selectedForBatchStatus = filtered.filter(s => 
     selectedIds.includes(s.id) && 
     (s.status === "confirmado_aguardando_vistoria" || s.comex_aprovado || s.armazem_aprovado)
   );
 
-  // Toggle selection
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -300,31 +318,47 @@ const InternoDashboard = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === filtered.length) {
+    if (selectedIds.length === paginatedFiltered.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filtered.map(s => s.id));
+      setSelectedIds(paginatedFiltered.map(s => s.id));
     }
   };
 
-  // Calculate launch counters
-  const lancamentoPendente = solicitacoes.filter(s => {
+  // Launch counters - always use dashboardFiltered (service filter only)
+  const lancamentoPendente = dashboardFiltered.filter(s => {
     const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
     if (!servico?.status_confirmacao_lancamento?.length) return false;
     return servico.status_confirmacao_lancamento.includes(s.status) && !s.lancamento_confirmado;
   }).length;
 
-  const lancamentoConfirmado = solicitacoes.filter(s => {
+  const lancamentoConfirmado = dashboardFiltered.filter(s => {
     const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
     if (!servico?.status_confirmacao_lancamento?.length) return false;
     return servico.status_confirmacao_lancamento.includes(s.status) && s.lancamento_confirmado === true;
   }).length;
 
-  // Check if process needs launch confirmation
   const needsLaunchConfirmation = (s: any) => {
     const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
     if (!servico?.status_confirmacao_lancamento?.length) return false;
     return servico.status_confirmacao_lancamento.includes(s.status);
+  };
+
+  // Check if deferimento button should be active
+  const isDeferimentoActive = (s: any) => {
+    return s.status === "vistoria_finalizada" && 
+      (s.tipo_operacao || "").toLowerCase().includes("posicionamento") &&
+      (s.categoria || "").toLowerCase() === "exportação";
+  };
+
+  // Status vistoria color
+  const getVistoriaStatusColor = (status: string | null) => {
+    if (!status) return "";
+    const lower = status.toLowerCase();
+    if (lower.includes("finalizada")) return "text-green-600";
+    if (lower.includes("pendência")) return "text-yellow-600";
+    if (lower.includes("não vistoriado")) return "text-red-600";
+    return "text-muted-foreground";
   };
 
   return (
@@ -333,7 +367,6 @@ const InternoDashboard = () => {
       <header className="jbs-header sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Logo area with white background */}
             <div className="bg-white rounded-lg p-2">
               <img src={jbsLogo} alt="JBS Terminais" className="h-8 w-auto" />
             </div>
@@ -345,15 +378,10 @@ const InternoDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Admin Menu */}
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-primary-foreground hover:bg-primary-foreground/10"
-                  >
+                  <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/10">
                     <Menu className="h-4 w-4 mr-1" />
                     Admin
                   </Button>
@@ -401,14 +429,8 @@ const InternoDashboard = () => {
               </DropdownMenu>
             )}
             
-            {/* Logs for all users */}
             {!isAdmin && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/interno/admin/logs")}
-                className="text-primary-foreground hover:bg-primary-foreground/10"
-              >
+              <Button variant="ghost" size="sm" onClick={() => navigate("/interno/admin/logs")} className="text-primary-foreground hover:bg-primary-foreground/10">
                 <FileText className="h-4 w-4" />
               </Button>
             )}
@@ -426,12 +448,7 @@ const InternoDashboard = () => {
                 </span>
               )}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
-            >
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-primary-foreground hover:bg-primary-foreground/10">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -439,7 +456,6 @@ const InternoDashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {/* Notifications Panel */}
         {showNotifications && user && (
           <NotificationsPanel userId={user.id} onClose={() => {
             setShowNotifications(false);
@@ -490,16 +506,16 @@ const InternoDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Stats Cards - now shows filtered total */}
+        {/* Stats Cards - dashboard counts (service filter only) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCard 
             label={tipoServicoFilter === "Todos" ? "Total" : tipoServicoFilter} 
-            value={filtered.length} 
+            value={dashboardFiltered.length} 
             icon={<ClipboardList className="h-5 w-5" />} 
           />
-          <StatCard label="Aguardando" value={statusCounts["aguardando_confirmacao"] || 0} icon={<Clock className="h-5 w-5" />} color="text-yellow-600" />
-          <StatCard label="Confirmados" value={statusCounts["confirmado_aguardando_vistoria"] || 0} icon={<CheckCircle2 className="h-5 w-5" />} color="text-blue-600" />
-          <StatCard label="Recusados" value={statusCounts["recusado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
+          <StatCard label="Aguardando" value={dashboardStatusCounts["aguardando_confirmacao"] || 0} icon={<Clock className="h-5 w-5" />} color="text-yellow-600" />
+          <StatCard label="Confirmados" value={dashboardStatusCounts["confirmado_aguardando_vistoria"] || 0} icon={<CheckCircle2 className="h-5 w-5" />} color="text-blue-600" />
+          <StatCard label="Recusados" value={dashboardStatusCounts["recusado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
         </div>
 
         {/* Launch Counters */}
@@ -520,6 +536,30 @@ const InternoDashboard = () => {
           </div>
         )}
 
+        {/* Deferimento Counters - for Posicionamento */}
+        {(tipoServicoFilter === "Todos" || tipoServicoFilter.toLowerCase().includes("posicionamento")) && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <StatCard 
+              label="Def. Pendente" 
+              value={deferimentoCounts.pendente} 
+              icon={<Clock className="h-5 w-5" />} 
+              color="text-yellow-600" 
+            />
+            <StatCard 
+              label="Def. Recusado" 
+              value={deferimentoCounts.recusado} 
+              icon={<XCircle className="h-5 w-5" />} 
+              color="text-destructive" 
+            />
+            <StatCard 
+              label="Def. Recebido" 
+              value={deferimentoCounts.recebido} 
+              icon={<CheckCircle2 className="h-5 w-5" />} 
+              color="text-green-600" 
+            />
+          </div>
+        )}
+
         {/* Status breakdown */}
         <div className="flex flex-wrap gap-2 mb-6">
           {Object.entries(STATUS_LABELS).map(([key, label]) => (
@@ -529,7 +569,7 @@ const InternoDashboard = () => {
               className="cursor-pointer hover:bg-muted transition-colors"
               onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
             >
-              {label}: {statusCounts[key] || 0}
+              {label}: {dashboardStatusCounts[key] || 0}
             </Badge>
           ))}
         </div>
@@ -570,6 +610,18 @@ const InternoDashboard = () => {
                   <SelectItem value="confirmado">Lançamento Confirmado</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={aprovacaoFilter} onValueChange={(v) => setAprovacaoFilter(v as any)}>
+                <SelectTrigger className="w-[180px]">
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Aprovação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="pendente">Aprovação Pendente</SelectItem>
+                  <SelectItem value="aprovado">Aprovado</SelectItem>
+                  <SelectItem value="reprovado">Reprovado</SelectItem>
+                </SelectContent>
+              </Select>
               <Button variant="outline" size="sm" onClick={fetchSolicitacoes}>
                 Atualizar
               </Button>
@@ -588,7 +640,6 @@ const InternoDashboard = () => {
                 </Button>
               )}
               
-              {/* Batch Action Buttons */}
               {selectedIds.length > 0 && (
                 <div className="flex gap-2">
                   {hasOperacionalProfile && selectedForBatchApproval.length > 0 && (
@@ -626,13 +677,13 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground w-[40px]">
                     <div className="bg-white rounded p-0.5 w-fit">
                       <Checkbox
-                        checked={selectedIds.length === filtered.length && filtered.length > 0}
+                        checked={selectedIds.length === paginatedFiltered.length && paginatedFiltered.length > 0}
                         onCheckedChange={() => toggleSelectAll()}
                         className="bg-white data-[state=checked]:bg-white data-[state=checked]:text-primary border-primary"
                       />
                     </div>
                   </TableHead>
-                  <TableHead className="text-primary-foreground w-[100px]">Ações</TableHead>
+                  <TableHead className="text-primary-foreground w-[130px]">Ações</TableHead>
                   <TableHead className="text-primary-foreground w-[50px]">$</TableHead>
                   <TableHead className="text-primary-foreground">Protocolo</TableHead>
                   <TableHead className="text-primary-foreground">Serviço Adicional</TableHead>
@@ -641,6 +692,7 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground">Tipo Carga</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
+                  <TableHead className="text-primary-foreground">Vistoria</TableHead>
                   <TableHead className="text-primary-foreground">Administrativa</TableHead>
                   <TableHead className="text-primary-foreground">Operacional</TableHead>
                   <TableHead className="text-primary-foreground">Data Solic.</TableHead>
@@ -649,18 +701,18 @@ const InternoDashboard = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
                       Carregando...
                     </TableCell>
                   </TableRow>
-                ) : filtered.length === 0 ? (
+                ) : paginatedFiltered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
                       Nenhuma solicitação encontrada.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((s) => (
+                  paginatedFiltered.map((s) => (
                     <TableRow key={s.id} className="hover:bg-muted/30">
                       <TableCell>
                         <Checkbox
@@ -678,7 +730,6 @@ const InternoDashboard = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {/* Botão reclassificar - só aparece se já tem decisão */}
                           {(s.comex_aprovado !== null || s.armazem_aprovado !== null) && (
                             <Button
                               variant="ghost"
@@ -689,24 +740,17 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Botão Deferimento - aparece quando: vistoria_finalizada + Posicionamento + Exportação */}
-                          {(() => {
-                            const showDefBtn = s.status === "vistoria_finalizada" && 
-                              (s.tipo_operacao || "").toLowerCase().includes("posicionamento") &&
-                              (s.categoria || "").toLowerCase() === "exportação";
-                            if (!showDefBtn) return null;
-                            return (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setDeferimentoSolicitacao(s)}
-                                title="Deferimento"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                            );
-                          })()}
-                          {/* PDF individual */}
+                          {/* Deferimento button - between reclassificação and download */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => isDeferimentoActive(s) ? setDeferimentoSolicitacao(s) : null}
+                            title="Deferimento"
+                            disabled={!isDeferimentoActive(s)}
+                            className={isDeferimentoActive(s) ? "text-blue-600 hover:text-blue-700" : "text-muted-foreground/40"}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -754,6 +798,11 @@ const InternoDashboard = () => {
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
                       <TableCell>
+                        <span className={`text-xs font-medium ${getVistoriaStatusColor(s.status_vistoria)}`}>
+                          {s.status_vistoria || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
                         <ApprovalIndicator approved={s.comex_aprovado} />
                       </TableCell>
                       <TableCell>
@@ -767,6 +816,33 @@ const InternoDashboard = () => {
                 )}
               </TableBody>
             </Table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <p className="text-sm text-muted-foreground">
+                  {filtered.length} resultado(s) · Página {currentPage} de {totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
@@ -777,7 +853,6 @@ const InternoDashboard = () => {
           solicitacao={selectedSolicitacao}
           profile={{
             ...profile,
-            // Mapear setor antigo para novo
             setor: profile.setor === "COMEX" ? "COMEX" : profile.setor === "ARMAZEM" ? "ARMAZEM" : profile.setor,
             perfis: userPerfis
           }}
@@ -786,6 +861,7 @@ const InternoDashboard = () => {
           onClose={() => {
             setSelectedSolicitacao(null);
             fetchSolicitacoes();
+            fetchDeferimentoCounts();
           }}
         />
       )}
@@ -841,6 +917,7 @@ const InternoDashboard = () => {
           onClose={() => {
             setDeferimentoSolicitacao(null);
             fetchSolicitacoes();
+            fetchDeferimentoCounts();
           }}
         />
       )}

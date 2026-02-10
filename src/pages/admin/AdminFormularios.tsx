@@ -59,6 +59,7 @@ interface Formulario {
   descricao: string | null;
   ativo: boolean;
   created_at: string;
+  estilo?: string;
 }
 
 interface Campo {
@@ -188,10 +189,10 @@ const AdminFormularios = () => {
   };
 
   // Form CRUD
-  const openFormDialog = (form?: Formulario & { estilo?: string }) => {
+  const openFormDialog = (form?: Formulario) => {
     if (form) {
       setEditingForm(form);
-      const estilo = (form as any).estilo || "jbs";
+      const estilo = form.estilo || "jbs";
       setFormData({ titulo: form.titulo, descricao: form.descricao || "", estilo });
       setSelectedStyle(estilo);
     } else {
@@ -444,6 +445,7 @@ const AdminFormularios = () => {
               <TableRow>
                 <TableHead>Título</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Estilo</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
@@ -453,6 +455,11 @@ const AdminFormularios = () => {
                 <TableRow key={form.id} className={!form.ativo ? "opacity-50" : ""}>
                   <TableCell className="font-medium">{form.titulo}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{form.descricao || "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">
+                      {FORM_STYLES.find(s => s.value === (form.estilo || "jbs"))?.label || form.estilo || "JBS"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <Switch checked={form.ativo} onCheckedChange={() => toggleFormActive(form)} />
                   </TableCell>
@@ -476,7 +483,7 @@ const AdminFormularios = () => {
               ))}
               {formularios.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     Nenhum formulário cadastrado
                   </TableCell>
                 </TableRow>

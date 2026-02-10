@@ -41,21 +41,9 @@ const InternoLogin = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleMicrosoftLogin = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'azure',
-      options: {
-        scopes: 'openid email profile',
-        redirectTo: `${window.location.origin}/interno/dashboard`,
-      }
-    });
-    
-    if (error) {
-      // Fallback to email/password for testing
-      toast.info("Login Microsoft não configurado. Use o formulário abaixo.");
-    }
-    setLoading(false);
+  const handleMicrosoftLogin = () => {
+    const url = `https://zdradwiudsuzavsexytt.supabase.co/auth/v1/authorize?provider=azure&redirect_to=${encodeURIComponent(window.location.origin + '/interno/dashboard')}&scopes=${encodeURIComponent('openid email profile')}`;
+    window.location.href = url;
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {

@@ -46,7 +46,7 @@ const InternoLogin = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
-        scopes: 'email profile',
+        scopes: 'openid email profile',
         redirectTo: `${window.location.origin}/interno/dashboard`,
       }
     });

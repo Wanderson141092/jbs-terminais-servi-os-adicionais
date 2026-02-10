@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, Save } from "lucide-react";
@@ -19,22 +20,30 @@ interface ParametroCampo {
   sigla: string | null;
   ordem: number;
   ativo: boolean;
+  servico_ids: string[];
+}
+
+interface Servico {
+  id: string;
+  nome: string;
 }
 
 const GRUPOS = [
-  { key: "tipo_carga", label: "Tipo Carga", showSigla: true },
-  { key: "categoria", label: "Categoria", showSigla: false },
-  { key: "status_deferimento", label: "Status Deferimento", showSigla: false },
+  { key: "tipo_carga", label: "Tipo Carga", showSigla: true, showServicoIds: false },
+  { key: "categoria", label: "Categoria", showSigla: false, showServicoIds: false },
+  { key: "status_deferimento", label: "Status Deferimento", showSigla: false, showServicoIds: false },
+  { key: "status_processo", label: "Status do Processo", showSigla: false, showServicoIds: true },
 ];
 
 const ParametrosCamposManager = () => {
   const [items, setItems] = useState<ParametroCampo[]>([]);
+  const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<ParametroCampo | null>(null);
-  const [formData, setFormData] = useState({ grupo: "tipo_carga", valor: "", sigla: "", ordem: 0 });
+  const [formData, setFormData] = useState({ grupo: "tipo_carga", valor: "", sigla: "", ordem: 0, servico_ids: [] as string[] });
 
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => { fetchItems(); fetchServicos(); }, []);
 
   const fetchItems = async () => {
     const { data } = await supabase
@@ -46,14 +55,23 @@ const ParametrosCamposManager = () => {
     setLoading(false);
   };
 
+  const fetchServicos = async () => {
+    const { data } = await supabase
+      .from("servicos")
+      .select("id, nome")
+      .eq("ativo", true)
+      .order("nome");
+    setServicos(data || []);
+  };
+
   const openDialog = (grupo: string, item?: ParametroCampo) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ grupo: item.grupo, valor: item.valor, sigla: item.sigla || "", ordem: item.ordem });
+      setFormData({ grupo: item.grupo, valor: item.valor, sigla: item.sigla || "", ordem: item.ordem, servico_ids: item.servico_ids || [] });
     } else {
       setEditingItem(null);
       const maxOrder = items.filter(i => i.grupo === grupo).reduce((max, i) => Math.max(max, i.ordem), 0);
-      setFormData({ grupo, valor: "", sigla: "", ordem: maxOrder + 1 });
+      setFormData({ grupo, valor: "", sigla: "", ordem: maxOrder + 1, servico_ids: [] });
     }
     setShowDialog(true);
   };
@@ -61,11 +79,12 @@ const ParametrosCamposManager = () => {
   const handleSave = async () => {
     if (!formData.valor.trim()) { toast.error("Valor é obrigatório"); return; }
     
-    const data = {
+    const data: any = {
       grupo: formData.grupo,
       valor: formData.valor.trim(),
       sigla: formData.sigla.trim() || null,
       ordem: formData.ordem,
+      servico_ids: formData.servico_ids,
       updated_at: new Date().toISOString(),
     };
 
@@ -98,7 +117,23 @@ const ParametrosCamposManager = () => {
     fetchItems();
   };
 
-  const renderGrupoTable = (grupo: { key: string; label: string; showSigla: boolean }) => {
+  const toggleServicoId = (servicoId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      servico_ids: prev.servico_ids.includes(servicoId)
+        ? prev.servico_ids.filter(id => id !== servicoId)
+        : [...prev.servico_ids, servicoId]
+    }));
+  };
+
+  const getServicoNomes = (ids: string[]) => {
+    if (!ids?.length) return "Todos";
+    return ids.map(id => servicos.find(s => s.id === id)?.nome || id).join(", ");
+  };
+
+  const currentGrupo = GRUPOS.find(g => g.key === formData.grupo);
+
+  const renderGrupoTable = (grupo: typeof GRUPOS[0]) => {
     const grupoItems = items.filter(i => i.grupo === grupo.key);
     return (
       <Card key={grupo.key}>
@@ -114,6 +149,7 @@ const ParametrosCamposManager = () => {
               <TableRow>
                 <TableHead>Valor</TableHead>
                 {grupo.showSigla && <TableHead>Sigla</TableHead>}
+                {grupo.showServicoIds && <TableHead>Serviços</TableHead>}
                 <TableHead>Ordem</TableHead>
                 <TableHead>Ativo</TableHead>
                 <TableHead>Ações</TableHead>
@@ -122,7 +158,7 @@ const ParametrosCamposManager = () => {
             <TableBody>
               {grupoItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={grupo.showSigla ? 5 : 4} className="text-center text-muted-foreground py-4">
+                  <TableCell colSpan={grupo.showSigla || grupo.showServicoIds ? 6 : 4} className="text-center text-muted-foreground py-4">
                     Nenhum item cadastrado.
                   </TableCell>
                 </TableRow>
@@ -131,6 +167,21 @@ const ParametrosCamposManager = () => {
                   <TableRow key={item.id} className={!item.ativo ? "opacity-50" : ""}>
                     <TableCell className="font-medium">{item.valor}</TableCell>
                     {grupo.showSigla && <TableCell className="font-mono">{item.sigla || "—"}</TableCell>}
+                    {grupo.showServicoIds && (
+                      <TableCell className="text-xs">
+                        {item.servico_ids?.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {item.servico_ids.map(id => (
+                              <Badge key={id} variant="outline" className="text-[10px]">
+                                {servicos.find(s => s.id === id)?.nome || id.slice(0, 8)}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Todos</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>{item.ordem}</TableCell>
                     <TableCell>
                       <Switch checked={item.ativo} onCheckedChange={() => toggleAtivo(item)} />
@@ -176,7 +227,7 @@ const ParametrosCamposManager = () => {
       </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingItem ? "Editar" : "Adicionar"} Item</DialogTitle>
           </DialogHeader>
@@ -185,10 +236,29 @@ const ParametrosCamposManager = () => {
               <Label>Valor</Label>
               <Input value={formData.valor} onChange={(e) => setFormData({ ...formData, valor: e.target.value })} placeholder="Nome do item" />
             </div>
-            {GRUPOS.find(g => g.key === formData.grupo)?.showSigla && (
+            {currentGrupo?.showSigla && (
               <div>
                 <Label>Sigla (abreviação)</Label>
                 <Input value={formData.sigla} onChange={(e) => setFormData({ ...formData, sigla: e.target.value })} placeholder="Ex: Dry, Reefer, IMO" />
+              </div>
+            )}
+            {currentGrupo?.showServicoIds && (
+              <div>
+                <Label>Serviços associados</Label>
+                <p className="text-xs text-muted-foreground mb-2">Deixe vazio para aplicar a todos os serviços</p>
+                <div className="space-y-2 max-h-48 overflow-auto border rounded-md p-3">
+                  {servicos.map(servico => (
+                    <div key={servico.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`srv-${servico.id}`}
+                        checked={formData.servico_ids.includes(servico.id)}
+                        onCheckedChange={() => toggleServicoId(servico.id)}
+                      />
+                      <label htmlFor={`srv-${servico.id}`} className="text-sm cursor-pointer">{servico.nome}</label>
+                    </div>
+                  ))}
+                  {servicos.length === 0 && <p className="text-xs text-muted-foreground">Nenhum serviço cadastrado</p>}
+                </div>
               </div>
             )}
             <div>

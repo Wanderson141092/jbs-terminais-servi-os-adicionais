@@ -38,6 +38,7 @@ const Index = () => {
   const [hasSearched, setHasSearched] = useState(false);
   const [buttons, setButtons] = useState<ExternalButton[]>([]);
   const [activeDialog, setActiveDialog] = useState<{ type: "iframe" | "form"; data: ExternalButton } | null>(null);
+  const [lastSearchServicoId, setLastSearchServicoId] = useState<string>("");
 
   // Carregar botões externos
   useEffect(() => {
@@ -59,6 +60,7 @@ const Index = () => {
   const handleSearch = useCallback(async (servicoId: string, valor: string) => {
     setIsLoading(true);
     setHasSearched(true);
+    setLastSearchServicoId(servicoId);
     try {
       // Primeiro buscar o nome do serviço para filtrar tipo_operacao
       const { data: servicoData } = await supabase
@@ -208,7 +210,7 @@ const Index = () => {
             {!isLoading && resultado && (
               <ConsultaResultado
                 solicitacao={resultado}
-                onRefresh={() => handleSearch(resultado.tipo_operacao, resultado.protocolo)}
+                onRefresh={() => handleSearch(lastSearchServicoId, resultado.protocolo)}
               />
             )}
 

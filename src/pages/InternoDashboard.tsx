@@ -128,11 +128,14 @@ const InternoDashboard = () => {
       .order("created_at", { ascending: false });
     
     // Filter logic:
-    // - If service=todos AND lançamento=todos: exclude vistoria_finalizada (show nothing meaningful)
+    // - If service=todos AND lançamento=todos AND tipoServico=Todos: don't load data
     // - If service=todos AND lançamento=pendente/confirmado: include vistoria_finalizada (need them for launch filter)
     // - If specific service: that's the primary filter
-    if (statusFilter === "all" && lancamentoFilter === "all") {
-      query = query.not("status", "in", '("vistoria_finalizada")');
+    if (tipoServicoFilter === "Todos" && lancamentoFilter === "all") {
+      // Return empty - user must select at least one filter
+      setSolicitacoes([]);
+      setLoading(false);
+      return;
     }
 
     const { data, error } = await query.limit(200);
@@ -143,7 +146,7 @@ const InternoDashboard = () => {
       setSolicitacoes(data || []);
     }
     setLoading(false);
-  }, [statusFilter, lancamentoFilter]);
+  }, [statusFilter, lancamentoFilter, tipoServicoFilter]);
 
   const fetchUnread = useCallback(async () => {
     if (!user) return;
@@ -686,11 +689,9 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Botão Deferimento - aparece quando status corresponde ao configurado no serviço */}
+                          {/* Botão Deferimento - aparece quando: vistoria_finalizada + Posicionamento + Exportação */}
                           {(() => {
-                            const servicoConf = servicos.find(sv => sv.nome === s.tipo_operacao);
-                            const statusLanc = servicoConf?.status_confirmacao_lancamento || [];
-                            const showDefBtn = statusLanc.includes(s.status) && 
+                            const showDefBtn = s.status === "vistoria_finalizada" && 
                               (s.tipo_operacao || "").toLowerCase().includes("posicionamento") &&
                               (s.categoria || "").toLowerCase() === "exportação";
                             if (!showDefBtn) return null;

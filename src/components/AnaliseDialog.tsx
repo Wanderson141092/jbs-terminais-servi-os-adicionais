@@ -295,12 +295,18 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setMotivoRecusaDeferimento("");
     setLoading(false);
     
-    // Refresh attachments
-    const { data } = await supabase
+    // Refresh only deferimento documents (not analysis attachments)
+    const { data: deferimentoDocs } = await supabase
       .from("deferimento_documents")
       .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-    setAttachments(data || []);
+      .eq("solicitacao_id", solicitacao.id)
+      .eq("document_type", "deferimento");
+    
+    // Keep existing non-deferimento attachments and replace deferimento ones
+    setAttachments(prev => {
+      const nonDeferimento = prev.filter(a => a.document_type !== "deferimento");
+      return [...nonDeferimento, ...(deferimentoDocs || [])];
+    });
   };
 
   const handleConfirmarLancamento = async () => {

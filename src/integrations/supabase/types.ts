@@ -1070,6 +1070,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      insert_audit_log: {
+        Args: {
+          p_acao: string
+          p_detalhes?: string
+          p_entidade?: string
+          p_entidade_id?: string
+          p_solicitacao_id: string
+          p_usuario_id: string
+        }
+        Returns: undefined
+      }
       setup_admin_role: { Args: never; Returns: undefined }
     }
     Enums: {

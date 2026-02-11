@@ -29,7 +29,6 @@ Deno.serve(async (req) => {
     const formularioId = formData.get("formulario_id") as string | null;
     const documentType = formData.get("document_type") as string || "deferimento";
 
-    // Validate file
     if (!file) {
       return new Response(
         JSON.stringify({ error: "Arquivo não enviado." }),
@@ -51,7 +50,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate bucket
     const allowedBuckets = ["deferimento", "form-uploads"];
     if (!bucket || !allowedBuckets.includes(bucket)) {
       return new Response(
@@ -65,7 +63,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // For deferimento uploads, validate solicitacao exists
+    // Sanitize file name
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+
+    // For deferimento uploads
     if (bucket === "deferimento" && solicitacaoId) {
       const { data: solicitacao } = await supabaseAdmin
         .from("solicitacoes")
@@ -80,15 +81,12 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Upload file
-      const fileName = `${solicitacao.protocolo}/${Date.now()}_${file.name}`;
+      const storagePath = `${solicitacao.protocolo}/${Date.now()}_${safeName}`;
       const fileBuffer = await file.arrayBuffer();
-      
+
       const { error: uploadError } = await supabaseAdmin.storage
         .from(bucket)
-        .upload(fileName, fileBuffer, {
-          contentType: file.type,
-        });
+        .upload(storagePath, fileBuffer, { contentType: file.type });
 
       if (uploadError) {
         return new Response(
@@ -97,17 +95,25 @@ Deno.serve(async (req) => {
         );
       }
 
-      const { data: urlData } = supabaseAdmin.storage
+      // Generate signed URL (1 hour)
+      const { data: signedData, error: signError } = await supabaseAdmin.storage
         .from(bucket)
-        .getPublicUrl(fileName);
+        .createSignedUrl(storagePath, 3600);
 
-      // Insert deferimento document record
+      if (signError) {
+        return new Response(
+          JSON.stringify({ error: "Erro ao gerar URL do arquivo." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Store the storage path (not full URL) for generating signed URLs later
       const { error: dbError } = await supabaseAdmin
         .from("deferimento_documents")
         .insert({
           solicitacao_id: solicitacaoId,
           file_name: file.name,
-          file_url: urlData.publicUrl,
+          file_url: storagePath, // Store path, not full URL
           document_type: documentType,
           status: "pendente",
         });
@@ -120,7 +126,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true, file_url: urlData.publicUrl, file_name: file.name }),
+        JSON.stringify({ success: true, file_url: signedData.signedUrl, file_name: file.name }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -128,14 +134,12 @@ Deno.serve(async (req) => {
     // For form uploads
     if (bucket === "form-uploads") {
       const prefix = formularioId || "general";
-      const fileName = `${prefix}/${Date.now()}_${file.name}`;
+      const storagePath = `${prefix}/${Date.now()}_${safeName}`;
       const fileBuffer = await file.arrayBuffer();
 
       const { error: uploadError } = await supabaseAdmin.storage
         .from(bucket)
-        .upload(fileName, fileBuffer, {
-          contentType: file.type,
-        });
+        .upload(storagePath, fileBuffer, { contentType: file.type });
 
       if (uploadError) {
         return new Response(
@@ -144,12 +148,20 @@ Deno.serve(async (req) => {
         );
       }
 
-      const { data: urlData } = supabaseAdmin.storage
+      // Generate signed URL (1 hour)
+      const { data: signedData, error: signError } = await supabaseAdmin.storage
         .from(bucket)
-        .getPublicUrl(fileName);
+        .createSignedUrl(storagePath, 3600);
+
+      if (signError) {
+        return new Response(
+          JSON.stringify({ error: "Erro ao gerar URL do arquivo." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       return new Response(
-        JSON.stringify({ success: true, file_url: urlData.publicUrl, file_name: file.name }),
+        JSON.stringify({ success: true, file_url: signedData.signedUrl, file_name: file.name, storage_path: storagePath }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

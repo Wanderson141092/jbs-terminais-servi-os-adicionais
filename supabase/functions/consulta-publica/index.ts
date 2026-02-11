@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
   try {
     const { servico_id, valor } = await req.json();
 
-    // Input validation
     if (!servico_id || typeof servico_id !== "string") {
       return new Response(
         JSON.stringify({ error: "Serviço inválido." }),
@@ -34,7 +33,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get service name
     const { data: servicoData, error: servicoError } = await supabaseAdmin
       .from("servicos")
       .select("nome")
@@ -52,13 +50,14 @@ Deno.serve(async (req) => {
     const tipoOperacao = servicoData.nome;
     const valorUpper = valor.toUpperCase().trim();
 
-    // Search by protocolo, then container, then lpco
+    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lancamento_confirmado, lpco, cliente_nome";
+
     let solicitacao = null;
 
     // By protocolo
     const { data: byProtocolo } = await supabaseAdmin
       .from("solicitacoes")
-      .select("id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lancamento_confirmado, lpco, cliente_nome")
+      .select(selectFields)
       .eq("protocolo", valorUpper)
       .eq("tipo_operacao", tipoOperacao)
       .maybeSingle();
@@ -69,7 +68,7 @@ Deno.serve(async (req) => {
     if (!solicitacao) {
       const { data: byContainer } = await supabaseAdmin
         .from("solicitacoes")
-        .select("id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lancamento_confirmado, lpco, cliente_nome")
+        .select(selectFields)
         .eq("numero_conteiner", valorUpper)
         .eq("tipo_operacao", tipoOperacao)
         .maybeSingle();
@@ -80,7 +79,7 @@ Deno.serve(async (req) => {
     if (!solicitacao) {
       const { data: byLpco } = await supabaseAdmin
         .from("solicitacoes")
-        .select("id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lancamento_confirmado, lpco, cliente_nome")
+        .select(selectFields)
         .eq("lpco", valorUpper)
         .eq("tipo_operacao", tipoOperacao)
         .maybeSingle();
@@ -94,18 +93,52 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch deferimento documents for this solicitacao
+    // Fetch deferimento documents
     const { data: deferimentoDocs } = await supabaseAdmin
       .from("deferimento_documents")
       .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
       .eq("solicitacao_id", solicitacao.id)
       .order("created_at", { ascending: false });
 
-    // Return safe data (excludes: cliente_email, observacoes, justificativas)
+    // Generate signed URLs for each document (private buckets)
+    const docsWithSignedUrls = [];
+    if (deferimentoDocs) {
+      for (const doc of deferimentoDocs) {
+        let signedUrl = doc.file_url;
+        
+        // If file_url is a storage path (not a full URL), generate signed URL
+        if (doc.file_url && !doc.file_url.startsWith("http")) {
+          const { data: signedData } = await supabaseAdmin.storage
+            .from("deferimento")
+            .createSignedUrl(doc.file_url, 3600); // 1 hour
+          if (signedData) {
+            signedUrl = signedData.signedUrl;
+          }
+        } else if (doc.file_url && doc.file_url.includes("/storage/v1/object/public/deferimento/")) {
+          // Legacy: extract path from old public URL and generate signed URL
+          const pathMatch = doc.file_url.split("/storage/v1/object/public/deferimento/");
+          if (pathMatch.length === 2) {
+            const storagePath = decodeURIComponent(pathMatch[1]);
+            const { data: signedData } = await supabaseAdmin.storage
+              .from("deferimento")
+              .createSignedUrl(storagePath, 3600);
+            if (signedData) {
+              signedUrl = signedData.signedUrl;
+            }
+          }
+        }
+
+        docsWithSignedUrls.push({
+          ...doc,
+          file_url: signedUrl,
+        });
+      }
+    }
+
     return new Response(
       JSON.stringify({
         solicitacao: solicitacao,
-        deferimento_docs: deferimentoDocs || [],
+        deferimento_docs: docsWithSignedUrls,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

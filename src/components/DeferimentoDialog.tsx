@@ -135,25 +135,21 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
   };
 
   const logAudit = async (acao: string, detalhes: string) => {
-    await supabase.from("audit_log").insert({
-      solicitacao_id: solicitacao.id,
-      usuario_id: userId,
-      acao,
-      detalhes,
+    await supabase.rpc("insert_audit_log", {
+      p_solicitacao_id: solicitacao.id,
+      p_usuario_id: userId,
+      p_acao: acao,
+      p_detalhes: detalhes,
     });
   };
 
   const createNotification = async (mensagem: string, tipo: string) => {
-    const { data: profiles } = await supabase.from("profiles").select("id");
-    if (profiles) {
-      const notifications = profiles.map((p) => ({
-        usuario_id: p.id,
-        solicitacao_id: solicitacao.id,
-        mensagem,
-        tipo,
-      }));
-      await supabase.from("notifications").insert(notifications);
-    }
+    await supabase.rpc("create_notifications_for_others", {
+      p_solicitacao_id: solicitacao.id,
+      p_mensagem: mensagem,
+      p_tipo: tipo,
+      p_exclude_user_id: userId,
+    });
   };
 
   const getStatusBadge = (status: string | null) => {

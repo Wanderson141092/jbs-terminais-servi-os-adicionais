@@ -89,8 +89,9 @@ Deno.serve(async (req) => {
         .upload(storagePath, fileBuffer, { contentType: file.type });
 
       if (uploadError) {
+        console.error("Storage upload error:", uploadError);
         return new Response(
-          JSON.stringify({ error: "Erro ao fazer upload: " + uploadError.message }),
+          JSON.stringify({ error: "Erro ao fazer upload. Tente novamente." }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -142,8 +143,9 @@ Deno.serve(async (req) => {
         .upload(storagePath, fileBuffer, { contentType: file.type });
 
       if (uploadError) {
+        console.error("Storage upload error:", uploadError);
         return new Response(
-          JSON.stringify({ error: "Erro ao fazer upload: " + uploadError.message }),
+          JSON.stringify({ error: "Erro ao fazer upload. Tente novamente." }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

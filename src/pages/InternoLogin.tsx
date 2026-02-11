@@ -75,106 +75,51 @@ const InternoLogin = () => {
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const adminInput = email.toLowerCase().trim();
-    const adminPass = password;
-
     setLoading(true);
 
-    // Primeiro, verificar se é login por CPF
-    if (cpf.trim()) {
-      const cpfNumeros = cpf.replace(/\D/g, '');
-      
-      // Buscar admin por CPF
-      const { data: adminAccount, error: adminError } = await supabase
-        .from("admin_accounts")
-        .select("*")
-        .eq("cpf", cpfNumeros)
-        .eq("ativo", true)
-        .maybeSingle();
+    try {
+      const body: Record<string, string> = { password };
 
-      if (adminAccount) {
-        // Verificar senha (hash simples para demo - em produção usar bcrypt)
-        if (adminAccount.senha_hash === adminPass) {
-          // Login como admin master usando conta padrão
-          const adminEmail = "admin@jbsterminais.com.br";
-          const adminPassword = "Admin123!@#Secure";
-          
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: adminEmail,
-            password: adminPassword,
-          });
+      if (cpf.trim()) {
+        body.cpf = cpf.replace(/\D/g, '');
+      } else {
+        body.username = email.trim();
+      }
 
-          if (signInError) {
-            toast.error("Erro ao autenticar. Contate o suporte.");
-          } else {
-            toast.success(`Bem-vindo, ${adminAccount.nome}!`);
-          }
-        } else {
-          toast.error("CPF ou senha incorretos.");
-        }
+      const response = await supabase.functions.invoke("admin-login", {
+        body,
+      });
+
+      if (response.error) {
+        toast.error(response.error.message || "Erro ao autenticar.");
         setLoading(false);
         return;
       }
-    }
 
-    // Admin padrão: Admin / Admin
-    if (adminInput === "admin" && adminPass === "Admin") {
-      const adminEmail = "admin@jbsterminais.com.br";
-      const adminPassword = "Admin123!@#Secure";
-      
-      // Try to sign in first
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: adminEmail,
-        password: adminPassword,
-      });
+      const data = response.data;
 
-      if (signInError) {
-        // If sign in fails, try to create admin account
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: adminEmail,
-          password: adminPassword,
-        });
-
-        if (signUpError) {
-          toast.error("Conta admin não configurada. Contate o suporte.");
-          setLoading(false);
-          return;
-        }
-
-        if (signUpData.user) {
-          await supabase.from("profiles").upsert({
-            id: signUpData.user.id,
-            email: adminEmail,
-            nome: "Administrador",
-            setor: null,
-          });
-          
-          await supabase.rpc("setup_admin_role");
-          toast.success("Conta admin configurada! Faça login novamente.");
-        }
-      } else if (signInData.user) {
-        await supabase.from("profiles").upsert({
-          id: signInData.user.id,
-          email: adminEmail,
-          nome: "Administrador",
-          setor: null,
-        });
-        
-        const { data: existingRole } = await supabase
-          .from("user_roles")
-          .select("id")
-          .eq("user_id", signInData.user.id)
-          .eq("role", "admin")
-          .maybeSingle();
-        
-        if (!existingRole) {
-          await supabase.rpc("setup_admin_role");
-        }
+      if (data?.error) {
+        toast.error(data.error);
+        setLoading(false);
+        return;
       }
-      
-      setLoading(false);
-    } else {
-      toast.error("Credenciais inválidas.");
+
+      if (data?.session) {
+        // Set the session from the edge function response
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        toast.success(`Bem-vindo, ${data.adminNome || "Administrador"}!`);
+        if (data.setup) {
+          toast.info("Conta admin configurada com sucesso!");
+        }
+      } else {
+        toast.error("Credenciais inválidas.");
+      }
+    } catch (err) {
+      toast.error("Erro ao conectar ao servidor.");
+    } finally {
       setLoading(false);
     }
   };

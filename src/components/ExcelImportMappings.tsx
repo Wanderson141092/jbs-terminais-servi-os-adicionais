@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, Check } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 interface ImportRow {
   campo_interno: string;
@@ -24,36 +24,52 @@ const ExcelImportMappings = ({ onImported }: ExcelImportMappingsProps) => {
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = evt.target?.result;
-        const wb = XLSX.read(data, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json<any>(ws);
-
-        const rows: ImportRow[] = json.map((row: any) => ({
-          campo_interno: (row["campo_interno"] || row["Campo Interno"] || "").toString().trim(),
-          campo_externo: (row["campo_externo"] || row["Campo Externo"] || "").toString().trim(),
-          sistema: (row["sistema"] || row["Sistema"] || "hashdata").toString().trim(),
-          descricao: (row["descricao"] || row["Descrição"] || row["Descricao"] || "").toString().trim(),
-        })).filter((r: ImportRow) => r.campo_interno && r.campo_externo);
-
-        if (rows.length === 0) {
-          toast.error("Nenhum dado válido encontrado. Use colunas: campo_interno, campo_externo, sistema, descricao");
-          return;
-        }
-        setPreviewData(rows);
-        setShowDialog(true);
-      } catch {
-        toast.error("Erro ao ler arquivo Excel");
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        toast.error("Planilha vazia");
+        return;
       }
-    };
-    reader.readAsBinaryString(file);
+
+      const headers: string[] = [];
+      worksheet.getRow(1).eachCell((cell, colNumber) => {
+        headers[colNumber] = String(cell.value ?? "").trim();
+      });
+
+      const rows: ImportRow[] = [];
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const obj: Record<string, string> = {};
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber];
+          if (header) obj[header] = String(cell.value ?? "").trim();
+        });
+
+        const mapped: ImportRow = {
+          campo_interno: (obj["campo_interno"] || obj["Campo Interno"] || ""),
+          campo_externo: (obj["campo_externo"] || obj["Campo Externo"] || ""),
+          sistema: (obj["sistema"] || obj["Sistema"] || "hashdata"),
+          descricao: (obj["descricao"] || obj["Descrição"] || obj["Descricao"] || ""),
+        };
+        if (mapped.campo_interno && mapped.campo_externo) rows.push(mapped);
+      });
+
+      if (rows.length === 0) {
+        toast.error("Nenhum dado válido encontrado. Use colunas: campo_interno, campo_externo, sistema, descricao");
+        return;
+      }
+      setPreviewData(rows);
+      setShowDialog(true);
+    } catch {
+      toast.error("Erro ao ler arquivo Excel");
+    }
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -78,15 +94,26 @@ const ExcelImportMappings = ({ onImported }: ExcelImportMappingsProps) => {
     setImporting(false);
   };
 
-  const downloadTemplate = () => {
-    const template = [
-      { campo_interno: "data_solicitacao", campo_externo: "DATA_SOLICITACAO", sistema: "hashdata", descricao: "Data da solicitação" },
-      { campo_interno: "numero_conteiner", campo_externo: "CONTEINER", sistema: "hashdata", descricao: "Número do contêiner" },
+  const downloadTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Mapeamentos");
+    ws.columns = [
+      { header: "campo_interno", key: "campo_interno", width: 25 },
+      { header: "campo_externo", key: "campo_externo", width: 25 },
+      { header: "sistema", key: "sistema", width: 15 },
+      { header: "descricao", key: "descricao", width: 30 },
     ];
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Mapeamentos");
-    XLSX.writeFile(wb, "modelo_mapeamento_campos.xlsx");
+    ws.addRow({ campo_interno: "data_solicitacao", campo_externo: "DATA_SOLICITACAO", sistema: "hashdata", descricao: "Data da solicitação" });
+    ws.addRow({ campo_interno: "numero_conteiner", campo_externo: "CONTEINER", sistema: "hashdata", descricao: "Número do contêiner" });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modelo_mapeamento_campos.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (

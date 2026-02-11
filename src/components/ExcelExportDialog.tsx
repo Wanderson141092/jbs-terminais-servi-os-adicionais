@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { STATUS_LABELS } from "@/components/StatusBadge";
 import { formatTipoCarga } from "@/lib/tipoCarga";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 interface ExcelExportDialogProps {
   open: boolean;
@@ -95,7 +95,6 @@ const ExcelExportDialog = ({ open, onClose }: ExcelExportDialogProps) => {
         query = query.in("status", selectedStatuses as any);
       }
 
-      // Date filter
       const dateCol = dateType === "posicionamento" ? "data_posicionamento" 
         : dateType === "agendamento" ? "data_agendamento" : "created_at";
 
@@ -130,12 +129,21 @@ const ExcelExportDialog = ({ open, onClose }: ExcelExportDialogProps) => {
         return;
       }
 
-      // Format data
-      const rows = data.map(row => {
+      // Build workbook with ExcelJS
+      const workbook = new ExcelJS.Workbook();
+      const ws = workbook.addWorksheet("Solicitações");
+
+      // Add headers
+      const colDefs = selectedColumns.map(colKey => {
+        const colDef = AVAILABLE_COLUMNS.find(c => c.key === colKey);
+        return { header: colDef?.label || colKey, key: colKey, width: 20 };
+      });
+      ws.columns = colDefs;
+
+      // Add rows
+      data.forEach(row => {
         const formatted: Record<string, any> = {};
         selectedColumns.forEach(colKey => {
-          const colDef = AVAILABLE_COLUMNS.find(c => c.key === colKey);
-          if (!colDef) return;
           let value = (row as any)[colKey];
           
           if (colKey === "tipo_carga") value = formatTipoCarga(value);
@@ -150,15 +158,20 @@ const ExcelExportDialog = ({ open, onClose }: ExcelExportDialogProps) => {
             value = value ? new Date(value + "T00:00:00").toLocaleDateString("pt-BR") : "";
           }
           
-          formatted[colDef.label] = value ?? "";
+          formatted[colKey] = value ?? "";
         });
-        return formatted;
+        ws.addRow(formatted);
       });
 
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Solicitações");
-      XLSX.writeFile(wb, `solicitacoes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      // Download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `solicitacoes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
       
       toast.success(`${data.length} registros exportados`);
       onClose();

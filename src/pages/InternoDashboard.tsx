@@ -147,11 +147,24 @@ const InternoDashboard = () => {
   }, [statusFilter, tipoServicoFilter, lancamentoFilter, aprovacaoFilter, searchTerm]);
 
   const fetchDeferimentoCounts = useCallback(async () => {
-    // Count deferimento documents for Posicionamento processes with vistoria_finalizada
+    // Get Posicionamento solicitacao IDs first
+    const { data: posSolicitacoes } = await supabase
+      .from("solicitacoes")
+      .select("id")
+      .ilike("tipo_operacao", "%posicionamento%");
+    
+    if (!posSolicitacoes || posSolicitacoes.length === 0) {
+      setDeferimentoCounts({ pendente: 0, recusado: 0, recebido: 0 });
+      return;
+    }
+
+    const posIds = posSolicitacoes.map(s => s.id);
+    
     const { data: docs } = await supabase
       .from("deferimento_documents")
       .select("status, solicitacao_id")
-      .eq("document_type", "deferimento");
+      .eq("document_type", "deferimento")
+      .in("solicitacao_id", posIds);
     
     if (docs) {
       const pendente = docs.filter(d => !d.status || d.status === "pendente").length;

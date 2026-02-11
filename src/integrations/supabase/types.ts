@@ -1059,6 +1059,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_notifications_for_others: {
+        Args: {
+          p_exclude_user_id: string
+          p_mensagem: string
+          p_solicitacao_id: string
+          p_tipo: string
+        }
+        Returns: undefined
+      }
       get_user_sector: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["setor_tipo"]

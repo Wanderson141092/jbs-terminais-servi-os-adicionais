@@ -87,12 +87,12 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     if (error) {
       toast.error("Erro ao alterar status");
     } else {
-      // Log the action
-      await supabase.from("audit_log").insert({
-        usuario_id: userId,
-        solicitacao_id: solicitacao.id,
-        acao: newStatus === 'aprovado' ? 'status_alterado_aprovado' : 'status_alterado_recusado',
-        detalhes: `Status alterado de ${solicitacao.status} para ${newStatus}. Justificativa: ${justificativa}`
+      // Log the action via SECURITY DEFINER function
+      await supabase.rpc("insert_audit_log", {
+        p_solicitacao_id: solicitacao.id,
+        p_usuario_id: userId,
+        p_acao: newStatus === 'aprovado' ? 'status_alterado_aprovado' : 'status_alterado_recusado',
+        p_detalhes: `Status alterado de ${solicitacao.status} para ${newStatus}. Justificativa: ${justificativa}`
       });
 
       toast.success(`Status alterado para ${newStatus === 'aprovado' ? 'Aprovado' : 'Recusado'}`);

@@ -18,15 +18,14 @@ interface Solicitacao {
   lpco: string | null;
   numero_conteiner: string | null;
   cliente_nome: string;
-  cliente_email: string;
   data_posicionamento: string | null;
   data_agendamento: string | null;
   tipo_carga: string | null;
   tipo_operacao: string | null;
-  observacoes: string | null;
   status: string;
   status_vistoria: string | null;
   created_at: string;
+  categoria?: string | null;
 }
 
 interface DeferimentoDocument {
@@ -36,6 +35,7 @@ interface DeferimentoDocument {
   status: string | null;
   motivo_recusa: string | null;
   created_at: string;
+  document_type?: string;
 }
 
 interface ServicoConfig {
@@ -44,40 +44,21 @@ interface ServicoConfig {
 
 interface ConsultaResultadoProps {
   solicitacao: Solicitacao;
+  deferimentoDocs?: DeferimentoDocument[];
   onRefresh: () => void;
 }
 
-const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) => {
+const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: ConsultaResultadoProps) => {
   const [uploading, setUploading] = useState(false);
-  const [existingDoc, setExistingDoc] = useState<DeferimentoDocument | null>(null);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [loadingDocs, setLoadingDocs] = useState(true);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
 
-  const [allDocs, setAllDocs] = useState<DeferimentoDocument[]>([]);
+  // Filter deferimento docs
+  const allDocs = deferimentoDocs.filter(d => d.document_type === "deferimento" || !d.document_type);
+  const existingDoc = allDocs.length > 0 ? allDocs[0] : null;
 
-  // Verificar todos os documentos de deferimento
   useEffect(() => {
-    const fetchExistingDocs = async () => {
-      setLoadingDocs(true);
-      const { data } = await supabase
-        .from("deferimento_documents")
-        .select("*")
-        .eq("solicitacao_id", solicitacao.id)
-        .eq("document_type", "deferimento")
-        .order("created_at", { ascending: false });
-
-      if (data && data.length > 0) {
-        setAllDocs(data);
-        setExistingDoc(data[0]); // O mais recente
-      } else {
-        setAllDocs([]);
-        setExistingDoc(null);
-      }
-      setLoadingDocs(false);
-    };
-
     const fetchServicoConfig = async () => {
       const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
       const { data } = await supabase
@@ -87,18 +68,13 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
         .maybeSingle();
       setServicoConfig(data);
     };
-
-    fetchExistingDocs();
     fetchServicoConfig();
-  }, [solicitacao.id, solicitacao.tipo_operacao]);
+  }, [solicitacao.tipo_operacao]);
 
-  // Calcula o status geral do deferimento baseado em todos os documentos
   const getGeneralDeferimentoStatus = (): "recebido" | "recusado" | "aguardando" | null => {
     if (allDocs.length === 0) return null;
-    
     const hasRecusado = allDocs.some(d => d.status === "recusado");
     const allAceitos = allDocs.every(d => d.status === "aceito");
-    
     if (hasRecusado) return "recusado";
     if (allAceitos) return "recebido";
     return "aguardando";
@@ -121,38 +97,30 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       return;
     }
 
-    // Criar URL para preview
     const url = URL.createObjectURL(file);
     setPreviewFile({ file, url });
     setShowConfirmDialog(true);
   };
 
+  // Upload via edge function (no direct storage/DB access)
   const handleConfirmUpload = async () => {
     if (!previewFile) return;
 
     setUploading(true);
     try {
-      const fileName = `${solicitacao.protocolo}/${Date.now()}_${previewFile.file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("deferimento")
-        .upload(fileName, previewFile.file);
+      const formData = new FormData();
+      formData.append("file", previewFile.file);
+      formData.append("bucket", "deferimento");
+      formData.append("solicitacao_id", solicitacao.id);
+      formData.append("document_type", "deferimento");
 
-      if (uploadError) throw uploadError;
+      const { data: response, error } = await supabase.functions.invoke("upload-publico", {
+        body: formData,
+      });
 
-      const { data: urlData } = supabase.storage
-        .from("deferimento")
-        .getPublicUrl(fileName);
-
-      const { error: dbError } = await supabase
-        .from("deferimento_documents")
-        .insert({
-          solicitacao_id: solicitacao.id,
-          file_name: previewFile.file.name,
-          file_url: urlData.publicUrl,
-          status: 'pendente'
-        });
-
-      if (dbError) throw dbError;
+      if (error || response?.error) {
+        throw new Error(response?.error || error?.message || "Erro ao enviar arquivo");
+      }
 
       toast.success("Deferimento enviado com sucesso! Aguardando confirmação.");
       setShowConfirmDialog(false);
@@ -173,26 +141,13 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     setShowConfirmDialog(false);
   };
 
-  // Deferimento available for Posicionamento + Exportação when status matches service config
   const isPositionamentoExportacao = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento") 
     && (solicitacao as any).categoria?.toLowerCase() === "exportação";
   const vistoriaFinalizada = solicitacao.status === "vistoria_finalizada";
   const showDeferimento = isPositionamentoExportacao && vistoriaFinalizada;
-  
-  // Pode enviar se: deferimento habilitado E (não tem doc OU status geral é recusado)
   const canUpload = showDeferimento && (allDocs.length === 0 || generalStatus === "recusado");
 
-  // Status do deferimento com cores baseado no status geral
   const getDeferimentoStatusSection = () => {
-    if (loadingDocs) {
-      return (
-        <div className="text-center py-4 text-muted-foreground">
-          Verificando documentos...
-        </div>
-      );
-    }
-
-    // Status RECEBIDO - todos aceitos
     if (generalStatus === "recebido") {
       return (
         <Alert className="border-green-500 bg-green-50">
@@ -207,7 +162,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       );
     }
 
-    // Status RECUSADO - algum recusado, libera campo para reenvio
     if (generalStatus === "recusado") {
       const recusedDoc = allDocs.find(d => d.status === "recusado");
       return (
@@ -241,7 +195,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       );
     }
 
-    // Status AGUARDANDO - tem docs pendentes
     if (generalStatus === "aguardando") {
       return (
         <Alert className="border-yellow-500 bg-yellow-50">
@@ -264,7 +217,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
       );
     }
 
-    // Nenhum documento ainda - permitir upload
     if (canUpload) {
       return (
         <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-4">
@@ -289,7 +241,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     return null;
   };
 
-  // Determina o label de data baseado no serviço
   const isPositionamento = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
   const isAgendamento = servicoConfig?.tipo_agendamento === "data_horario";
 
@@ -299,7 +250,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     return "Data do serviço";
   };
 
-  // Formatar tipo de carga usando utility
   const formattedTipoCarga = formatTipoCarga(solicitacao.tipo_carga);
 
   const getDateValue = () => {
@@ -318,7 +268,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
     return "—";
   };
 
-  // Build info items, filtering out empty ones for visual cleanliness
   const infoItems = [
     { icon: <User className="h-4 w-4" />, label: "Cliente", value: solicitacao.cliente_nome },
     solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
@@ -351,16 +300,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
             ))}
           </div>
 
-          {solicitacao.observacoes && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1">Observações</p>
-                <p className="text-sm">{solicitacao.observacoes}</p>
-              </div>
-            </>
-          )}
-
           {solicitacao.status_vistoria && (
             <>
               <Separator />
@@ -371,7 +310,6 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
             </>
           )}
 
-          {/* Seção de Deferimento - Só aparece para Posicionamento + Exportação + vistoria_finalizada */}
           {showDeferimento && (
             <>
               <Separator />
@@ -404,6 +342,7 @@ const ConsultaResultado = ({ solicitacao, onRefresh }: ConsultaResultadoProps) =
                     src={previewFile.url} 
                     className="w-full h-[300px] rounded border" 
                     title="Preview do PDF"
+                    sandbox="allow-scripts allow-same-origin"
                   />
                 ) : (
                   <img 

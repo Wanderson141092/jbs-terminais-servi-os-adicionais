@@ -32,13 +32,25 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Settings,
 };
 
+// URL validation - only allow http/https protocols
+const isValidUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return ["http:", "https:"].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+};
+
 const Index = () => {
   const [resultado, setResultado] = useState<any>(null);
+  const [deferimentoDocs, setDeferimentoDocs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [buttons, setButtons] = useState<ExternalButton[]>([]);
   const [activeDialog, setActiveDialog] = useState<{ type: "iframe" | "form"; data: ExternalButton } | null>(null);
   const [lastSearchServicoId, setLastSearchServicoId] = useState<string>("");
+  const [lastSearchValor, setLastSearchValor] = useState<string>("");
 
   // Carregar botões externos
   useEffect(() => {
@@ -56,72 +68,43 @@ const Index = () => {
     fetchButtons();
   }, []);
 
-  // Recebe servicoId (id do serviço) e valor (protocolo/conteiner/lpco)
+  // Secure consultation via edge function (no direct DB access)
   const handleSearch = useCallback(async (servicoId: string, valor: string) => {
     setIsLoading(true);
     setHasSearched(true);
     setLastSearchServicoId(servicoId);
+    setLastSearchValor(valor);
     try {
-      // Primeiro buscar o nome do serviço para filtrar tipo_operacao
-      const { data: servicoData } = await supabase
-        .from("servicos")
-        .select("nome")
-        .eq("id", servicoId)
-        .single();
+      const { data: response, error } = await supabase.functions.invoke("consulta-publica", {
+        body: { servico_id: servicoId, valor },
+      });
 
-      if (!servicoData) {
-        toast.error("Serviço não encontrado.");
+      if (error) {
+        toast.error("Erro na consulta.");
         setResultado(null);
+        setDeferimentoDocs([]);
         setIsLoading(false);
         return;
       }
 
-      const tipoOperacao = servicoData.nome;
-      const valorUpper = valor.toUpperCase().trim();
-
-      // Tentar buscar por protocolo
-      let { data, error } = await supabase
-        .from("solicitacoes")
-        .select("*")
-        .eq("protocolo", valorUpper)
-        .eq("tipo_operacao", tipoOperacao)
-        .maybeSingle();
-
-      if (!data && !error) {
-        // Tentar por número de contêiner
-        const resultContainer = await supabase
-          .from("solicitacoes")
-          .select("*")
-          .eq("numero_conteiner", valorUpper)
-          .eq("tipo_operacao", tipoOperacao)
-          .maybeSingle();
-        
-        data = resultContainer.data;
-        error = resultContainer.error;
+      if (response?.error) {
+        toast.error(response.error);
+        setResultado(null);
+        setDeferimentoDocs([]);
+        setIsLoading(false);
+        return;
       }
 
-      if (!data && !error) {
-        // Tentar por LPCO
-        const resultLpco = await supabase
-          .from("solicitacoes")
-          .select("*")
-          .eq("lpco", valorUpper)
-          .eq("tipo_operacao", tipoOperacao)
-          .maybeSingle();
-        
-        data = resultLpco.data;
-        error = resultLpco.error;
-      }
+      setResultado(response?.solicitacao || null);
+      setDeferimentoDocs(response?.deferimento_docs || []);
 
-      if (error) throw error;
-      setResultado(data);
-
-      if (!data) {
+      if (!response?.solicitacao) {
         toast.info("Nenhuma solicitação encontrada para este serviço com os dados informados.");
       }
     } catch (err: any) {
       toast.error("Erro na consulta: " + err.message);
       setResultado(null);
+      setDeferimentoDocs([]);
     } finally {
       setIsLoading(false);
     }
@@ -129,12 +112,22 @@ const Index = () => {
 
   const handleButtonClick = (button: ExternalButton) => {
     if (button.tipo === "link" && button.url) {
+      // Validate URL before navigation
+      if (!isValidUrl(button.url)) {
+        toast.error("URL inválida ou não permitida.");
+        return;
+      }
       if (button.abrir_nova_aba) {
-        window.open(button.url, "_blank");
+        window.open(button.url, "_blank", "noopener,noreferrer");
       } else {
         window.location.href = button.url;
       }
     } else if (button.tipo === "iframe") {
+      // Validate URL for iframe
+      if (button.url && !isValidUrl(button.url)) {
+        toast.error("URL inválida ou não permitida.");
+        return;
+      }
       setActiveDialog({ type: "iframe", data: button });
     } else if (button.tipo === "formulario") {
       setActiveDialog({ type: "form", data: button });
@@ -210,7 +203,8 @@ const Index = () => {
             {!isLoading && resultado && (
               <ConsultaResultado
                 solicitacao={resultado}
-                onRefresh={() => handleSearch(lastSearchServicoId, resultado.protocolo)}
+                deferimentoDocs={deferimentoDocs}
+                onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor)}
               />
             )}
 
@@ -239,11 +233,12 @@ const Index = () => {
             <DialogTitle>{activeDialog?.data.titulo}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            {activeDialog?.type === "iframe" && activeDialog.data.url ? (
+            {activeDialog?.type === "iframe" && activeDialog.data.url && isValidUrl(activeDialog.data.url) ? (
               <iframe 
                 src={activeDialog.data.url}
                 className="w-full min-h-[500px] rounded-lg border"
                 title={activeDialog.data.titulo}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />

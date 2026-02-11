@@ -130,21 +130,26 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     setSubmitting(true);
 
     try {
-      // Upload files
+      // Upload files via edge function (secure, no direct storage access)
       const uploadedFiles: { campo_id: string; file_url: string; file_name: string }[] = [];
       for (const [campoId, fileData] of Object.entries(files)) {
-        const fileName = `${formularioId}/${Date.now()}_${fileData.file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("form-uploads")
-          .upload(fileName, fileData.file);
+        const formData = new FormData();
+        formData.append("file", fileData.file);
+        formData.append("bucket", "form-uploads");
+        formData.append("formulario_id", formularioId);
 
-        if (uploadError) throw uploadError;
+        const { data: uploadResponse, error: uploadError } = await supabase.functions.invoke("upload-publico", {
+          body: formData,
+        });
 
-        const { data: urlData } = supabase.storage.from("form-uploads").getPublicUrl(fileName);
+        if (uploadError || uploadResponse?.error) {
+          throw new Error(uploadResponse?.error || uploadError?.message || "Erro ao fazer upload");
+        }
+
         uploadedFiles.push({
           campo_id: campoId,
-          file_url: urlData.publicUrl,
-          file_name: fileData.file.name,
+          file_url: uploadResponse.file_url,
+          file_name: uploadResponse.file_name,
         });
       }
 
@@ -156,7 +161,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
         }
       }
 
-      // Save response
+      // Save response (formulario_respostas has public INSERT policy)
       const { error } = await supabase.from("formulario_respostas").insert({
         formulario_id: formularioId,
         respostas,
@@ -201,7 +206,6 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
 
   const estilo = formulario.estilo || "jbs";
   
-  // Style classes based on form style
   const styleClasses: Record<string, { container: string; header: string; field: string; button: string }> = {
     jbs: {
       container: "bg-card rounded-lg p-6 md:p-8 max-w-2xl mx-auto",

@@ -90,16 +90,12 @@ const InternoLogin = () => {
         body,
       });
 
-      if (response.error) {
-        toast.error(response.error.message || "Erro ao autenticar.");
-        setLoading(false);
-        return;
-      }
-
       const data = response.data;
 
-      if (data?.error) {
-        toast.error(data.error);
+      // Handle edge function errors - extract message from response body
+      if (response.error || data?.error) {
+        const errorMsg = data?.error || "Login ou senha incorretos.";
+        toast.error(errorMsg);
         setLoading(false);
         return;
       }

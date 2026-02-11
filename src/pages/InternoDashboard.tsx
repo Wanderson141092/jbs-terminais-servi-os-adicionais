@@ -46,6 +46,8 @@ interface Servico {
   ativo: boolean;
   tipo_agendamento: string | null;
   status_confirmacao_lancamento?: string[];
+  deferimento_status_ativacao?: string[];
+  aprovacao_ativada?: boolean;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -76,11 +78,10 @@ const InternoDashboard = () => {
   const [deferimentoSolicitacao, setDeferimentoSolicitacao] = useState<any>(null);
   const [showExcelExport, setShowExcelExport] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0, recusado: 0, recebido: 0 });
+  const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   
   const { isAdmin } = useAdminCheck(user?.id || null);
   
-  // Initialize native notifications
   useNotifications(user?.id || null);
 
   useEffect(() => {
@@ -116,10 +117,10 @@ const InternoDashboard = () => {
   const fetchServicos = useCallback(async () => {
     const { data } = await supabase
       .from("servicos")
-      .select("*, status_confirmacao_lancamento")
+      .select("*")
       .eq("ativo", true)
       .order("nome");
-    setServicos(data || []);
+    setServicos((data || []) as Servico[]);
   }, []);
 
   const fetchSolicitacoes = useCallback(async () => {
@@ -130,7 +131,6 @@ const InternoDashboard = () => {
       .select("*")
       .order("created_at", { ascending: false });
     
-    // Always load data now - filters work on the table only
     const { data, error } = await query.limit(500);
 
     if (error) {
@@ -141,20 +141,18 @@ const InternoDashboard = () => {
     setLoading(false);
   }, []);
 
-  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, tipoServicoFilter, lancamentoFilter, aprovacaoFilter, searchTerm]);
 
   const fetchDeferimentoCounts = useCallback(async () => {
-    // Get Posicionamento solicitacao IDs first
     const { data: posSolicitacoes } = await supabase
       .from("solicitacoes")
       .select("id")
-      .ilike("tipo_operacao", "%posicionamento%");
+      .eq("solicitar_deferimento", true);
     
     if (!posSolicitacoes || posSolicitacoes.length === 0) {
-      setDeferimentoCounts({ pendente: 0, recusado: 0, recebido: 0 });
+      setDeferimentoCounts({ pendente: 0 });
       return;
     }
 
@@ -168,9 +166,7 @@ const InternoDashboard = () => {
     
     if (docs) {
       const pendente = docs.filter(d => !d.status || d.status === "pendente").length;
-      const recusado = docs.filter(d => d.status === "recusado").length;
-      const recebido = docs.filter(d => d.status === "aceito").length;
-      setDeferimentoCounts({ pendente, recusado, recebido });
+      setDeferimentoCounts({ pendente });
     }
   }, []);
 
@@ -225,15 +221,14 @@ const InternoDashboard = () => {
     );
   }
 
-  // Week days for dashboard
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeekStart, i));
 
-  // Dashboard counts use ALL solicitacoes (filtered by service for dashboard only)
+  // Dashboard counts - filtered by service only
   const dashboardFiltered = solicitacoes.filter((s) => {
     return tipoServicoFilter === "Todos" || s.tipo_operacao === tipoServicoFilter;
   });
 
-  // Table filters (separate from dashboard)
+  // Table filters - search works across all data when filters are "Todos"
   const filtered = solicitacoes.filter((s) => {
     const matchesStatus = statusFilter === "all" || s.status === statusFilter;
     const matchesTipo = tipoServicoFilter === "Todos" || s.tipo_operacao === tipoServicoFilter;
@@ -244,7 +239,6 @@ const InternoDashboard = () => {
       (s.numero_conteiner && s.numero_conteiner.toLowerCase().includes(searchTerm.toLowerCase())) ||
       s.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Filtro de lançamento
     let matchesLancamento = true;
     if (lancamentoFilter !== "all") {
       const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
@@ -260,7 +254,6 @@ const InternoDashboard = () => {
       }
     }
 
-    // Filtro de aprovação
     let matchesAprovacao = true;
     if (aprovacaoFilter !== "all") {
       if (aprovacaoFilter === "pendente") {
@@ -275,24 +268,19 @@ const InternoDashboard = () => {
     return matchesStatus && matchesTipo && matchesSearch && matchesLancamento && matchesAprovacao;
   });
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginatedFiltered = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // Dashboard counts use dashboardFiltered (only service filter applies)
   const dashboardStatusCounts = dashboardFiltered.reduce((acc: Record<string, number>, s) => {
     acc[s.status] = (acc[s.status] || 0) + 1;
     return acc;
   }, {});
 
-  // Group by date for weekly view
   const getCountForDay = (day: Date, status?: string) => {
     const dayStr = format(day, "yyyy-MM-dd");
     return dashboardFiltered.filter(s => {
       const matches = s.data_posicionamento === dayStr;
-      if (status) {
-        return matches && s.status === status;
-      }
+      if (status) return matches && s.status === status;
       return matches;
     }).length;
   };
@@ -338,7 +326,6 @@ const InternoDashboard = () => {
     }
   };
 
-  // Launch counters - always use dashboardFiltered (service filter only)
   const lancamentoPendente = dashboardFiltered.filter(s => {
     const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
     if (!servico?.status_confirmacao_lancamento?.length) return false;
@@ -357,22 +344,15 @@ const InternoDashboard = () => {
     return servico.status_confirmacao_lancamento.includes(s.status);
   };
 
-  // Check if deferimento button should be active
+  // Check if deferimento button should be active - uses service config
   const isDeferimentoActive = (s: any) => {
-    return s.status === "vistoria_finalizada" && 
-      (s.tipo_operacao || "").toLowerCase().includes("posicionamento") &&
-      (s.categoria || "").toLowerCase() === "exportação";
+    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    if (!servico?.deferimento_status_ativacao?.length) return false;
+    return servico.deferimento_status_ativacao.includes(s.status);
   };
 
-  // Status vistoria color
-  const getVistoriaStatusColor = (status: string | null) => {
-    if (!status) return "";
-    const lower = status.toLowerCase();
-    if (lower.includes("finalizada")) return "text-green-600";
-    if (lower.includes("pendência")) return "text-yellow-600";
-    if (lower.includes("não vistoriado")) return "text-red-600";
-    return "text-muted-foreground";
-  };
+  // Check if service needs approval
+  const isServicoPositionamento = tipoServicoFilter.toLowerCase().includes("posicionamento") || tipoServicoFilter === "Todos";
 
   return (
     <div className="min-h-screen bg-background">
@@ -519,7 +499,7 @@ const InternoDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Stats Cards - dashboard counts (service filter only) */}
+        {/* Stats Cards - horizontal row */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <StatCard 
             label={tipoServicoFilter === "Todos" ? "Serviços" : tipoServicoFilter} 
@@ -529,14 +509,12 @@ const InternoDashboard = () => {
           <StatCard label="Aguardando" value={dashboardStatusCounts["aguardando_confirmacao"] || 0} icon={<Clock className="h-5 w-5" />} color="text-yellow-600" />
           <StatCard label="Confirmados" value={dashboardStatusCounts["confirmado_aguardando_vistoria"] || 0} icon={<CheckCircle2 className="h-5 w-5" />} color="text-blue-600" />
           <StatCard label="Cancelados" value={dashboardStatusCounts["cancelado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
-          {(tipoServicoFilter === "Todos" || tipoServicoFilter.toLowerCase().includes("posicionamento")) && (
-            <StatCard 
-              label="Def. Pendente" 
-              value={deferimentoCounts.pendente} 
-              icon={<FileText className="h-5 w-5" />} 
-              color="text-yellow-600" 
-            />
-          )}
+          <StatCard 
+            label="Def. Pendente" 
+            value={deferimentoCounts.pendente} 
+            icon={<FileText className="h-5 w-5" />} 
+            color="text-yellow-600" 
+          />
         </div>
 
         {/* Launch Counters */}
@@ -556,8 +534,6 @@ const InternoDashboard = () => {
             />
           </div>
         )}
-
-        {/* Removed separate deferimento counters - now in main stats row */}
 
         {/* Status breakdown - only actionable statuses */}
         <div className="flex flex-wrap gap-2 mb-6">
@@ -672,7 +648,7 @@ const InternoDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Table */}
+        {/* Table - removed Vistoria column */}
         <Card className="border-0 shadow-sm">
           <CardContent className="p-0">
             <Table>
@@ -696,7 +672,6 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground">Tipo Carga</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
-                  <TableHead className="text-primary-foreground">Vistoria</TableHead>
                   <TableHead className="text-primary-foreground">Administrativa</TableHead>
                   <TableHead className="text-primary-foreground">Operacional</TableHead>
                   <TableHead className="text-primary-foreground">Data Solic.</TableHead>
@@ -705,13 +680,13 @@ const InternoDashboard = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 ) : paginatedFiltered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
                       Nenhuma solicitação encontrada.
                     </TableCell>
                   </TableRow>
@@ -744,7 +719,7 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Deferimento button - between reclassificação and download */}
+                          {/* Deferimento button */}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -801,11 +776,6 @@ const InternoDashboard = () => {
                       </TableCell>
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
-                      <TableCell>
-                        <span className={`text-xs font-medium ${getVistoriaStatusColor(s.status_vistoria)}`}>
-                          {s.status_vistoria || "—"}
-                        </span>
-                      </TableCell>
                       <TableCell>
                         <ApprovalIndicator approved={s.comex_aprovado} />
                       </TableCell>

@@ -126,6 +126,33 @@ export type Database = {
           },
         ]
       }
+      deferimento_titulos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          servico_ids: string[]
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          servico_ids?: string[]
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          servico_ids?: string[]
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       external_buttons: {
         Row: {
           abrir_nova_aba: boolean | null
@@ -418,6 +445,7 @@ export type Database = {
           created_at: string
           id: string
           servico_id: string
+          setor_ids: string[] | null
           status_gatilho: string
           tipos_notificacao: string[]
           updated_at: string
@@ -427,6 +455,7 @@ export type Database = {
           created_at?: string
           id?: string
           servico_id: string
+          setor_ids?: string[] | null
           status_gatilho: string
           tipos_notificacao?: string[]
           updated_at?: string
@@ -436,6 +465,7 @@ export type Database = {
           created_at?: string
           id?: string
           servico_id?: string
+          setor_ids?: string[] | null
           status_gatilho?: string
           tipos_notificacao?: string[]
           updated_at?: string
@@ -590,6 +620,33 @@ export type Database = {
           ordem?: number
           servico_ids?: string[]
           sigla?: string | null
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: []
+      }
+      pendencia_opcoes: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          ordem: number
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          ordem?: number
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          ordem?: number
           updated_at?: string
           valor?: string
         }
@@ -766,10 +823,12 @@ export type Database = {
       servicos: {
         Row: {
           anexos_embutidos: boolean | null
+          aprovacao_ativada: boolean | null
           ativo: boolean
           codigo_prefixo: string
           created_at: string
           deferimento_embutidos: boolean
+          deferimento_status_ativacao: string[] | null
           descricao: string | null
           id: string
           nome: string
@@ -779,10 +838,12 @@ export type Database = {
         }
         Insert: {
           anexos_embutidos?: boolean | null
+          aprovacao_ativada?: boolean | null
           ativo?: boolean
           codigo_prefixo: string
           created_at?: string
           deferimento_embutidos?: boolean
+          deferimento_status_ativacao?: string[] | null
           descricao?: string | null
           id?: string
           nome: string
@@ -792,10 +853,12 @@ export type Database = {
         }
         Update: {
           anexos_embutidos?: boolean | null
+          aprovacao_ativada?: boolean | null
           ativo?: boolean
           codigo_prefixo?: string
           created_at?: string
           deferimento_embutidos?: boolean
+          deferimento_status_ativacao?: string[] | null
           descricao?: string | null
           id?: string
           nome?: string
@@ -894,7 +957,9 @@ export type Database = {
           lpco: string | null
           numero_conteiner: string | null
           observacoes: string | null
+          pendencias_selecionadas: string[] | null
           protocolo: string
+          solicitar_deferimento: boolean | null
           status: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria: string | null
           tipo_carga: string | null
@@ -923,7 +988,9 @@ export type Database = {
           lpco?: string | null
           numero_conteiner?: string | null
           observacoes?: string | null
+          pendencias_selecionadas?: string[] | null
           protocolo: string
+          solicitar_deferimento?: boolean | null
           status?: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria?: string | null
           tipo_carga?: string | null
@@ -952,7 +1019,9 @@ export type Database = {
           lpco?: string | null
           numero_conteiner?: string | null
           observacoes?: string | null
+          pendencias_selecionadas?: string[] | null
           protocolo?: string
+          solicitar_deferimento?: boolean | null
           status?: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria?: string | null
           tipo_carga?: string | null

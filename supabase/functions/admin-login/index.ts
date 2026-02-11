@@ -98,6 +98,8 @@ Deno.serve(async (req) => {
       const adminPass = Deno.env.get("ADMIN_DEFAULT_PASSWORD");
       const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
 
+      // Validate secrets exist
+
       if (!adminUsername || !adminPass || !adminAuthPassword) {
         return new Response(
           JSON.stringify({ error: "Configuração de admin não encontrada. Contate o suporte." }),
@@ -105,7 +107,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (username.toLowerCase().trim() !== adminUsername.toLowerCase() || password !== adminPass) {
+      if (username.toLowerCase().trim() !== adminUsername.toLowerCase().trim() || password !== adminPass.trim()) {
         return new Response(
           JSON.stringify({ error: "Credenciais inválidas." }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }

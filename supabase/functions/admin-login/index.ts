@@ -201,6 +201,7 @@ Deno.serve(async (req) => {
       });
 
       if (signInError) {
+        // Try to create user first
         const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
           email: adminEmail,
           password: adminAuthPassword,
@@ -208,9 +209,59 @@ Deno.serve(async (req) => {
         });
 
         if (signUpError) {
+          // User exists but password doesn't match - update password
+          const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+          const existingUser = users?.find((u: any) => u.email === adminEmail);
+
+          if (!existingUser) {
+            return new Response(
+              JSON.stringify({ error: "Conta admin não configurada. Contate o suporte." }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Reset password to match current ADMIN_AUTH_PASSWORD
+          await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+            password: adminAuthPassword,
+          });
+
+          // Setup profile and role
+          await supabaseAdmin.from("profiles").upsert({
+            id: existingUser.id,
+            email: adminEmail,
+            nome: "Administrador",
+            setor: null,
+          });
+
+          const { data: existingRole } = await supabaseAdmin
+            .from("user_roles")
+            .select("id")
+            .eq("user_id", existingUser.id)
+            .eq("role", "admin")
+            .maybeSingle();
+
+          if (!existingRole) {
+            await supabaseAdmin.from("user_roles").insert({
+              user_id: existingUser.id,
+              role: "admin",
+            });
+          }
+
+          const { data: retrySignIn, error: retryError } = await supabaseAdmin.auth.signInWithPassword({
+            email: adminEmail,
+            password: adminAuthPassword,
+          });
+
+          if (retryError) {
+            return new Response(
+              JSON.stringify({ error: "Erro ao autenticar após reconfiguração." }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
           return new Response(
-            JSON.stringify({ error: "Conta admin não configurada. Contate o suporte." }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ session: retrySignIn.session, adminNome: "Administrador" }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 

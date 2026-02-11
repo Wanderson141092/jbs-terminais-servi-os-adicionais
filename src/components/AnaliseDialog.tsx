@@ -366,11 +366,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
 
-    // Update solicitacao observacoes field
-    const currentObs = solicitacao.observacoes || "";
-    const newObs = currentObs ? `${currentObs}\n\n[${new Date().toLocaleString("pt-BR")}] ${observacaoTexto.trim()}` : observacaoTexto.trim();
-    
-    await supabase.from("solicitacoes").update({ observacoes: newObs }).eq("id", solicitacao.id);
+    // Update solicitacao observacoes field - replace with new message only
+    await supabase.from("solicitacoes").update({ observacoes: observacaoTexto.trim() }).eq("id", solicitacao.id);
     await logAudit("observacao", `Observação atualizada: ${observacaoTexto.trim()}`);
 
     // Refresh history

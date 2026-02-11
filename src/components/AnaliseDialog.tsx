@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import StatusBadge from "./StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,6 +28,7 @@ interface ServicoConfig {
   nome: string;
   tipo_agendamento: string | null;
   anexos_embutidos: boolean | null;
+  aprovacao_ativada?: boolean;
 }
 
 interface ObservacaoHistorico {
@@ -52,20 +55,62 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [servicos, setServicos] = useState<any[]>([]);
   const [observacaoTexto, setObservacaoTexto] = useState("");
   const [observacaoHistorico, setObservacaoHistorico] = useState<ObservacaoHistorico[]>([]);
+  const [statusOptions, setStatusOptions] = useState<any[]>([]);
+  const [pendenciaOpcoes, setPendenciaOpcoes] = useState<any[]>([]);
+  const [pendenciasSelecionadas, setPendenciasSelecionadas] = useState<string[]>([]);
+  const [solicitarDeferimento, setSolicitarDeferimento] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
-        supabase.from("servicos").select("id, nome, tipo_agendamento, anexos_embutidos").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
+        supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
-        supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false })
+        supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false }),
+        supabase.from("parametros_campos").select("*").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
+        supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem")
       ]);
 
       setAttachments(attachRes.data || []);
       if (servicoRes.data) setServicoConfig(servicoRes.data);
       setServicos(allServicosRes.data || []);
       setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
+      setSolicitarDeferimento(solicitacao.solicitar_deferimento || false);
+      
+      // Filter status options by service
+      const currentServicoId = servicoRes.data?.id;
+      const filteredStatus = (statusRes.data || []).filter((s: any) => 
+        s.servico_ids.length === 0 || (currentServicoId && s.servico_ids.includes(currentServicoId))
+      );
+      
+      // Combine with default options if needed, or replace
+      // For now, let's merge with hardcoded defaults to ensure core flow works
+      const defaultOptions = [
+        { value: "aguardando_confirmacao", label: "Aguardando Confirmação" },
+        { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
+        { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
+        { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
+        { value: "nao_vistoriado", label: "Não Vistoriado" },
+        { value: "recusado", label: "Recusado" },
+        { value: "cancelado", label: "Cancelado" },
+      ];
+      
+      const dynamicOptions = filteredStatus.map((s: any) => ({
+        value: s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ã/g, 'a').replace(/ç/g, 'c').replace(/é/g, 'e').replace(/ê/g, 'e'),
+        label: s.valor
+      }));
+      
+      // Merge unique options
+      const mergedOptions = [...defaultOptions];
+      dynamicOptions.forEach(opt => {
+        if (!mergedOptions.some(m => m.value === opt.value)) {
+          mergedOptions.push(opt);
+        }
+      });
+      
+      setStatusOptions(mergedOptions);
+      setPendenciaOpcoes(pendenciaRes.data || []);
+      setPendenciasSelecionadas(solicitacao.pendencias_selecionadas || []);
     };
     
     fetchData();
@@ -75,11 +120,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const isComex = setor === "COMEX";
   const isArmazem = setor === "ARMAZEM";
 
-  // Verificar perfis do usuário
-  const userPerfis = profile.perfis || [];
-  const hasPerfilAdministrativo = userPerfis.includes("ADMINISTRATIVO") || profile.setor === "COMEX";
-  const hasPerfilOperacional = userPerfis.includes("OPERACIONAL") || profile.setor === "ARMAZEM";
-
   const comexPending = solicitacao.comex_aprovado === null;
   const armazemPending = solicitacao.armazem_aprovado === null;
 
@@ -87,8 +127,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const wasRefused = currentApproval === false;
   const alreadyApproved = currentApproval === true;
 
-  const canDecide = solicitacao.status === "aguardando_confirmacao" && !alreadyApproved && setor !== null;
-  const canChangeRefusal = wasRefused && solicitacao.status !== "recusado";
+  // Use approval flag from service config
+  const approvalRequired = servicoConfig?.aprovacao_ativada !== false; // Default true if undefined
+  
+  const canDecide = approvalRequired && solicitacao.status === "aguardando_confirmacao" && !alreadyApproved && setor !== null;
+  const canChangeRefusal = approvalRequired && wasRefused && solicitacao.status !== "recusado";
 
   // Determinar labels de data baseado no serviço
   const isPositionamento = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
@@ -100,12 +143,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     return "Data do serviço";
   };
 
-  // Usar anexos embutidos baseado na configuração do serviço
   const showEmbeddedPreview = servicoConfig?.anexos_embutidos ?? true;
-
-  // Verificar se é serviço de posicionamento (apenas ele tem deferimento)
-  const hasDeferimento = isPositionamento;
-
 
   const handleAprovar = async () => {
     if (wasRefused) {
@@ -200,23 +238,24 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const handleUpdateStatus = async () => {
     if (!selectedStatus) return;
-    if (selectedStatus === solicitacao.status) {
-      toast.info("O status selecionado é igual ao atual.");
+    if (selectedStatus === solicitacao.status && 
+        solicitarDeferimento === solicitacao.solicitar_deferimento && 
+        JSON.stringify(pendenciasSelecionadas) === JSON.stringify(solicitacao.pendencias_selecionadas)) {
+      toast.info("Nenhuma alteração detectada.");
       return;
     }
     
-    // Validação: só permite mudança de status de vistoria se ambos aprovaram
+    // Validação: só permite mudança de status de vistoria se ambos aprovaram (se aprovação for ativada)
     const bothApproved = solicitacao.comex_aprovado === true && solicitacao.armazem_aprovado === true;
     const vistoriaStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
     
-    if (vistoriaStatuses.includes(selectedStatus) && !bothApproved) {
+    if (approvalRequired && vistoriaStatuses.includes(selectedStatus) && !bothApproved) {
       toast.error("Ambos os setores (Administrativo e Operacional) devem aprovar antes de alterar para este status.");
       return;
     }
     
     setLoading(true);
     
-    // Map status to vistoria label
     let statusVistoria: string | null = null;
     if (selectedStatus === "vistoria_finalizada") {
       statusVistoria = "Vistoria Finalizada";
@@ -231,6 +270,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       .update({
         status: selectedStatus,
         status_vistoria: statusVistoria,
+        solicitar_deferimento: solicitarDeferimento,
+        pendencias_selecionadas: pendenciasSelecionadas,
         updated_at: new Date().toISOString()
       })
       .eq("id", solicitacao.id);
@@ -241,24 +282,23 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
     
-    const statusLabel = STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label || selectedStatus;
-    await logAudit("status_atualizado", `Status atualizado para: ${statusLabel}`);
+    const statusLabel = statusOptions.find(s => s.value === selectedStatus)?.label || selectedStatus;
+    
+    let details = `Status atualizado para: ${statusLabel}`;
+    if (solicitarDeferimento !== solicitacao.solicitar_deferimento) {
+      details += `. Solicitar Deferimento: ${solicitarDeferimento ? "Ativado" : "Desativado"}`;
+    }
+    if (JSON.stringify(pendenciasSelecionadas) !== JSON.stringify(solicitacao.pendencias_selecionadas)) {
+      details += `. Pendências atualizadas.`;
+    }
+
+    await logAudit("status_atualizado", details);
     await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
     
-    toast.success("Status atualizado com sucesso!");
+    toast.success("Atualização realizada com sucesso!");
     setLoading(false);
     onClose();
   };
-
-  const STATUS_OPTIONS = [
-    { value: "aguardando_confirmacao", label: "Aguardando Confirmação" },
-    { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
-    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
-    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
-    { value: "nao_vistoriado", label: "Não Vistoriado" },
-    { value: "recusado", label: "Recusado" },
-    { value: "cancelado", label: "Cancelado" },
-  ];
 
   const handleDeferimentoDecision = async (docId: string, aceito: boolean) => {
     setLoading(true);
@@ -290,14 +330,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setMotivoRecusaDeferimento("");
     setLoading(false);
     
-    // Refresh only deferimento documents (not analysis attachments)
     const { data: deferimentoDocs } = await supabase
       .from("deferimento_documents")
       .select("*")
       .eq("solicitacao_id", solicitacao.id)
       .eq("document_type", "deferimento");
     
-    // Keep existing non-deferimento attachments and replace deferimento ones
     setAttachments(prev => {
       const nonDeferimento = prev.filter(a => a.document_type !== "deferimento");
       return [...nonDeferimento, ...(deferimentoDocs || [])];
@@ -351,7 +389,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
     setLoading(true);
     
-    // Save to history log
     const { error: histError } = await supabase.from("observacao_historico").insert({
       solicitacao_id: solicitacao.id,
       observacao: observacaoTexto.trim(),
@@ -366,11 +403,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
 
-    // Update solicitacao observacoes field - replace with new message only
     await supabase.from("solicitacoes").update({ observacoes: observacaoTexto.trim() }).eq("id", solicitacao.id);
     await logAudit("observacao", `Observação atualizada: ${observacaoTexto.trim()}`);
 
-    // Refresh history
     const { data: histData } = await supabase
       .from("observacao_historico")
       .select("*")
@@ -383,34 +418,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setLoading(false);
   };
 
-  const getSetorLabel = (setor: string | null) => {
-    if (!setor) return "—";
-    const labels: Record<string, string> = {
-      "COMEX": "Administrativo",
-      "ARMAZEM": "Operacional",
-    };
-    return labels[setor] || setor;
+  const togglePendencia = (valor: string) => {
+    setPendenciasSelecionadas(prev => 
+      prev.includes(valor) ? prev.filter(v => v !== valor) : [...prev, valor]
+    );
   };
 
-  const getDeferimentoStatusBadge = (status: string | null) => {
-    if (!status || status === 'pendente') {
-      return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">Aguardando análise</Badge>;
-    }
-    if (status === 'aceito') {
-      return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">Recebido</Badge>;
-    }
-    return <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">Recusado</Badge>;
-  };
-
-  // Formatar data baseado no tipo de serviço
   const formatDateValue = () => {
     if (isAgendamento && solicitacao.data_agendamento) {
       return new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
+        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
       });
     }
     if (solicitacao.data_posicionamento) {
@@ -457,130 +474,166 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
             <Separator />
 
-            {/* Approval Status */}
-            <div className="grid grid-cols-2 gap-4">
-              <ApprovalCard
-                label="Administrativo"
-                approved={solicitacao.comex_aprovado}
-                justificativa={solicitacao.comex_justificativa}
-                data={solicitacao.comex_data}
-                isCurrentSetor={isComex}
-              />
-              <ApprovalCard
-                label="Operacional"
-                approved={solicitacao.armazem_aprovado}
-                justificativa={solicitacao.armazem_justificativa}
-                data={solicitacao.armazem_data}
-                isCurrentSetor={isArmazem}
-              />
-            </div>
-
-            {/* Admin Sector Selection */}
-            {isAdmin && solicitacao.status === "aguardando_confirmacao" && (
+            {approvalRequired && (
               <>
-                <Separator />
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold">Administrador — Selecione o setor para atuar:</p>
-                  <div className="flex gap-3">
-                    <Button
-                      variant={adminSelectedSetor === "COMEX" ? "default" : "outline"}
-                      onClick={() => setAdminSelectedSetor("COMEX")}
-                      disabled={solicitacao.comex_aprovado === true}
-                      className="flex-1"
-                    >
-                      Administrativo {solicitacao.comex_aprovado === true && "(Aprovado)"}
-                      {solicitacao.comex_aprovado === false && "(Recusado)"}
-                    </Button>
-                    <Button
-                      variant={adminSelectedSetor === "ARMAZEM" ? "default" : "outline"}
-                      onClick={() => setAdminSelectedSetor("ARMAZEM")}
-                      disabled={solicitacao.armazem_aprovado === true}
-                      className="flex-1"
-                    >
-                      Operacional {solicitacao.armazem_aprovado === true && "(Aprovado)"}
-                      {solicitacao.armazem_aprovado === false && "(Recusado)"}
-                    </Button>
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <ApprovalCard
+                    label="Administrativo"
+                    approved={solicitacao.comex_aprovado}
+                    justificativa={solicitacao.comex_justificativa}
+                    data={solicitacao.comex_data}
+                    isCurrentSetor={isComex}
+                  />
+                  <ApprovalCard
+                    label="Operacional"
+                    approved={solicitacao.armazem_aprovado}
+                    justificativa={solicitacao.armazem_justificativa}
+                    data={solicitacao.armazem_data}
+                    isCurrentSetor={isArmazem}
+                  />
                 </div>
+
+                {isAdmin && solicitacao.status === "aguardando_confirmacao" && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold">Administrador — Selecione o setor para atuar:</p>
+                      <div className="flex gap-3">
+                        <Button
+                          variant={adminSelectedSetor === "COMEX" ? "default" : "outline"}
+                          onClick={() => setAdminSelectedSetor("COMEX")}
+                          disabled={solicitacao.comex_aprovado === true}
+                          className="flex-1"
+                        >
+                          Administrativo {solicitacao.comex_aprovado === true && "(Aprovado)"}
+                          {solicitacao.comex_aprovado === false && "(Recusado)"}
+                        </Button>
+                        <Button
+                          variant={adminSelectedSetor === "ARMAZEM" ? "default" : "outline"}
+                          onClick={() => setAdminSelectedSetor("ARMAZEM")}
+                          disabled={solicitacao.armazem_aprovado === true}
+                          className="flex-1"
+                        >
+                          Operacional {solicitacao.armazem_aprovado === true && "(Aprovado)"}
+                          {solicitacao.armazem_aprovado === false && "(Recusado)"}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {(canDecide || canChangeRefusal) && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold">
+                        Sua decisão ({getSetorLabel(setor)})
+                        {wasRefused && (
+                          <span className="text-destructive ml-2 text-xs">(Alterando decisão anterior)</span>
+                        )}
+                      </p>
+                      <div>
+                        <Label className="text-sm">
+                          {wasRefused 
+                            ? "Justificativa (obrigatória para alterar para aprovado)"
+                            : "Justificativa (obrigatória para recusa)"
+                          }
+                        </Label>
+                        <Textarea
+                          value={justificativa}
+                          onChange={(e) => setJustificativa(e.target.value)}
+                          placeholder={wasRefused 
+                            ? "Informe o motivo da alteração de recusado para aprovado..."
+                            : "Informe a justificativa..."
+                          }
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <Button 
+                          onClick={handleAprovar} 
+                          disabled={loading} 
+                          className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          {wasRefused ? "Alterar para Aprovado" : "Aprovar"}
+                        </Button>
+                        {!wasRefused && (
+                          <Button onClick={handleRecusar} disabled={loading} variant="destructive" className="flex-1">
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Recusar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
-            {/* Approval Actions */}
-            {(canDecide || canChangeRefusal) && (
+            {/* Atualizar Status - disponível se aprovado ou não requer aprovação */}
+            {(!approvalRequired || (solicitacao.comex_aprovado && solicitacao.armazem_aprovado)) && (
               <>
                 <Separator />
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold">
-                    Sua decisão ({getSetorLabel(setor)})
-                    {wasRefused && (
-                      <span className="text-destructive ml-2 text-xs">(Alterando decisão anterior)</span>
-                    )}
-                  </p>
-                  <div>
-                    <Label className="text-sm">
-                      {wasRefused 
-                        ? "Justificativa (obrigatória para alterar para aprovado)"
-                        : "Justificativa (obrigatória para recusa)"
-                      }
-                    </Label>
-                    <Textarea
-                      value={justificativa}
-                      onChange={(e) => setJustificativa(e.target.value)}
-                      placeholder={wasRefused 
-                        ? "Informe o motivo da alteração de recusado para aprovado..."
-                        : "Informe a justificativa..."
-                      }
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <Button 
-                      onClick={handleAprovar} 
-                      disabled={loading} 
-                      className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      {wasRefused ? "Alterar para Aprovado" : "Aprovar"}
-                    </Button>
-                    {!wasRefused && (
-                      <Button onClick={handleRecusar} disabled={loading} variant="destructive" className="flex-1">
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Recusar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Atualizar Status - disponível após aprovação */}
-            {(solicitacao.comex_aprovado || solicitacao.armazem_aprovado) && (
-              <>
-                <Separator />
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold">Atualizar Status:</p>
+                <div className="space-y-3 bg-muted/20 p-4 rounded-lg border">
+                  <p className="text-sm font-semibold">Atualizar Status & Ações:</p>
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o novo status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.map(opt => (
+                      {statusOptions.map(opt => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+
+                  {/* Pendências Checkboxes */}
+                  {selectedStatus === "vistoriado_com_pendencia" && (
+                    <div className="space-y-2 border rounded-md p-3 bg-white">
+                      <Label className="text-xs mb-2 block">Selecione as pendências:</Label>
+                      {pendenciaOpcoes.map(op => (
+                        <div key={op.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={op.id}
+                            checked={pendenciasSelecionadas.includes(op.valor)}
+                            onCheckedChange={() => togglePendencia(op.valor)}
+                          />
+                          <Label htmlFor={op.id} className="text-sm cursor-pointer font-normal">{op.valor}</Label>
+                        </div>
+                      ))}
+                      {pendenciaOpcoes.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma opção cadastrada.</p>}
+                    </div>
+                  )}
+
+                  {/* Solicitar Deferimento Toggle */}
+                  <div className="flex items-center justify-between border rounded-md p-3 bg-white">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <div className="flex flex-col">
+                        <Label className="cursor-pointer" htmlFor="solicitar-def">Solicitar Deferimento</Label>
+                        <span className="text-[10px] text-muted-foreground">Habilita envio de anexo na pág. externa</span>
+                      </div>
+                    </div>
+                    <Switch
+                      id="solicitar-def"
+                      checked={solicitarDeferimento}
+                      onCheckedChange={setSolicitarDeferimento}
+                    />
+                  </div>
+
                   <Button 
                     onClick={handleUpdateStatus} 
-                    disabled={loading || selectedStatus === solicitacao.status} 
-                    className="jbs-btn-primary"
+                    disabled={loading} 
+                    className="jbs-btn-primary w-full"
                   >
-                    Atualizar Status
+                    Salvar Alterações
                   </Button>
                 </div>
               </>
             )}
 
-            {/* Confirmação de Lançamento - mostra quando status está na lista do serviço */}
+            {/* Confirmação de Lançamento */}
             {(() => {
               const svcConf = servicos.find(sv => sv.nome === (solicitacao.tipo_operacao || ""));
               const statusLanc = svcConf?.status_confirmacao_lancamento || [];
@@ -593,13 +646,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     <DollarSign className="h-5 w-5" />
                     <span className="font-semibold">Aguardando confirmação de lançamento do serviço</span>
                   </div>
-                  <p className="text-sm text-red-600 mb-3">
-                    Confirme se o serviço foi lançado no sistema.
-                  </p>
                   <Button 
                     onClick={() => setShowLancamentoDialog(true)} 
                     variant="outline" 
-                    className="border-red-300 text-red-600 hover:bg-red-50"
+                    className="border-red-300 text-red-600 hover:bg-red-50 w-full"
                   >
                     Confirmar Lançamento
                   </Button>
@@ -607,19 +657,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {solicitacao.lancamento_confirmado && (
-              <>
-                <Separator />
-                <div className="bg-muted/50 rounded-lg p-3 flex items-center gap-2">
-                  <Check className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Lançamento confirmado em {new Date(solicitacao.lancamento_confirmado_data).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-              </>
-            )}
-
-            {/* Anexos - Separados do Deferimento */}
+            {/* Anexos */}
             {attachments.length > 0 && (
               <>
                 <Separator />
@@ -758,33 +796,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogContent>
         </Dialog>
       )}
-
-      {/* Dialog para recusar deferimento */}
-      <Dialog open={!!showDeferimentoAction} onOpenChange={() => setShowDeferimentoAction(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Recusar Deferimento</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Label>Motivo da recusa</Label>
-            <Textarea
-              value={motivoRecusaDeferimento}
-              onChange={(e) => setMotivoRecusaDeferimento(e.target.value)}
-              placeholder="Informe o motivo da recusa..."
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeferimentoAction(null)}>Cancelar</Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => showDeferimentoAction && handleDeferimentoDecision(showDeferimentoAction, false)}
-              disabled={!motivoRecusaDeferimento.trim() || loading}
-            >
-              Confirmar Recusa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Dialog para confirmar lançamento */}
       <Dialog open={showLancamentoDialog} onOpenChange={setShowLancamentoDialog}>
@@ -930,6 +941,15 @@ const ApprovalCard = ({
       )}
     </div>
   );
+};
+
+const getSetorLabel = (setor: string | null) => {
+  if (!setor) return "—";
+  const labels: Record<string, string> = {
+    "COMEX": "Administrativo",
+    "ARMAZEM": "Operacional",
+  };
+  return labels[setor] || setor;
 };
 
 export default AnaliseDialog;

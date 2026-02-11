@@ -80,6 +80,7 @@ interface NotificationRule {
   status_gatilho: string;
   tipos_notificacao: string[];
   ativo: boolean;
+  setor_ids?: string[];
 }
 
 const DIAS_SEMANA = [
@@ -144,7 +145,8 @@ const AdminParametros = () => {
   const [notifFormData, setNotifFormData] = useState({
     servico_id: "",
     status_gatilho: "",
-    tipos_notificacao: [] as string[]
+    tipos_notificacao: [] as string[],
+    setor_ids: [] as string[]
   });
 
   const TIPOS_NOTIFICACAO = [
@@ -194,7 +196,6 @@ const AdminParametros = () => {
   // ============= REGRAS DE SERVIÇO =============
   const openRegraDialog = (regra?: RegraServico) => {
     if (regra) {
-      // Determinar tipo de limite com base nos dados
       let tipoLimite: "nenhum" | "fixo" | "por_dia" = "nenhum";
       if (regra.limite_dia) {
         tipoLimite = "fixo";
@@ -471,11 +472,12 @@ const AdminParametros = () => {
       setNotifFormData({
         servico_id: rule.servico_id,
         status_gatilho: rule.status_gatilho,
-        tipos_notificacao: rule.tipos_notificacao
+        tipos_notificacao: rule.tipos_notificacao,
+        setor_ids: rule.setor_ids || []
       });
     } else {
       setEditingNotif(null);
-      setNotifFormData({ servico_id: "", status_gatilho: "", tipos_notificacao: [] });
+      setNotifFormData({ servico_id: "", status_gatilho: "", tipos_notificacao: [], setor_ids: [] });
     }
     setShowNotifDialog(true);
   };
@@ -489,6 +491,15 @@ const AdminParametros = () => {
     }));
   };
 
+  const toggleSetorNotif = (setorId: string) => {
+    setNotifFormData(prev => ({
+      ...prev,
+      setor_ids: prev.setor_ids.includes(setorId)
+        ? prev.setor_ids.filter(id => id !== setorId)
+        : [...prev.setor_ids, setorId]
+    }));
+  };
+
   const saveNotifRule = async () => {
     if (!notifFormData.servico_id || !notifFormData.status_gatilho || notifFormData.tipos_notificacao.length === 0) {
       toast.error("Preencha todos os campos e selecione pelo menos um tipo de notificação");
@@ -499,6 +510,7 @@ const AdminParametros = () => {
       servico_id: notifFormData.servico_id,
       status_gatilho: notifFormData.status_gatilho,
       tipos_notificacao: notifFormData.tipos_notificacao,
+      setor_ids: notifFormData.setor_ids,
       updated_at: new Date().toISOString()
     };
 
@@ -589,7 +601,6 @@ const AdminParametros = () => {
         {/* ============= PÁGINA INTERNA ============= */}
         <TabsContent value="pagina-interna">
           <div className="space-y-6">
-            {/* Visualização de anexos - agora está em Serviços */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -607,12 +618,11 @@ const AdminParametros = () => {
               </CardContent>
             </Card>
 
-            {/* Regras de Roteamento */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Link2 className="h-5 w-5" />
-                  Regras de Roteamento (Subcritérios de Visualização)
+                  Regras de Roteamento
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -701,7 +711,7 @@ const AdminParametros = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Gerencie os valores disponíveis para Tipo Carga, Categoria e Status de Deferimento.
+                Gerencie os valores disponíveis para Tipo Carga, Categoria, Status de Deferimento, Status de Processo e Pendências.
               </p>
               <ParametrosCamposManager />
             </CardContent>
@@ -813,13 +823,14 @@ const AdminParametros = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Configure quais status disparam notificações e de qual tipo, por serviço. A notificação <strong>não será enviada</strong> ao usuário que realizou a atualização, apenas aos demais com acesso ao serviço.
+                Configure quais status disparam notificações e de qual tipo, por serviço.
               </p>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Serviço</TableHead>
                     <TableHead>Status Gatilho</TableHead>
+                    <TableHead>Setores Destino</TableHead>
                     <TableHead>Tipos de Notificação</TableHead>
                     <TableHead>Ativo</TableHead>
                     <TableHead>Ações</TableHead>
@@ -830,6 +841,13 @@ const AdminParametros = () => {
                     <TableRow key={rule.id} className={!rule.ativo ? "opacity-50" : ""}>
                       <TableCell className="font-medium">{getServicoNome(rule.servico_id)}</TableCell>
                       <TableCell>{STATUS_GATILHO_OPTIONS.find(s => s.value === rule.status_gatilho)?.label || rule.status_gatilho}</TableCell>
+                      <TableCell className="text-xs">
+                        {rule.setor_ids && rule.setor_ids.length > 0 ? (
+                          rule.setor_ids.map(id => getSetorLabel(id)).join(", ")
+                        ) : (
+                          <span className="text-muted-foreground">Todos</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">
                         <div className="flex flex-wrap gap-1">
                           {rule.tipos_notificacao.map(t => (
@@ -853,7 +871,7 @@ const AdminParametros = () => {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Excluir Regra de Notificação</AlertDialogTitle>
+                                <AlertDialogTitle>Excluir Regra</AlertDialogTitle>
                                 <AlertDialogDescription>Tem certeza que deseja excluir esta regra?</AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -868,7 +886,7 @@ const AdminParametros = () => {
                   ))}
                   {notifRules.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         Nenhuma regra de notificação configurada.
                       </TableCell>
                     </TableRow>
@@ -1030,68 +1048,32 @@ const AdminParametros = () => {
             {regraFormData.tipo_limite === "por_dia" && (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Defina a quantidade máxima de solicitações para cada dia da semana. Deixe em branco para sem limite naquele dia.
+                  Defina a quantidade máxima de solicitações para cada dia da semana.
                 </p>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label className="text-xs">Segunda</Label>
-                    <Input
-                      type="number"
-                      value={regraFormData.limite_seg}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_seg: e.target.value }))}
-                      placeholder="—"
-                      min="0"
-                    />
+                    <Input type="number" value={regraFormData.limite_seg} onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_seg: e.target.value }))} placeholder="—" />
                   </div>
                   <div>
                     <Label className="text-xs">Terça</Label>
-                    <Input
-                      type="number"
-                      value={regraFormData.limite_ter}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_ter: e.target.value }))}
-                      placeholder="—"
-                      min="0"
-                    />
+                    <Input type="number" value={regraFormData.limite_ter} onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_ter: e.target.value }))} placeholder="—" />
                   </div>
                   <div>
                     <Label className="text-xs">Quarta</Label>
-                    <Input
-                      type="number"
-                      value={regraFormData.limite_qua}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qua: e.target.value }))}
-                      placeholder="—"
-                      min="0"
-                    />
+                    <Input type="number" value={regraFormData.limite_qua} onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qua: e.target.value }))} placeholder="—" />
                   </div>
                   <div>
                     <Label className="text-xs">Quinta</Label>
-                    <Input
-                      type="number"
-                      value={regraFormData.limite_qui}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qui: e.target.value }))}
-                      placeholder="—"
-                      min="0"
-                    />
+                    <Input type="number" value={regraFormData.limite_qui} onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_qui: e.target.value }))} placeholder="—" />
                   </div>
                   <div>
                     <Label className="text-xs">Sexta</Label>
-                    <Input
-                      type="number"
-                      value={regraFormData.limite_sex}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sex: e.target.value }))}
-                      placeholder="—"
-                      min="0"
-                    />
+                    <Input type="number" value={regraFormData.limite_sex} onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sex: e.target.value }))} placeholder="—" />
                   </div>
                   <div>
                     <Label className="text-xs">Sábado</Label>
-                    <Input
-                      type="number"
-                      value={regraFormData.limite_sab}
-                      onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sab: e.target.value }))}
-                      placeholder="—"
-                      min="0"
-                    />
+                    <Input type="number" value={regraFormData.limite_sab} onChange={(e) => setRegraFormData(prev => ({ ...prev, limite_sab: e.target.value }))} placeholder="—" />
                   </div>
                 </div>
               </div>
@@ -1103,9 +1085,7 @@ const AdminParametros = () => {
                 checked={regraFormData.aplica_dia_anterior}
                 onCheckedChange={(c) => setRegraFormData(prev => ({ ...prev, aplica_dia_anterior: !!c }))}
               />
-              <Label htmlFor="aplica_dia_anterior">
-                Aplicar regra ao dia anterior
-              </Label>
+              <Label htmlFor="aplica_dia_anterior">Aplicar regra ao dia anterior</Label>
             </div>
           </div>
           <DialogFooter className="mt-4">
@@ -1275,9 +1255,28 @@ const AdminParametros = () => {
                 </SelectContent>
               </Select>
             </div>
+            
+            <div>
+              <Label>Setores a serem notificados</Label>
+              <p className="text-xs text-muted-foreground mb-2">Se vazio, notifica todos os envolvidos</p>
+              <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-auto">
+                {setorEmails.map(setor => (
+                  <div key={setor.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`setor-notif-${setor.id}`}
+                      checked={notifFormData.setor_ids.includes(setor.id)}
+                      onCheckedChange={() => toggleSetorNotif(setor.id)}
+                    />
+                    <label htmlFor={`setor-notif-${setor.id}`} className="text-sm cursor-pointer">
+                      {setor.descricao || setor.email_setor}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div>
               <Label>Tipos de Notificação *</Label>
-              <p className="text-xs text-muted-foreground mb-2">Selecione pelo menos um tipo</p>
               <div className="space-y-2 border rounded-lg p-3">
                 {TIPOS_NOTIFICACAO.map(tipo => (
                   <div key={tipo.key} className="flex items-center gap-2">

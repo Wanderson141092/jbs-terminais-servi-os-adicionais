@@ -33,6 +33,7 @@ const GRUPOS = [
   { key: "categoria", label: "Categoria", showSigla: false, showServicoIds: false },
   { key: "status_deferimento", label: "Status Deferimento", showSigla: false, showServicoIds: false },
   { key: "status_processo", label: "Status do Processo", showSigla: false, showServicoIds: true },
+  { key: "pendencia_opcoes", label: "Opções de Pendência (Vistoria)", showSigla: false, showServicoIds: true },
 ];
 
 const ParametrosCamposManager = () => {
@@ -124,11 +125,6 @@ const ParametrosCamposManager = () => {
         ? prev.servico_ids.filter(id => id !== servicoId)
         : [...prev.servico_ids, servicoId]
     }));
-  };
-
-  const getServicoNomes = (ids: string[]) => {
-    if (!ids?.length) return "Todos";
-    return ids.map(id => servicos.find(s => s.id === id)?.nome || id).join(", ");
   };
 
   const currentGrupo = GRUPOS.find(g => g.key === formData.grupo);

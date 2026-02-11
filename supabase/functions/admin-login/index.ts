@@ -68,6 +68,12 @@ async function hashPassword(password: string): Promise<string> {
   return "$pbkdf2$" + btoa(String.fromCharCode(...combined));
 }
 
+const errorResponse = (message: string, status = 401) =>
+  new Response(
+    JSON.stringify({ error: message }),
+    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -78,10 +84,7 @@ Deno.serve(async (req) => {
 
     // Input validation
     if (!password || typeof password !== "string" || password.length > 100) {
-      return new Response(
-        JSON.stringify({ error: "Credenciais inválidas." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("Credenciais inválidas.", 400);
     }
 
     const supabaseAdmin = createClient(
@@ -93,10 +96,7 @@ Deno.serve(async (req) => {
     if (cpf && typeof cpf === "string") {
       const cpfNumeros = cpf.replace(/\D/g, "");
       if (cpfNumeros.length !== 11) {
-        return new Response(
-          JSON.stringify({ error: "CPF inválido." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse("CPF inválido.", 400);
       }
 
       const { data: adminAccount, error: lookupError } = await supabaseAdmin
@@ -107,25 +107,18 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (lookupError || !adminAccount) {
-        return new Response(
-          JSON.stringify({ error: "CPF ou senha incorretos." }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse("CPF ou senha incorretos.");
       }
 
-      // Verify password - supports both PBKDF2 hashed and legacy plaintext
+      // Verify password
       let passwordValid = false;
       const storedHash = adminAccount.senha_hash;
 
       if (storedHash.startsWith("$pbkdf2$")) {
-        // PBKDF2 hashed password
-        const hashPart = storedHash.substring(8); // Remove "$pbkdf2$" prefix
+        const hashPart = storedHash.substring(8);
         passwordValid = await verifyPassword(password, hashPart);
       } else {
-        // Legacy plaintext password - compare directly
         passwordValid = storedHash === password;
-
-        // Auto-migrate to PBKDF2 hash if plaintext matches
         if (passwordValid) {
           const newHash = await hashPassword(password);
           await supabaseAdmin
@@ -136,39 +129,24 @@ Deno.serve(async (req) => {
       }
 
       if (!passwordValid) {
-        return new Response(
-          JSON.stringify({ error: "CPF ou senha incorretos." }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse("CPF ou senha incorretos.");
       }
 
-      // Sign in with the admin Supabase auth account
+      // Sign in with admin auth account
       const adminEmail = "admin@jbsterminais.com.br";
       const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
       if (!adminAuthPassword) {
-        return new Response(
-          JSON.stringify({ error: "Configuração de admin não encontrada. Contate o suporte." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        // Config missing - return generic auth error, not 500
+        return errorResponse("Login ou senha incorretos.");
       }
 
-      const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-        email: adminEmail,
-        password: adminAuthPassword,
-      });
-
-      if (signInError) {
-        return new Response(
-          JSON.stringify({ error: "Erro ao autenticar. Contate o suporte." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      const session = await ensureAdminSession(supabaseAdmin, adminEmail, adminAuthPassword);
+      if (!session) {
+        return errorResponse("Login ou senha incorretos.");
       }
 
       return new Response(
-        JSON.stringify({
-          session: signInData.session,
-          adminNome: adminAccount.nome,
-        }),
+        JSON.stringify({ session, adminNome: adminAccount.nome }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -179,168 +157,96 @@ Deno.serve(async (req) => {
       const adminPass = Deno.env.get("ADMIN_DEFAULT_PASSWORD");
       const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
 
+      // If any config is missing, return auth error (not 500)
       if (!adminUsername || !adminPass || !adminAuthPassword) {
-        return new Response(
-          JSON.stringify({ error: "Configuração de admin não encontrada. Contate o suporte." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse("Login ou senha incorretos.");
       }
 
       if (username.toLowerCase().trim() !== adminUsername.toLowerCase().trim() || password !== adminPass.trim()) {
-        return new Response(
-          JSON.stringify({ error: "Login ou senha incorretos." }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse("Login ou senha incorretos.");
       }
 
       const adminEmail = "admin@jbsterminais.com.br";
 
-      const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-        email: adminEmail,
-        password: adminAuthPassword,
-      });
-
-      if (signInError) {
-        // Try to create user first
-        const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
-          email: adminEmail,
-          password: adminAuthPassword,
-          email_confirm: true,
-        });
-
-        if (signUpError) {
-          // User exists but password doesn't match - update password
-          try {
-            const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
-            const existingUser = users?.find((u: any) => u.email === adminEmail);
-
-            if (!existingUser) {
-              return new Response(
-                JSON.stringify({ error: "Login ou senha incorretos." }),
-                { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
-
-            // Reset password to match current ADMIN_AUTH_PASSWORD
-            await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-              password: adminAuthPassword,
-            });
-
-            // Setup profile and role
-            await supabaseAdmin.from("profiles").upsert({
-              id: existingUser.id,
-              email: adminEmail,
-              nome: "Administrador",
-              setor: null,
-            });
-
-            const { data: existingRole } = await supabaseAdmin
-              .from("user_roles")
-              .select("id")
-              .eq("user_id", existingUser.id)
-              .eq("role", "admin")
-              .maybeSingle();
-
-            if (!existingRole) {
-              await supabaseAdmin.from("user_roles").insert({
-                user_id: existingUser.id,
-                role: "admin",
-              });
-            }
-
-            const { data: retrySignIn, error: retryError } = await supabaseAdmin.auth.signInWithPassword({
-              email: adminEmail,
-              password: adminAuthPassword,
-            });
-
-            if (retryError) {
-              return new Response(
-                JSON.stringify({ error: "Login ou senha incorretos." }),
-                { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
-
-            return new Response(
-              JSON.stringify({ session: retrySignIn.session, adminNome: "Administrador" }),
-              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          } catch (e) {
-            return new Response(
-              JSON.stringify({ error: "Login ou senha incorretos." }),
-              { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-        }
-
-        if (signUpData.user) {
-          await supabaseAdmin.from("profiles").upsert({
-            id: signUpData.user.id,
-            email: adminEmail,
-            nome: "Administrador",
-            setor: null,
-          });
-
-          await supabaseAdmin.from("user_roles").insert({
-            user_id: signUpData.user.id,
-            role: "admin",
-          });
-
-          const { data: newSignIn, error: newSignInError } = await supabaseAdmin.auth.signInWithPassword({
-            email: adminEmail,
-            password: adminAuthPassword,
-          });
-
-          if (newSignInError) {
-            return new Response(
-              JSON.stringify({ error: "Erro ao autenticar após configuração." }),
-              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-
-          return new Response(
-            JSON.stringify({ session: newSignIn.session, adminNome: "Administrador", setup: true }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+      const session = await ensureAdminSession(supabaseAdmin, adminEmail, adminAuthPassword);
+      if (!session) {
+        return errorResponse("Erro ao autenticar. Tente novamente.");
       }
 
-      if (signInData?.user) {
-        await supabaseAdmin.from("profiles").upsert({
-          id: signInData.user.id,
-          email: adminEmail,
-          nome: "Administrador",
-          setor: null,
-        });
-
-        const { data: existingRole } = await supabaseAdmin
-          .from("user_roles")
-          .select("id")
-          .eq("user_id", signInData.user.id)
-          .eq("role", "admin")
-          .maybeSingle();
-
-        if (!existingRole) {
-          await supabaseAdmin.from("user_roles").insert({
-            user_id: signInData.user.id,
-            role: "admin",
-          });
-        }
-
-        return new Response(
-          JSON.stringify({ session: signInData.session, adminNome: "Administrador" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      return new Response(
+        JSON.stringify({ session, adminNome: "Administrador" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    return new Response(
-      JSON.stringify({ error: "Credenciais inválidas." }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse("Credenciais inválidas.");
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Erro interno do servidor." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error("admin-login error:", err);
+    return errorResponse("Erro interno do servidor.", 500);
   }
 });
+
+// Helper: ensure admin user exists, password matches, and return session
+async function ensureAdminSession(supabaseAdmin: any, email: string, password: string) {
+  // Try sign in first
+  const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (!signInError && signInData?.session) {
+    // Ensure profile and role exist
+    await setupAdminProfile(supabaseAdmin, signInData.user.id, email);
+    return signInData.session;
+  }
+
+  // Sign in failed - try to create or fix the user
+  try {
+    // Try create
+    const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+    if (!signUpError && signUpData?.user) {
+      await setupAdminProfile(supabaseAdmin, signUpData.user.id, email);
+      const { data: newSignIn } = await supabaseAdmin.auth.signInWithPassword({ email, password });
+      return newSignIn?.session || null;
+    }
+
+    // User exists but password mismatch - update password
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = users?.find((u: any) => u.email === email);
+
+    if (!existingUser) return null;
+
+    await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { password });
+    await setupAdminProfile(supabaseAdmin, existingUser.id, email);
+
+    const { data: retrySignIn } = await supabaseAdmin.auth.signInWithPassword({ email, password });
+    return retrySignIn?.session || null;
+  } catch {
+    return null;
+  }
+}
+
+async function setupAdminProfile(supabaseAdmin: any, userId: string, email: string) {
+  await supabaseAdmin.from("profiles").upsert({
+    id: userId,
+    email,
+    nome: "Administrador",
+    setor: null,
+  });
+
+  const { data: existingRole } = await supabaseAdmin
+    .from("user_roles")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (!existingRole) {
+    await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: "admin" });
+  }
+}

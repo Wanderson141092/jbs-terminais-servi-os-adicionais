@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import StatusBadge from "./StatusBadge";
@@ -26,6 +27,8 @@ interface Solicitacao {
   status_vistoria: string | null;
   created_at: string;
   categoria?: string | null;
+  solicitar_deferimento?: boolean;
+  pendencias_selecionadas?: string[];
 }
 
 interface DeferimentoDocument {
@@ -54,7 +57,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
 
-  // Filter deferimento docs
   const allDocs = deferimentoDocs.filter(d => d.document_type === "deferimento" || !d.document_type);
   const existingDoc = allDocs.length > 0 ? allDocs[0] : null;
 
@@ -102,7 +104,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
     setShowConfirmDialog(true);
   };
 
-  // Upload via edge function (no direct storage/DB access)
   const handleConfirmUpload = async () => {
     if (!previewFile) return;
 
@@ -141,10 +142,8 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
     setShowConfirmDialog(false);
   };
 
-  const isPositionamentoExportacao = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento") 
-    && (solicitacao as any).categoria?.toLowerCase() === "exportação";
-  const vistoriaFinalizada = solicitacao.status === "vistoria_finalizada";
-  const showDeferimento = isPositionamentoExportacao && vistoriaFinalizada;
+  // Show deferimento if solicitar_deferimento is true on the process
+  const showDeferimento = solicitacao.solicitar_deferimento === true;
   const canUpload = showDeferimento && (allDocs.length === 0 || generalStatus === "recusado");
 
   const getDeferimentoStatusSection = () => {
@@ -169,7 +168,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
           <Alert className="border-red-500 bg-red-50">
             <X className="h-4 w-4 text-red-600" />
             <AlertDescription className="ml-2">
-              <span className="font-semibold text-red-700">Deferimento Recusado - Reenviar Anexo</span>
+              <span className="font-semibold text-red-700">Deferimento Recusado</span>
               {recusedDoc?.motivo_recusa && (
                 <p className="text-sm text-red-600 mt-1">
                   <strong>Motivo:</strong> {recusedDoc.motivo_recusa}
@@ -204,14 +203,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
             <p className="text-sm text-yellow-600 mt-1">
               Documento(s) enviado(s). Aguardando análise pela equipe.
             </p>
-            {existingDoc && (
-              <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-yellow-700" asChild>
-                <a href={existingDoc.file_url} target="_blank" rel="noopener noreferrer">
-                  <Eye className="h-3 w-3 mr-1" />
-                  Visualizar documento enviado
-                </a>
-              </Button>
-            )}
           </AlertDescription>
         </Alert>
       );
@@ -255,11 +246,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
   const getDateValue = () => {
     if (isAgendamento && solicitacao.data_agendamento) {
       return new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
+        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
       });
     }
     if (solicitacao.data_posicionamento) {
@@ -268,29 +255,48 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
     return "—";
   };
 
+  // Status color for status badge
+  const getStatusColor = (status: string) => {
+    if (status === "vistoria_finalizada") return "text-green-700 bg-green-50 border-green-200";
+    if (status === "vistoriado_com_pendencia") return "text-yellow-700 bg-yellow-50 border-yellow-200";
+    if (status === "nao_vistoriado") return "text-red-700 bg-red-50 border-red-200";
+    if (status === "confirmado_aguardando_vistoria") return "text-blue-700 bg-blue-50 border-blue-200";
+    if (status === "recusado" || status === "cancelado") return "text-red-700 bg-red-50 border-red-200";
+    return "text-yellow-700 bg-yellow-50 border-yellow-200";
+  };
+
   const infoItems = [
     { icon: <User className="h-4 w-4" />, label: "Cliente", value: solicitacao.cliente_nome },
     solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
     solicitacao.numero_conteiner ? { icon: <Package className="h-4 w-4" />, label: "Contêiner", value: solicitacao.numero_conteiner } : null,
     { icon: <Calendar className="h-4 w-4" />, label: getDateLabel(), value: getDateValue() !== "—" ? getDateValue() : null },
     solicitacao.tipo_carga ? { icon: <Package className="h-4 w-4" />, label: "Tipo de Carga", value: formattedTipoCarga } : null,
-    solicitacao.tipo_operacao ? { icon: <FileText className="h-4 w-4" />, label: "Serviço Adicional", value: solicitacao.tipo_operacao } : null,
+    solicitacao.tipo_operacao ? { icon: <FileText className="h-4 w-4" />, label: "Serviço solicitado", value: solicitacao.tipo_operacao } : null,
   ].filter(Boolean) as { icon: React.ReactNode; label: string; value: string }[];
 
   return (
     <>
       <Card className="border-0 shadow-lg">
         <CardHeader className="bg-primary/5 rounded-t-lg">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="text-lg font-bold text-foreground">
-              Protocolo: {solicitacao.protocolo}
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <StatusBadge status={solicitacao.status} />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <CardTitle className="text-lg font-bold text-foreground">
+                Protocolo: {solicitacao.protocolo}
+              </CardTitle>
               <Button variant="outline" size="sm" onClick={() => downloadProcessoPdf(solicitacao)} title="Baixar PDF">
                 <Download className="h-4 w-4" />
               </Button>
             </div>
+            <Separator className="my-1" />
+            <div className={`inline-flex items-center px-3 py-1 rounded-md border text-sm font-medium ${getStatusColor(solicitacao.status)}`}>
+              <StatusBadge status={solicitacao.status} />
+            </div>
+            {/* Pendências sub-status */}
+            {solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas && solicitacao.pendencias_selecionadas.length > 0 && (
+              <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1 mt-1">
+                Pendências: {solicitacao.pendencias_selecionadas.join(", ")}
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
@@ -299,16 +305,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               <InfoItem key={i} icon={item.icon} label={item.label} value={item.value} />
             ))}
           </div>
-
-          {solicitacao.status_vistoria && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1">Status da Vistoria</p>
-                <p className="text-sm font-medium">{solicitacao.status_vistoria}</p>
-              </div>
-            </>
-          )}
 
           {showDeferimento && (
             <>

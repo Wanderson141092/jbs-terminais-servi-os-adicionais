@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 import ParametrosCamposManager from "@/components/ParametrosCamposManager";
@@ -73,6 +74,14 @@ interface SetorEmail {
   descricao: string | null;
 }
 
+interface NotificationRule {
+  id: string;
+  servico_id: string;
+  status_gatilho: string;
+  tipos_notificacao: string[];
+  ativo: boolean;
+}
+
 const DIAS_SEMANA = [
   { key: "seg", label: "Seg" },
   { key: "ter", label: "Ter" },
@@ -128,19 +137,46 @@ const AdminParametros = () => {
     setor_ids: [] as string[]
   });
 
+  // Notification Rules
+  const [notifRules, setNotifRules] = useState<NotificationRule[]>([]);
+  const [showNotifDialog, setShowNotifDialog] = useState(false);
+  const [editingNotif, setEditingNotif] = useState<NotificationRule | null>(null);
+  const [notifFormData, setNotifFormData] = useState({
+    servico_id: "",
+    status_gatilho: "",
+    tipos_notificacao: [] as string[]
+  });
+
+  const TIPOS_NOTIFICACAO = [
+    { key: "push", label: "Notificação Push (Nativa)" },
+    { key: "toast", label: "Toast na Tela" },
+    { key: "email", label: "E-mail" },
+  ];
+
+  const STATUS_GATILHO_OPTIONS = [
+    { value: "aguardando_confirmacao", label: "Aguardando Confirmação" },
+    { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
+    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
+    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
+    { value: "nao_vistoriado", label: "Não Vistoriado" },
+    { value: "recusado", label: "Recusado" },
+    { value: "cancelado", label: "Cancelado" },
+  ];
+
   useEffect(() => {
     fetchAllData();
   }, []);
 
   const fetchAllData = async () => {
-    const [regrasRes, servicosRes, protocolRes, pageConfigRes, routingRes, fieldMappingsRes, setorEmailsRes] = await Promise.all([
+    const [regrasRes, servicosRes, protocolRes, pageConfigRes, routingRes, fieldMappingsRes, setorEmailsRes, notifRulesRes] = await Promise.all([
       supabase.from("regras_servico").select("*").order("created_at"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("protocol_config").select("*").limit(1).single(),
       supabase.from("page_config").select("*").order("config_key"),
       supabase.from("service_routing_rules").select("*").order("created_at"),
       supabase.from("field_mappings").select("campo_interno, campo_externo"),
-      supabase.from("setor_emails").select("id, email_setor, descricao").eq("ativo", true)
+      supabase.from("setor_emails").select("id, email_setor, descricao").eq("ativo", true),
+      supabase.from("notification_rules").select("*").order("created_at")
     ]);
 
     if (regrasRes.data) setRegras(regrasRes.data);
@@ -150,6 +186,7 @@ const AdminParametros = () => {
     if (routingRes.data) setRoutingRules(routingRes.data);
     if (fieldMappingsRes.data) setFieldMappings(fieldMappingsRes.data);
     if (setorEmailsRes.data) setSetorEmails(setorEmailsRes.data);
+    if (notifRulesRes.data) setNotifRules(notifRulesRes.data as NotificationRule[]);
     
     setLoading(false);
   };
@@ -427,6 +464,75 @@ const AdminParametros = () => {
     return setor?.descricao || setor?.email_setor || setorId;
   };
 
+  // ============= NOTIFICATION RULES =============
+  const openNotifDialog = (rule?: NotificationRule) => {
+    if (rule) {
+      setEditingNotif(rule);
+      setNotifFormData({
+        servico_id: rule.servico_id,
+        status_gatilho: rule.status_gatilho,
+        tipos_notificacao: rule.tipos_notificacao
+      });
+    } else {
+      setEditingNotif(null);
+      setNotifFormData({ servico_id: "", status_gatilho: "", tipos_notificacao: [] });
+    }
+    setShowNotifDialog(true);
+  };
+
+  const toggleTipoNotif = (tipo: string) => {
+    setNotifFormData(prev => ({
+      ...prev,
+      tipos_notificacao: prev.tipos_notificacao.includes(tipo)
+        ? prev.tipos_notificacao.filter(t => t !== tipo)
+        : [...prev.tipos_notificacao, tipo]
+    }));
+  };
+
+  const saveNotifRule = async () => {
+    if (!notifFormData.servico_id || !notifFormData.status_gatilho || notifFormData.tipos_notificacao.length === 0) {
+      toast.error("Preencha todos os campos e selecione pelo menos um tipo de notificação");
+      return;
+    }
+
+    const data = {
+      servico_id: notifFormData.servico_id,
+      status_gatilho: notifFormData.status_gatilho,
+      tipos_notificacao: notifFormData.tipos_notificacao,
+      updated_at: new Date().toISOString()
+    };
+
+    setSaving(true);
+    if (editingNotif) {
+      const { error } = await supabase.from("notification_rules").update(data).eq("id", editingNotif.id);
+      if (error) { toast.error("Erro ao atualizar regra"); setSaving(false); return; }
+      toast.success("Regra atualizada!");
+    } else {
+      const { error } = await supabase.from("notification_rules").insert(data);
+      if (error) {
+        if (error.code === "23505") toast.error("Já existe uma regra para este serviço e status");
+        else toast.error("Erro ao criar regra");
+        setSaving(false); return;
+      }
+      toast.success("Regra criada!");
+    }
+    setShowNotifDialog(false);
+    setSaving(false);
+    fetchAllData();
+  };
+
+  const deleteNotifRule = async (rule: NotificationRule) => {
+    const { error } = await supabase.from("notification_rules").delete().eq("id", rule.id);
+    if (error) { toast.error("Erro ao excluir regra"); return; }
+    toast.success("Regra excluída!");
+    fetchAllData();
+  };
+
+  const toggleNotifAtivo = async (rule: NotificationRule) => {
+    await supabase.from("notification_rules").update({ ativo: !rule.ativo }).eq("id", rule.id);
+    fetchAllData();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -448,22 +554,26 @@ const AdminParametros = () => {
       </div>
 
       <Tabs defaultValue="pagina-externa" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="pagina-externa" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
-            Página Externa
+            Pág. Externa
           </TabsTrigger>
           <TabsTrigger value="pagina-interna" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
-            Página Interna
+            Pág. Interna
           </TabsTrigger>
           <TabsTrigger value="campos-respostas" className="flex items-center gap-2">
             <List className="h-4 w-4" />
-            Campos Respostas
+            Campos
           </TabsTrigger>
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            Regras de Negócio
+            Regras
+          </TabsTrigger>
+          <TabsTrigger value="notificacoes" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notificações
           </TabsTrigger>
           <TabsTrigger value="protocolo" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -679,6 +789,87 @@ const AdminParametros = () => {
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                         Nenhuma regra configurada. O sistema usará valores padrão.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============= REGRAS DE NOTIFICAÇÃO ============= */}
+        <TabsContent value="notificacoes">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Regras de Notificação ({notifRules.length})
+              </CardTitle>
+              <Button onClick={() => openNotifDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Regra
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Configure quais status disparam notificações e de qual tipo, por serviço. A notificação <strong>não será enviada</strong> ao usuário que realizou a atualização, apenas aos demais com acesso ao serviço.
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Serviço</TableHead>
+                    <TableHead>Status Gatilho</TableHead>
+                    <TableHead>Tipos de Notificação</TableHead>
+                    <TableHead>Ativo</TableHead>
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {notifRules.map(rule => (
+                    <TableRow key={rule.id} className={!rule.ativo ? "opacity-50" : ""}>
+                      <TableCell className="font-medium">{getServicoNome(rule.servico_id)}</TableCell>
+                      <TableCell>{STATUS_GATILHO_OPTIONS.find(s => s.value === rule.status_gatilho)?.label || rule.status_gatilho}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex flex-wrap gap-1">
+                          {rule.tipos_notificacao.map(t => (
+                            <Badge key={t} variant="outline" className="text-[10px]">
+                              {TIPOS_NOTIFICACAO.find(tn => tn.key === t)?.label || t}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Switch checked={rule.ativo} onCheckedChange={() => toggleNotifAtivo(rule)} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openNotifDialog(rule)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir Regra de Notificação</AlertDialogTitle>
+                                <AlertDialogDescription>Tem certeza que deseja excluir esta regra?</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteNotifRule(rule)} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {notifRules.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Nenhuma regra de notificação configurada.
                       </TableCell>
                     </TableRow>
                   )}
@@ -1038,6 +1229,71 @@ const AdminParametros = () => {
           </div>
           <DialogFooter className="mt-4">
             <Button onClick={saveRoutingRule} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Notification Rule */}
+      <Dialog open={showNotifDialog} onOpenChange={setShowNotifDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingNotif ? "Editar Regra" : "Adicionar Regra de Notificação"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Serviço</Label>
+              <Select
+                value={notifFormData.servico_id}
+                onValueChange={(v) => setNotifFormData(prev => ({ ...prev, servico_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o serviço" />
+                </SelectTrigger>
+                <SelectContent>
+                  {servicos.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Status Gatilho</Label>
+              <Select
+                value={notifFormData.status_gatilho}
+                onValueChange={(v) => setNotifFormData(prev => ({ ...prev, status_gatilho: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_GATILHO_OPTIONS.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tipos de Notificação *</Label>
+              <p className="text-xs text-muted-foreground mb-2">Selecione pelo menos um tipo</p>
+              <div className="space-y-2 border rounded-lg p-3">
+                {TIPOS_NOTIFICACAO.map(tipo => (
+                  <div key={tipo.key} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`notif-${tipo.key}`}
+                      checked={notifFormData.tipos_notificacao.includes(tipo.key)}
+                      onCheckedChange={() => toggleTipoNotif(tipo.key)}
+                    />
+                    <Label htmlFor={`notif-${tipo.key}`} className="cursor-pointer text-sm">{tipo.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={saveNotifRule} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Salvando..." : "Salvar"}
             </Button>

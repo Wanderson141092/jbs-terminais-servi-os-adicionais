@@ -35,21 +35,22 @@ const AdminAdmins = () => {
     confirmarSenha: ""
   });
   const [newPassword, setNewPassword] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchAdmins();
   }, []);
 
+  // Use edge function to list admins (excludes senha_hash)
   const fetchAdmins = async () => {
-    const { data, error } = await supabase
-      .from("admin_accounts")
-      .select("id, cpf, nome, ativo, created_at")
-      .order("nome");
+    const { data: response, error } = await supabase.functions.invoke("admin-manage", {
+      body: { action: "list", data: {} },
+    });
 
-    if (error) {
+    if (error || response?.error) {
       toast.error("Erro ao carregar administradores");
     } else {
-      setAdmins(data || []);
+      setAdmins(response?.admins || []);
     }
     setLoading(false);
   };
@@ -67,14 +68,14 @@ const AdminAdmins = () => {
     return nums.length === 11;
   };
 
+  // Toggle active via edge function
   const handleToggleActive = async (admin: AdminAccount) => {
-    const { error } = await supabase
-      .from("admin_accounts")
-      .update({ ativo: !admin.ativo })
-      .eq("id", admin.id);
+    const { data: response, error } = await supabase.functions.invoke("admin-manage", {
+      body: { action: "update", data: { id: admin.id, ativo: !admin.ativo } },
+    });
 
-    if (error) {
-      toast.error("Erro ao atualizar status");
+    if (error || response?.error) {
+      toast.error(response?.error || "Erro ao atualizar status");
       return;
     }
 
@@ -82,6 +83,7 @@ const AdminAdmins = () => {
     fetchAdmins();
   };
 
+  // Save via edge function (passwords hashed server-side)
   const handleSave = async () => {
     const cpfNums = formData.cpf.replace(/\D/g, '');
     
@@ -105,47 +107,40 @@ const AdminAdmins = () => {
       return;
     }
 
-    if (editingAdmin) {
-      const { error } = await supabase
-        .from("admin_accounts")
-        .update({
-          cpf: cpfNums,
-          nome: formData.nome,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", editingAdmin.id);
+    setSaving(true);
 
-      if (error) {
-        toast.error("Erro ao atualizar administrador");
+    if (editingAdmin) {
+      const { data: response, error } = await supabase.functions.invoke("admin-manage", {
+        body: { action: "update", data: { id: editingAdmin.id, cpf: cpfNums, nome: formData.nome } },
+      });
+
+      if (error || response?.error) {
+        toast.error(response?.error || "Erro ao atualizar administrador");
+        setSaving(false);
         return;
       }
       toast.success("Administrador atualizado!");
     } else {
-      const { error } = await supabase
-        .from("admin_accounts")
-        .insert({
-          cpf: cpfNums,
-          nome: formData.nome,
-          senha_hash: formData.senha // Em produção, usar hash bcrypt
-        });
+      const { data: response, error } = await supabase.functions.invoke("admin-manage", {
+        body: { action: "create", data: { cpf: cpfNums, nome: formData.nome, senha: formData.senha } },
+      });
 
-      if (error) {
-        if (error.code === "23505") {
-          toast.error("CPF já cadastrado");
-        } else {
-          toast.error("Erro ao adicionar administrador");
-        }
+      if (error || response?.error) {
+        toast.error(response?.error || "Erro ao adicionar administrador");
+        setSaving(false);
         return;
       }
       toast.success("Administrador adicionado!");
     }
 
+    setSaving(false);
     setShowDialog(false);
     setEditingAdmin(null);
     setFormData({ cpf: "", nome: "", senha: "", confirmarSenha: "" });
     fetchAdmins();
   };
 
+  // Change password via edge function (hashed server-side)
   const handleChangePassword = async () => {
     if (!selectedAdminForPassword) return;
     
@@ -154,33 +149,33 @@ const AdminAdmins = () => {
       return;
     }
 
-    const { error } = await supabase
-      .from("admin_accounts")
-      .update({ 
-        senha_hash: newPassword,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", selectedAdminForPassword.id);
+    setSaving(true);
 
-    if (error) {
-      toast.error("Erro ao alterar senha");
+    const { data: response, error } = await supabase.functions.invoke("admin-manage", {
+      body: { action: "change-password", data: { id: selectedAdminForPassword.id, senha: newPassword } },
+    });
+
+    if (error || response?.error) {
+      toast.error(response?.error || "Erro ao alterar senha");
+      setSaving(false);
       return;
     }
 
     toast.success(`Senha de ${selectedAdminForPassword.nome} alterada!`);
+    setSaving(false);
     setShowPasswordDialog(false);
     setSelectedAdminForPassword(null);
     setNewPassword("");
   };
 
+  // Delete via edge function
   const handleDelete = async (admin: AdminAccount) => {
-    const { error } = await supabase
-      .from("admin_accounts")
-      .delete()
-      .eq("id", admin.id);
+    const { data: response, error } = await supabase.functions.invoke("admin-manage", {
+      body: { action: "delete", data: { id: admin.id } },
+    });
 
-    if (error) {
-      toast.error("Erro ao excluir administrador");
+    if (error || response?.error) {
+      toast.error(response?.error || "Erro ao excluir administrador");
       return;
     }
 
@@ -286,9 +281,9 @@ const AdminAdmins = () => {
                   </div>
                 </>
               )}
-              <Button onClick={handleSave} className="w-full">
+              <Button onClick={handleSave} className="w-full" disabled={saving}>
                 <Save className="h-4 w-4 mr-2" />
-                {editingAdmin ? "Salvar Alterações" : "Adicionar"}
+                {saving ? "Salvando..." : editingAdmin ? "Salvar Alterações" : "Adicionar"}
               </Button>
             </div>
           </DialogContent>
@@ -317,9 +312,9 @@ const AdminAdmins = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>Cancelar</Button>
-            <Button onClick={handleChangePassword}>
+            <Button onClick={handleChangePassword} disabled={saving}>
               <Key className="h-4 w-4 mr-2" />
-              Alterar Senha
+              {saving ? "Alterando..." : "Alterar Senha"}
             </Button>
           </DialogFooter>
         </DialogContent>

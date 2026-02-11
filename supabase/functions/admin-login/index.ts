@@ -6,6 +6,68 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// PBKDF2 password verification
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const combined = Uint8Array.from(atob(storedHash), c => c.charCodeAt(0));
+  const salt = combined.slice(0, 16);
+  const storedDerivedBits = combined.slice(16);
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    256
+  );
+  const newHash = new Uint8Array(derivedBits);
+  if (newHash.length !== storedDerivedBits.length) return false;
+
+  let result = 0;
+  for (let i = 0; i < newHash.length; i++) {
+    result |= newHash[i] ^ storedDerivedBits[i];
+  }
+  return result === 0;
+}
+
+// Hash password with PBKDF2
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    256
+  );
+  const hashArray = new Uint8Array(derivedBits);
+  const combined = new Uint8Array(salt.length + hashArray.length);
+  combined.set(salt);
+  combined.set(hashArray, salt.length);
+  return "$pbkdf2$" + btoa(String.fromCharCode(...combined));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,7 +99,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Lookup admin by CPF using service role (bypasses RLS)
       const { data: adminAccount, error: lookupError } = await supabaseAdmin
         .from("admin_accounts")
         .select("id, nome, senha_hash, ativo, cpf")
@@ -52,8 +113,29 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Server-side password comparison (no exposure to client)
-      if (adminAccount.senha_hash !== password) {
+      // Verify password - supports both PBKDF2 hashed and legacy plaintext
+      let passwordValid = false;
+      const storedHash = adminAccount.senha_hash;
+
+      if (storedHash.startsWith("$pbkdf2$")) {
+        // PBKDF2 hashed password
+        const hashPart = storedHash.substring(8); // Remove "$pbkdf2$" prefix
+        passwordValid = await verifyPassword(password, hashPart);
+      } else {
+        // Legacy plaintext password - compare directly
+        passwordValid = storedHash === password;
+
+        // Auto-migrate to PBKDF2 hash if plaintext matches
+        if (passwordValid) {
+          const newHash = await hashPassword(password);
+          await supabaseAdmin
+            .from("admin_accounts")
+            .update({ senha_hash: newHash, updated_at: new Date().toISOString() })
+            .eq("id", adminAccount.id);
+        }
+      }
+
+      if (!passwordValid) {
         return new Response(
           JSON.stringify({ error: "CPF ou senha incorretos." }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -62,7 +144,6 @@ Deno.serve(async (req) => {
 
       // Sign in with the admin Supabase auth account
       const adminEmail = "admin@jbsterminais.com.br";
-      // Get admin auth password from secrets
       const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
       if (!adminAuthPassword) {
         return new Response(
@@ -98,8 +179,6 @@ Deno.serve(async (req) => {
       const adminPass = Deno.env.get("ADMIN_DEFAULT_PASSWORD");
       const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
 
-      // Validate secrets exist
-
       if (!adminUsername || !adminPass || !adminAuthPassword) {
         return new Response(
           JSON.stringify({ error: "Configuração de admin não encontrada. Contate o suporte." }),
@@ -109,21 +188,19 @@ Deno.serve(async (req) => {
 
       if (username.toLowerCase().trim() !== adminUsername.toLowerCase().trim() || password !== adminPass.trim()) {
         return new Response(
-          JSON.stringify({ error: "Credenciais inválidas." }),
+          JSON.stringify({ error: "Login ou senha incorretos." }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       const adminEmail = "admin@jbsterminais.com.br";
 
-      // Try to sign in
       const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
         email: adminEmail,
         password: adminAuthPassword,
       });
 
       if (signInError) {
-        // Try to create admin account if it doesn't exist
         const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
           email: adminEmail,
           password: adminAuthPassword,
@@ -145,13 +222,11 @@ Deno.serve(async (req) => {
             setor: null,
           });
 
-          // Setup admin role
           await supabaseAdmin.from("user_roles").insert({
             user_id: signUpData.user.id,
             role: "admin",
           });
 
-          // Sign in after creation
           const { data: newSignIn, error: newSignInError } = await supabaseAdmin.auth.signInWithPassword({
             email: adminEmail,
             password: adminAuthPassword,
@@ -172,7 +247,6 @@ Deno.serve(async (req) => {
       }
 
       if (signInData?.user) {
-        // Ensure profile and role exist
         await supabaseAdmin.from("profiles").upsert({
           id: signInData.user.id,
           email: adminEmail,

@@ -412,6 +412,44 @@ export type Database = {
           },
         ]
       }
+      notification_rules: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          servico_id: string
+          status_gatilho: string
+          tipos_notificacao: string[]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          servico_id: string
+          status_gatilho: string
+          tipos_notificacao?: string[]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          servico_id?: string
+          status_gatilho?: string
+          tipos_notificacao?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_rules_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -443,6 +481,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      observacao_historico: {
+        Row: {
+          autor_id: string
+          autor_nome: string | null
+          created_at: string
+          id: string
+          observacao: string
+          solicitacao_id: string
+          status_no_momento: string
+        }
+        Insert: {
+          autor_id: string
+          autor_nome?: string | null
+          created_at?: string
+          id?: string
+          observacao: string
+          solicitacao_id: string
+          status_no_momento: string
+        }
+        Update: {
+          autor_id?: string
+          autor_nome?: string | null
+          created_at?: string
+          id?: string
+          observacao?: string
+          solicitacao_id?: string
+          status_no_momento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "observacao_historico_solicitacao_id_fkey"
             columns: ["solicitacao_id"]
             isOneToOne: false
             referencedRelation: "solicitacoes"

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,14 @@ interface ServicoConfig {
   anexos_embutidos: boolean | null;
 }
 
+interface ObservacaoHistorico {
+  id: string;
+  observacao: string;
+  status_no_momento: string;
+  autor_nome: string | null;
+  created_at: string;
+}
+
 const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
@@ -42,35 +50,22 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [showLancamentoDialog, setShowLancamentoDialog] = useState(false);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
   const [servicos, setServicos] = useState<any[]>([]);
+  const [observacaoTexto, setObservacaoTexto] = useState("");
+  const [observacaoHistorico, setObservacaoHistorico] = useState<ObservacaoHistorico[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      // Buscar todos os anexos (análise + anexos gerais, excluindo deferimento)
-      const { data: attachData } = await supabase
-        .from("deferimento_documents")
-        .select("*")
-        .eq("solicitacao_id", solicitacao.id)
-        .neq("document_type", "deferimento");
-      setAttachments(attachData || []);
-      
-      // Buscar configurações do serviço
-      const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
-      const { data: servicoData } = await supabase
-        .from("servicos")
-        .select("id, nome, tipo_agendamento, anexos_embutidos")
-        .eq("nome", tipoOperacao)
-        .maybeSingle();
-      
-      if (servicoData) {
-        setServicoConfig(servicoData);
-      }
+      const [attachRes, servicoRes, allServicosRes, histRes] = await Promise.all([
+        supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
+        supabase.from("servicos").select("id, nome, tipo_agendamento, anexos_embutidos").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
+        supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
+        supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false })
+      ]);
 
-      // Buscar todos os serviços para configuração de lançamento
-      const { data: allServicos } = await supabase
-        .from("servicos")
-        .select("*, status_confirmacao_lancamento")
-        .eq("ativo", true);
-      setServicos(allServicos || []);
+      setAttachments(attachRes.data || []);
+      if (servicoRes.data) setServicoConfig(servicoRes.data);
+      setServicos(allServicosRes.data || []);
+      setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
     };
     
     fetchData();
@@ -343,14 +338,61 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const createNotification = async (mensagem: string, tipo: string) => {
     const { data: profiles } = await supabase.from("profiles").select("id");
     if (profiles) {
-      const notifications = profiles.map((p) => ({
-        usuario_id: p.id,
-        solicitacao_id: solicitacao.id,
-        mensagem,
-        tipo,
-      }));
-      await supabase.from("notifications").insert(notifications);
+      // Exclude the current user from notifications
+      const notifications = profiles
+        .filter((p) => p.id !== userId)
+        .map((p) => ({
+          usuario_id: p.id,
+          solicitacao_id: solicitacao.id,
+          mensagem,
+          tipo,
+        }));
+      if (notifications.length > 0) {
+        await supabase.from("notifications").insert(notifications);
+      }
     }
+  };
+
+  const handleSaveObservacao = async () => {
+    if (!observacaoTexto.trim()) {
+      toast.error("Digite uma observação");
+      return;
+    }
+    setLoading(true);
+    
+    // Save to history log
+    const { error: histError } = await supabase.from("observacao_historico").insert({
+      solicitacao_id: solicitacao.id,
+      observacao: observacaoTexto.trim(),
+      status_no_momento: solicitacao.status,
+      autor_id: userId,
+      autor_nome: profile.nome || profile.email
+    });
+
+    if (histError) {
+      toast.error("Erro ao salvar observação");
+      setLoading(false);
+      return;
+    }
+
+    // Update solicitacao observacoes field
+    const currentObs = solicitacao.observacoes || "";
+    const newObs = currentObs ? `${currentObs}\n\n[${new Date().toLocaleString("pt-BR")}] ${observacaoTexto.trim()}` : observacaoTexto.trim();
+    
+    await supabase.from("solicitacoes").update({ observacoes: newObs }).eq("id", solicitacao.id);
+    await logAudit("observacao", `Observação atualizada: ${observacaoTexto.trim()}`);
+
+    // Refresh history
+    const { data: histData } = await supabase
+      .from("observacao_historico")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id)
+      .order("created_at", { ascending: false });
+    setObservacaoHistorico((histData as ObservacaoHistorico[]) || []);
+
+    setObservacaoTexto("");
+    toast.success("Observação registrada!");
+    setLoading(false);
   };
 
   const getSetorLabel = (setor: string | null) => {
@@ -649,6 +691,49 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </div>
               </>
             )}
+
+            {/* Observações e Histórico */}
+            <Separator />
+            <div className="space-y-3">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Observações
+              </p>
+              <div className="flex gap-2">
+                <Textarea
+                  value={observacaoTexto}
+                  onChange={(e) => setObservacaoTexto(e.target.value)}
+                  placeholder="Adicionar nova observação..."
+                  className="min-h-[60px]"
+                />
+                <Button onClick={handleSaveObservacao} disabled={loading || !observacaoTexto.trim()} size="sm" className="self-end">
+                  Salvar
+                </Button>
+              </div>
+
+              {observacaoHistorico.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  <p className="text-xs font-semibold flex items-center gap-1 text-muted-foreground">
+                    <History className="h-3 w-3" />
+                    Histórico de Observações
+                  </p>
+                  <div className="max-h-[200px] overflow-auto space-y-2">
+                    {observacaoHistorico.map((obs) => (
+                      <div key={obs.id} className="bg-muted/50 rounded-lg p-2 text-xs">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-medium">{obs.autor_nome || "Sistema"}</span>
+                          <span className="text-muted-foreground">
+                            {new Date(obs.created_at).toLocaleString("pt-BR")}
+                          </span>
+                        </div>
+                        <p className="text-foreground">{obs.observacao}</p>
+                        <StatusBadge status={obs.status_no_momento} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter>

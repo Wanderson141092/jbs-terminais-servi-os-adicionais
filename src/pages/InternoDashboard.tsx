@@ -520,15 +520,23 @@ const InternoDashboard = () => {
         </Card>
 
         {/* Stats Cards - dashboard counts (service filter only) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <StatCard 
-            label={tipoServicoFilter === "Todos" ? "Total" : tipoServicoFilter} 
+            label={tipoServicoFilter === "Todos" ? "Serviços" : tipoServicoFilter} 
             value={dashboardFiltered.length} 
             icon={<ClipboardList className="h-5 w-5" />} 
           />
           <StatCard label="Aguardando" value={dashboardStatusCounts["aguardando_confirmacao"] || 0} icon={<Clock className="h-5 w-5" />} color="text-yellow-600" />
           <StatCard label="Confirmados" value={dashboardStatusCounts["confirmado_aguardando_vistoria"] || 0} icon={<CheckCircle2 className="h-5 w-5" />} color="text-blue-600" />
-          <StatCard label="Recusados" value={dashboardStatusCounts["recusado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
+          <StatCard label="Cancelados" value={dashboardStatusCounts["cancelado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
+          {(tipoServicoFilter === "Todos" || tipoServicoFilter.toLowerCase().includes("posicionamento")) && (
+            <StatCard 
+              label="Def. Pendente" 
+              value={deferimentoCounts.pendente} 
+              icon={<FileText className="h-5 w-5" />} 
+              color="text-yellow-600" 
+            />
+          )}
         </div>
 
         {/* Launch Counters */}
@@ -549,33 +557,16 @@ const InternoDashboard = () => {
           </div>
         )}
 
-        {/* Deferimento Counters - for Posicionamento */}
-        {(tipoServicoFilter === "Todos" || tipoServicoFilter.toLowerCase().includes("posicionamento")) && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <StatCard 
-              label="Def. Pendente" 
-              value={deferimentoCounts.pendente} 
-              icon={<Clock className="h-5 w-5" />} 
-              color="text-yellow-600" 
-            />
-            <StatCard 
-              label="Def. Recusado" 
-              value={deferimentoCounts.recusado} 
-              icon={<XCircle className="h-5 w-5" />} 
-              color="text-destructive" 
-            />
-            <StatCard 
-              label="Def. Recebido" 
-              value={deferimentoCounts.recebido} 
-              icon={<CheckCircle2 className="h-5 w-5" />} 
-              color="text-green-600" 
-            />
-          </div>
-        )}
+        {/* Removed separate deferimento counters - now in main stats row */}
 
-        {/* Status breakdown */}
+        {/* Status breakdown - only actionable statuses */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {Object.entries(STATUS_LABELS).map(([key, label]) => (
+          {[
+            { key: "aguardando_confirmacao", label: "Aguardando Confirmação" },
+            { key: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
+            { key: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
+            { key: "cancelado", label: "Cancelado" },
+          ].map(({ key, label }) => (
             <Badge
               key={key}
               variant={statusFilter === key ? "default" : "outline"}

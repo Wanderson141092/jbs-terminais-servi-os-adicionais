@@ -6,6 +6,8 @@ interface ProcessStageStepperProps {
   comexAprovado?: boolean | null;
   armazemAprovado?: boolean | null;
   aprovacaoAtivada?: boolean;
+  aprovacaoAdministrativo?: boolean;
+  aprovacaoOperacional?: boolean;
   solicitarDeferimento?: boolean;
   deferimentoStatus?: "recebido" | "recusado" | "aguardando" | null;
   compact?: boolean;
@@ -24,6 +26,8 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     comexAprovado,
     armazemAprovado,
     aprovacaoAtivada = false,
+    aprovacaoAdministrativo = false,
+    aprovacaoOperacional = false,
     solicitarDeferimento = false,
     deferimentoStatus,
   } = props;
@@ -42,21 +46,41 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     state: "completed",
   });
 
-  // Stage 2: Aprovação (only if aprovacao_ativada)
-  if (aprovacaoAtivada) {
+  // Stage 2: Aprovação Administrativo (only if enabled)
+  if (aprovacaoAdministrativo) {
     let approvalState: Stage["state"] = "pending";
-    if (isRecusado && (comexAprovado === false || armazemAprovado === false)) {
+    if (isRecusado && comexAprovado === false) {
       approvalState = "error";
-    } else if (comexAprovado === true && armazemAprovado === true) {
+    } else if (comexAprovado === true) {
       approvalState = "completed";
     } else if (status === "aguardando_confirmacao") {
       approvalState = "current";
-    } else if (comexAprovado !== null || armazemAprovado !== null) {
+    } else if (comexAprovado !== null && comexAprovado !== undefined) {
       approvalState = "current";
     }
     stages.push({
-      key: "aprovacao",
-      label: "Aprovação",
+      key: "aprovacao_admin",
+      label: "Aprovação Administrativo",
+      icon: <Shield className="h-4 w-4" />,
+      state: approvalState,
+    });
+  }
+
+  // Stage 2b: Aprovação Operacional (only if enabled)
+  if (aprovacaoOperacional) {
+    let approvalState: Stage["state"] = "pending";
+    if (isRecusado && armazemAprovado === false) {
+      approvalState = "error";
+    } else if (armazemAprovado === true) {
+      approvalState = "completed";
+    } else if (status === "aguardando_confirmacao") {
+      approvalState = "current";
+    } else if (armazemAprovado !== null && armazemAprovado !== undefined) {
+      approvalState = "current";
+    }
+    stages.push({
+      key: "aprovacao_oper",
+      label: "Aprovação Operacional",
       icon: <Shield className="h-4 w-4" />,
       state: approvalState,
     });

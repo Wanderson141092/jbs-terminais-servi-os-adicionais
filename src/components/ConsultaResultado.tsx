@@ -48,6 +48,8 @@ interface DeferimentoDocument {
 interface ServicoConfig {
   tipo_agendamento: string | null;
   aprovacao_ativada?: boolean | null;
+  aprovacao_administrativo?: boolean | null;
+  aprovacao_operacional?: boolean | null;
 }
 
 interface ConsultaResultadoProps {
@@ -61,7 +63,8 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
-  const [aprovacaoAtivada, setAprovacaoAtivada] = useState(false);
+  const [aprovacaoAdministrativo, setAprovacaoAdministrativo] = useState(false);
+  const [aprovacaoOperacional, setAprovacaoOperacional] = useState(false);
 
   const allDocs = deferimentoDocs.filter(d => d.document_type === "deferimento" || !d.document_type);
   const existingDoc = allDocs.length > 0 ? allDocs[0] : null;
@@ -71,11 +74,12 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
       const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
       const { data } = await supabase
         .from("servicos")
-        .select("tipo_agendamento, aprovacao_ativada")
+        .select("tipo_agendamento, aprovacao_ativada, aprovacao_administrativo, aprovacao_operacional")
         .eq("nome", tipoOperacao)
         .maybeSingle();
-      setServicoConfig(data);
-      setAprovacaoAtivada(data?.aprovacao_ativada ?? false);
+      setServicoConfig(data as ServicoConfig | null);
+      setAprovacaoAdministrativo((data as any)?.aprovacao_administrativo ?? false);
+      setAprovacaoOperacional((data as any)?.aprovacao_operacional ?? false);
     };
     fetchServicoConfig();
   }, [solicitacao.tipo_operacao]);
@@ -289,7 +293,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               <CardTitle className="text-lg font-bold text-foreground">
                 Protocolo: {solicitacao.protocolo}
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => downloadProcessoPdf(solicitacao, { includeChecklist: true, aprovacaoAtivada, deferimentoStatus: generalStatus })} title="Baixar PDF">
+              <Button variant="outline" size="sm" onClick={() => downloadProcessoPdf(solicitacao, { includeChecklist: true, aprovacaoAtivada: aprovacaoAdministrativo || aprovacaoOperacional, deferimentoStatus: generalStatus })} title="Baixar PDF">
                 <Download className="h-4 w-4" />
               </Button>
             </div>
@@ -313,7 +317,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               status={solicitacao.status}
               comexAprovado={solicitacao.comex_aprovado ?? undefined}
               armazemAprovado={solicitacao.armazem_aprovado ?? undefined}
-              aprovacaoAtivada={aprovacaoAtivada}
+              aprovacaoAtivada={aprovacaoAdministrativo || aprovacaoOperacional}
+              aprovacaoAdministrativo={aprovacaoAdministrativo}
+              aprovacaoOperacional={aprovacaoOperacional}
               solicitarDeferimento={solicitacao.solicitar_deferimento}
               deferimentoStatus={generalStatus}
             />
@@ -322,7 +328,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
           {/* Checklist */}
           <ProcessChecklist
             solicitacao={solicitacao as any}
-            aprovacaoAtivada={aprovacaoAtivada}
+            aprovacaoAtivada={aprovacaoAdministrativo || aprovacaoOperacional}
+            aprovacaoAdministrativo={aprovacaoAdministrativo}
+            aprovacaoOperacional={aprovacaoOperacional}
             deferimentoStatus={generalStatus}
             compact
             hideInternal

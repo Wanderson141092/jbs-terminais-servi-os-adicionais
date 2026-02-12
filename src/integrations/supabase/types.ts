@@ -823,7 +823,9 @@ export type Database = {
       servicos: {
         Row: {
           anexos_embutidos: boolean | null
+          aprovacao_administrativo: boolean | null
           aprovacao_ativada: boolean | null
+          aprovacao_operacional: boolean | null
           ativo: boolean
           codigo_prefixo: string
           created_at: string
@@ -838,7 +840,9 @@ export type Database = {
         }
         Insert: {
           anexos_embutidos?: boolean | null
+          aprovacao_administrativo?: boolean | null
           aprovacao_ativada?: boolean | null
+          aprovacao_operacional?: boolean | null
           ativo?: boolean
           codigo_prefixo: string
           created_at?: string
@@ -853,7 +857,9 @@ export type Database = {
         }
         Update: {
           anexos_embutidos?: boolean | null
+          aprovacao_administrativo?: boolean | null
           aprovacao_ativada?: boolean | null
+          aprovacao_operacional?: boolean | null
           ativo?: boolean
           codigo_prefixo?: string
           created_at?: string

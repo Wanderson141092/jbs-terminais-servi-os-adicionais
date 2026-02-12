@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatContainerInput, isValidContainer } from "@/lib/containerValidation";
 
 interface ConsultaFormProps {
   onSearch: (tipo: string, valor: string) => void;
@@ -41,22 +42,23 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
     if (valor.trim() && servicoSelecionado) {
       const valorUpper = valor.trim().toUpperCase();
       
-      // Validar formato do contêiner (4ª letra deve ser U)
       const containerRegex = /^[A-Z]{3}U\d{7}$/;
       const protocoloRegex = /^JBS[A-Z]\d{6,}$/;
       const lpcoRegex = /^[A-Z]\d{10}$/;
       
-      if (containerRegex.test(valorUpper) || protocoloRegex.test(valorUpper) || lpcoRegex.test(valorUpper)) {
-        onSearch(servicoSelecionado, valorUpper);
-      } else {
-        // Tenta identificar o formato para dar feedback
-        if (/^[A-Z]{4}\d{7}$/.test(valorUpper) && valorUpper[3] !== 'U') {
-          toast.error("Formato de contêiner inválido: a 4ª letra deve ser 'U'");
+      // Se parece contêiner (começa com letras + dígitos), validar rigorosamente
+      if (/^[A-Z]{3,4}/.test(valorUpper) && !protocoloRegex.test(valorUpper) && !lpcoRegex.test(valorUpper)) {
+        if (!containerRegex.test(valorUpper)) {
+          if (valorUpper.length >= 4 && valorUpper[3] !== 'U') {
+            toast.error("A 4ª letra do contêiner deve ser obrigatoriamente 'U'");
+          } else {
+            toast.error("Formato de contêiner inválido. Use: 3 letras + U + 7 números (ex: ABCU1234567)");
+          }
           return;
         }
-        // Aceita busca mesmo assim
-        onSearch(servicoSelecionado, valorUpper);
       }
+      
+      onSearch(servicoSelecionado, valorUpper);
     }
   };
 
@@ -114,7 +116,15 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         <div className="flex-1">
           <Input
             value={valor}
-            onChange={(e) => setValor(e.target.value.toUpperCase())}
+            onChange={(e) => {
+              const raw = e.target.value.toUpperCase();
+              // Se parece contêiner (começa com letras, não é protocolo JBS), aplicar máscara
+              if (/^[A-Z]{0,4}/.test(raw) && !raw.startsWith("JBS") && !/^[A-Z]\d/.test(raw)) {
+                setValor(formatContainerInput(raw));
+              } else {
+                setValor(raw.slice(0, 15));
+              }
+            }}
             placeholder={getPlaceholder()}
             disabled={!servicoSelecionado}
             maxLength={15}

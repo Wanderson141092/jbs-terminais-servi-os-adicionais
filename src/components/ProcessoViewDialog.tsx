@@ -31,6 +31,8 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [attachments, setAttachments] = useState<any[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [aprovacaoAtivada, setAprovacaoAtivada] = useState(false);
+  const [aprovacaoAdministrativo, setAprovacaoAdministrativo] = useState(false);
+  const [aprovacaoOperacional, setAprovacaoOperacional] = useState(false);
   const [deferimentoStatus, setDeferimentoStatus] = useState<"recebido" | "recusado" | "aguardando" | null>(null);
 
   // Fetch attachments when dialog opens
@@ -66,10 +68,12 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     const tipoOperacao = solicitacao?.tipo_operacao || "Posicionamento";
     const { data } = await supabase
       .from("servicos")
-      .select("aprovacao_ativada")
+      .select("aprovacao_ativada, aprovacao_administrativo, aprovacao_operacional")
       .eq("nome", tipoOperacao)
       .maybeSingle();
     setAprovacaoAtivada(data?.aprovacao_ativada ?? false);
+    setAprovacaoAdministrativo((data as any)?.aprovacao_administrativo ?? false);
+    setAprovacaoOperacional((data as any)?.aprovacao_operacional ?? false);
   };
 
   const handleStatusChange = async () => {
@@ -160,6 +164,8 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                 comexAprovado={solicitacao.comex_aprovado}
                 armazemAprovado={solicitacao.armazem_aprovado}
                 aprovacaoAtivada={aprovacaoAtivada}
+                aprovacaoAdministrativo={aprovacaoAdministrativo}
+                aprovacaoOperacional={aprovacaoOperacional}
                 solicitarDeferimento={solicitacao.solicitar_deferimento}
                 deferimentoStatus={deferimentoStatus}
               />
@@ -169,6 +175,8 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
             <ProcessChecklist
               solicitacao={solicitacao}
               aprovacaoAtivada={aprovacaoAtivada}
+              aprovacaoAdministrativo={aprovacaoAdministrativo}
+              aprovacaoOperacional={aprovacaoOperacional}
               deferimentoStatus={deferimentoStatus}
             />
 

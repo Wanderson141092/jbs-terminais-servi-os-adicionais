@@ -14,6 +14,8 @@ interface ProcessChecklistProps {
     pendencias_selecionadas?: string[] | null;
   };
   aprovacaoAtivada?: boolean;
+  aprovacaoAdministrativo?: boolean;
+  aprovacaoOperacional?: boolean;
   deferimentoStatus?: "recebido" | "recusado" | "aguardando" | null;
   compact?: boolean;
   hideInternal?: boolean;
@@ -26,19 +28,21 @@ interface CheckItem {
 }
 
 const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
-  const { solicitacao: s, aprovacaoAtivada = false, deferimentoStatus, hideInternal = false } = props;
+  const { solicitacao: s, aprovacaoAtivada = false, aprovacaoAdministrativo = false, aprovacaoOperacional = false, deferimentoStatus, hideInternal = false } = props;
   const items: CheckItem[] = [];
 
   // 1. Solicitação registrada
   items.push({ label: "Solicitação registrada", status: "done" });
 
-  // 2. Aprovações (if enabled)
-  if (aprovacaoAtivada) {
+  // 2. Aprovações (individually)
+  if (aprovacaoAdministrativo) {
     items.push({
       label: "Aprovação Administrativo",
       status: s.comex_aprovado === true ? "done" : s.comex_aprovado === false ? "error" : "waiting",
       detail: s.comex_justificativa || undefined,
     });
+  }
+  if (aprovacaoOperacional) {
     items.push({
       label: "Aprovação Operacional",
       status: s.armazem_aprovado === true ? "done" : s.armazem_aprovado === false ? "error" : "waiting",

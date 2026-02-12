@@ -26,6 +26,8 @@ interface Servico {
   deferimento_embutidos: boolean | null;
   status_confirmacao_lancamento?: string[];
   aprovacao_ativada?: boolean;
+  aprovacao_administrativo?: boolean;
+  aprovacao_operacional?: boolean;
   deferimento_status_ativacao?: string[];
 }
 
@@ -51,6 +53,8 @@ const AdminServicos = () => {
     deferimento_embutidos: true,
     status_confirmacao_lancamento: [] as string[],
     aprovacao_ativada: false,
+    aprovacao_administrativo: false,
+    aprovacao_operacional: false,
     deferimento_status_ativacao: [] as string[]
   });
 
@@ -141,7 +145,9 @@ const AdminServicos = () => {
       anexos_embutidos: formData.anexos_embutidos,
       deferimento_embutidos: formData.deferimento_embutidos,
       status_confirmacao_lancamento: formData.status_confirmacao_lancamento,
-      aprovacao_ativada: formData.aprovacao_ativada,
+      aprovacao_ativada: formData.aprovacao_administrativo || formData.aprovacao_operacional,
+      aprovacao_administrativo: formData.aprovacao_administrativo,
+      aprovacao_operacional: formData.aprovacao_operacional,
       deferimento_status_ativacao: formData.deferimento_status_ativacao,
       updated_at: new Date().toISOString()
     };
@@ -167,6 +173,7 @@ const AdminServicos = () => {
       nome: "", codigo_prefixo: "", descricao: "", tipo_agendamento: "none",
       anexos_embutidos: true, deferimento_embutidos: true,
       status_confirmacao_lancamento: [], aprovacao_ativada: false,
+      aprovacao_administrativo: false, aprovacao_operacional: false,
       deferimento_status_ativacao: []
     });
   };
@@ -182,6 +189,8 @@ const AdminServicos = () => {
       deferimento_embutidos: servico.deferimento_embutidos ?? true,
       status_confirmacao_lancamento: servico.status_confirmacao_lancamento || [],
       aprovacao_ativada: servico.aprovacao_ativada ?? false,
+      aprovacao_administrativo: (servico as any).aprovacao_administrativo ?? false,
+      aprovacao_operacional: (servico as any).aprovacao_operacional ?? false,
       deferimento_status_ativacao: servico.deferimento_status_ativacao || []
     });
     setShowDialog(true);
@@ -304,11 +313,17 @@ const AdminServicos = () => {
               <Separator />
               <div>
                 <Label className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" />Aprovação</Label>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-sm">Requer aprovação (Administrativo/Operacional)</span>
-                  <Switch checked={formData.aprovacao_ativada} onCheckedChange={(c) => setFormData({ ...formData, aprovacao_ativada: c })} />
+                <p className="text-xs text-muted-foreground mt-1 mb-3">Ative os setores que precisam aprovar este serviço.</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Aprovação Administrativo</span>
+                    <Switch checked={formData.aprovacao_administrativo} onCheckedChange={(c) => setFormData({ ...formData, aprovacao_administrativo: c })} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Aprovação Operacional</span>
+                    <Switch checked={formData.aprovacao_operacional} onCheckedChange={(c) => setFormData({ ...formData, aprovacao_operacional: c })} />
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Quando ativado, o processo precisa de aprovação dos setores antes de prosseguir.</p>
               </div>
 
               <Separator />

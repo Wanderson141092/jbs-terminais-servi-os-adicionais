@@ -94,8 +94,6 @@ export const generateProcessoPdf = (solicitacao: any, options: PdfOptions = {}):
   const fields = [
     ["Protocolo", solicitacao.protocolo],
     ["Status", STATUS_LABELS[solicitacao.status] || solicitacao.status],
-    ["Cliente", solicitacao.cliente_nome],
-    ["E-mail", solicitacao.cliente_email],
     ["Serviço Adicional", solicitacao.tipo_operacao || "—"],
     ["Categoria", solicitacao.categoria || "—"],
     ["Contêiner", solicitacao.numero_conteiner || "—"],
@@ -123,44 +121,7 @@ export const generateProcessoPdf = (solicitacao: any, options: PdfOptions = {}):
     },
   });
 
-  if (includeChecklist) {
-    const finalY = (doc as any).lastAutoTable?.finalY || 120;
-
-    // Stage Flow
-    const { stages, currentIdx } = getStageFlow(solicitacao, options);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Fluxo do Processo", 14, finalY + 12);
-
-    const stageText = stages.map((s, i) => {
-      if (i < currentIdx) return `✔ ${s}`;
-      if (i === currentIdx) return `▶ ${s} (atual)`;
-      return `○ ${s}`;
-    }).join("  →  ");
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(stageText, 14, finalY + 20, { maxWidth: 180 });
-
-    // Checklist
-    const checkItems = getChecklistItems(solicitacao, options);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Checklist de Verificação", 14, finalY + 32);
-
-    autoTable(doc, {
-      startY: finalY + 36,
-      head: [["Etapa", "Status"]],
-      body: checkItems.map(item => [item.label, item.status]),
-      theme: "striped",
-      headStyles: { fillColor: [0, 100, 50] },
-      styles: { fontSize: 9 },
-      columnStyles: {
-        0: { fontStyle: "bold", cellWidth: 80 },
-        1: { cellWidth: "auto" },
-      },
-    });
-  }
+  // No flow or checklist in PDF - only the status is shown in the data table above
 
   return doc;
 };

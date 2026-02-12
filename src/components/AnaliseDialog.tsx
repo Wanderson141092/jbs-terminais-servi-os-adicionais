@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
+import { Input } from "@/components/ui/input";
 import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +60,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [pendenciaOpcoes, setPendenciaOpcoes] = useState<any[]>([]);
   const [pendenciasSelecionadas, setPendenciasSelecionadas] = useState<string[]>([]);
   const [solicitarDeferimento, setSolicitarDeferimento] = useState(false);
+  const [clienteNome, setClienteNome] = useState("");
+  const [clienteCnpj, setClienteCnpj] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,6 +79,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setServicos(allServicosRes.data || []);
       setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
       setSolicitarDeferimento(solicitacao.solicitar_deferimento || false);
+      setClienteNome(solicitacao.cliente_nome || "");
+      setClienteCnpj(solicitacao.cnpj || "");
       
       // Filter status options by service
       const currentServicoId = servicoRes.data?.id;
@@ -272,6 +277,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         status_vistoria: statusVistoria,
         solicitar_deferimento: solicitarDeferimento,
         pendencias_selecionadas: pendenciasSelecionadas,
+        cliente_nome: clienteNome.trim(),
+        cnpj: clienteCnpj.trim() || null,
         updated_at: new Date().toISOString()
       })
       .eq("id", solicitacao.id);
@@ -451,8 +458,33 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Campos editáveis de cliente */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <User className="h-3 w-3" /> Nome da Empresa
+                </Label>
+                <Input
+                  value={clienteNome}
+                  onChange={(e) => setClienteNome(e.target.value)}
+                  placeholder="Nome da empresa"
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <FileText className="h-3 w-3" /> CNPJ
+                </Label>
+                <Input
+                  value={clienteCnpj}
+                  onChange={(e) => setClienteCnpj(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <InfoItem icon={<User className="h-4 w-4" />} label="Cliente" value={solicitacao.cliente_nome} />
               <InfoItem icon={<Package className="h-4 w-4" />} label="Contêiner" value={solicitacao.numero_conteiner || "—"} />
               <InfoItem icon={<FileText className="h-4 w-4" />} label="LPCO" value={solicitacao.lpco || "—"} />
               <InfoItem icon={<Calendar className="h-4 w-4" />} label={getDateLabel()} value={formatDateValue()} />

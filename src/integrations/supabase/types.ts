@@ -949,6 +949,7 @@ export type Database = {
           categoria: string | null
           cliente_email: string
           cliente_nome: string
+          cnpj: string | null
           comex_aprovado: boolean | null
           comex_data: string | null
           comex_justificativa: string | null
@@ -980,6 +981,7 @@ export type Database = {
           categoria?: string | null
           cliente_email: string
           cliente_nome: string
+          cnpj?: string | null
           comex_aprovado?: boolean | null
           comex_data?: string | null
           comex_justificativa?: string | null
@@ -1011,6 +1013,7 @@ export type Database = {
           categoria?: string | null
           cliente_email?: string
           cliente_nome?: string
+          cnpj?: string | null
           comex_aprovado?: boolean | null
           comex_data?: string | null
           comex_justificativa?: string | null

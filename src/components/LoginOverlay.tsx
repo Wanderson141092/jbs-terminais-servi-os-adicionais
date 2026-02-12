@@ -41,8 +41,7 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
   }, [navigate, onOpenChange]);
 
   const handleMicrosoftLogin = () => {
-    const url = `https://zdradwiudsuzavsexytt.supabase.co/auth/v1/authorize?provider=azure&redirect_to=${encodeURIComponent(window.location.origin + '/interno/dashboard')}&scopes=${encodeURIComponent('openid email profile')}`;
-    window.location.href = url;
+    toast.info("Autenticação Microsoft será disponibilizada em breve.");
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {

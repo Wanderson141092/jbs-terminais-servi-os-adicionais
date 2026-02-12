@@ -9,6 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import StatusBadge from "./StatusBadge";
+import ProcessStageStepper from "./ProcessStageStepper";
+import ProcessChecklist from "./ProcessChecklist";
 import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 
@@ -28,11 +30,14 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [loading, setLoading] = useState(false);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [aprovacaoAtivada, setAprovacaoAtivada] = useState(false);
+  const [deferimentoStatus, setDeferimentoStatus] = useState<"recebido" | "recusado" | "aguardando" | null>(null);
 
   // Fetch attachments when dialog opens
   useEffect(() => {
     if (open && solicitacao) {
       fetchAttachments();
+      fetchServicoConfig();
     }
   }, [open, solicitacao]);
 
@@ -43,6 +48,28 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       .eq("solicitacao_id", solicitacao.id);
     
     setAttachments(data || []);
+
+    // Calculate deferimento status
+    const defDocs = (data || []).filter((d: any) => d.document_type === "deferimento" || !d.document_type);
+    if (defDocs.length === 0) {
+      setDeferimentoStatus(null);
+    } else if (defDocs.some((d: any) => d.status === "recusado")) {
+      setDeferimentoStatus("recusado");
+    } else if (defDocs.every((d: any) => d.status === "aceito")) {
+      setDeferimentoStatus("recebido");
+    } else {
+      setDeferimentoStatus("aguardando");
+    }
+  };
+
+  const fetchServicoConfig = async () => {
+    const tipoOperacao = solicitacao?.tipo_operacao || "Posicionamento";
+    const { data } = await supabase
+      .from("servicos")
+      .select("aprovacao_ativada")
+      .eq("nome", tipoOperacao)
+      .maybeSingle();
+    setAprovacaoAtivada(data?.aprovacao_ativada ?? false);
   };
 
   const handleStatusChange = async () => {
@@ -125,6 +152,28 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
           </DialogHeader>
 
           <div className="space-y-6">
+            {/* Fluxo de Etapas */}
+            <div className="bg-muted/30 rounded-lg p-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-3">Progresso do Processo</p>
+              <ProcessStageStepper
+                status={solicitacao.status}
+                comexAprovado={solicitacao.comex_aprovado}
+                armazemAprovado={solicitacao.armazem_aprovado}
+                aprovacaoAtivada={aprovacaoAtivada}
+                solicitarDeferimento={solicitacao.solicitar_deferimento}
+                deferimentoStatus={deferimentoStatus}
+              />
+            </div>
+
+            {/* Checklist */}
+            <ProcessChecklist
+              solicitacao={solicitacao}
+              aprovacaoAtivada={aprovacaoAtivada}
+              deferimentoStatus={deferimentoStatus}
+            />
+
+            <Separator />
+
             {/* Dados do Processo */}
             <div className="grid grid-cols-2 gap-4">
               <div>

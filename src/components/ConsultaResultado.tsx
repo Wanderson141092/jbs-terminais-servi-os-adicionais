@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import StatusBadge from "./StatusBadge";
+import ProcessStageStepper from "./ProcessStageStepper";
+import ProcessChecklist from "./ProcessChecklist";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatTipoCarga } from "@/lib/tipoCarga";
@@ -29,6 +31,8 @@ interface Solicitacao {
   categoria?: string | null;
   solicitar_deferimento?: boolean;
   pendencias_selecionadas?: string[];
+  comex_aprovado?: boolean | null;
+  armazem_aprovado?: boolean | null;
 }
 
 interface DeferimentoDocument {
@@ -43,6 +47,7 @@ interface DeferimentoDocument {
 
 interface ServicoConfig {
   tipo_agendamento: string | null;
+  aprovacao_ativada?: boolean | null;
 }
 
 interface ConsultaResultadoProps {
@@ -56,6 +61,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
+  const [aprovacaoAtivada, setAprovacaoAtivada] = useState(false);
 
   const allDocs = deferimentoDocs.filter(d => d.document_type === "deferimento" || !d.document_type);
   const existingDoc = allDocs.length > 0 ? allDocs[0] : null;
@@ -65,10 +71,11 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
       const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
       const { data } = await supabase
         .from("servicos")
-        .select("tipo_agendamento")
+        .select("tipo_agendamento, aprovacao_ativada")
         .eq("nome", tipoOperacao)
         .maybeSingle();
       setServicoConfig(data);
+      setAprovacaoAtivada(data?.aprovacao_ativada ?? false);
     };
     fetchServicoConfig();
   }, [solicitacao.tipo_operacao]);
@@ -283,7 +290,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               <CardTitle className="text-lg font-bold text-foreground">
                 Protocolo: {solicitacao.protocolo}
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => downloadProcessoPdf(solicitacao)} title="Baixar PDF">
+              <Button variant="outline" size="sm" onClick={() => downloadProcessoPdf(solicitacao, { includeChecklist: true, aprovacaoAtivada, deferimentoStatus: generalStatus })} title="Baixar PDF">
                 <Download className="h-4 w-4" />
               </Button>
             </div>
@@ -300,6 +307,29 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
           </div>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
+          {/* Fluxo de Etapas */}
+          <div className="bg-muted/30 rounded-lg p-4">
+            <p className="text-xs font-semibold text-muted-foreground mb-3">Progresso do Processo</p>
+            <ProcessStageStepper
+              status={solicitacao.status}
+              comexAprovado={solicitacao.comex_aprovado ?? undefined}
+              armazemAprovado={solicitacao.armazem_aprovado ?? undefined}
+              aprovacaoAtivada={aprovacaoAtivada}
+              solicitarDeferimento={solicitacao.solicitar_deferimento}
+              deferimentoStatus={generalStatus}
+            />
+          </div>
+
+          {/* Checklist */}
+          <ProcessChecklist
+            solicitacao={solicitacao as any}
+            aprovacaoAtivada={aprovacaoAtivada}
+            deferimentoStatus={generalStatus}
+            compact
+          />
+
+          <Separator />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {infoItems.map((item, i) => (
               <InfoItem key={i} icon={item.icon} label={item.label} value={item.value} />

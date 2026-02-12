@@ -606,21 +606,29 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     </div>
                   )}
 
-                  {/* Solicitar Deferimento Toggle */}
-                  <div className="flex items-center justify-between border rounded-md p-3 bg-white">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-600" />
-                      <div className="flex flex-col">
-                        <Label className="cursor-pointer" htmlFor="solicitar-def">Solicitar Deferimento</Label>
-                        <span className="text-[10px] text-muted-foreground">Habilita envio de anexo na pág. externa</span>
+                  {/* Solicitar Deferimento Toggle - apenas para Posicionamento */}
+                  {(() => {
+                    const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
+                    return (
+                      <div className={`flex items-center justify-between border rounded-md p-3 ${isPosicionamento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          <div className="flex flex-col">
+                            <Label className="cursor-pointer" htmlFor="solicitar-def">Solicitar Deferimento</Label>
+                            <span className="text-[10px] text-muted-foreground">
+                              {isPosicionamento ? "Habilita envio de anexo na pág. externa" : "Disponível apenas para Posicionamento"}
+                            </span>
+                          </div>
+                        </div>
+                        <Switch
+                          id="solicitar-def"
+                          checked={solicitarDeferimento}
+                          onCheckedChange={setSolicitarDeferimento}
+                          disabled={!isPosicionamento}
+                        />
                       </div>
-                    </div>
-                    <Switch
-                      id="solicitar-def"
-                      checked={solicitarDeferimento}
-                      onCheckedChange={setSolicitarDeferimento}
-                    />
-                  </div>
+                    );
+                  })()}
 
                   <Button 
                     onClick={handleUpdateStatus} 

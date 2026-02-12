@@ -149,7 +149,7 @@ const Index = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-primary-foreground mb-2">
             Serviços Adicionais
           </h1>
-          <p className="text-primary-foreground/70">Status da solicitação</p>
+          
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

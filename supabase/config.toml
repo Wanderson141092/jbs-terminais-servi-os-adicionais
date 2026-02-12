@@ -1,1 +1,10 @@
 project_id = "zdradwiudsuzavsexytt"
+
+[functions.admin-login]
+verify_jwt = false
+
+[functions.consulta-publica]
+verify_jwt = false
+
+[functions.upload-publico]
+verify_jwt = false

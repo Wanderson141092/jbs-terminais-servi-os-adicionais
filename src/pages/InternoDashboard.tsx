@@ -543,10 +543,10 @@ const InternoDashboard = () => {
             { key: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
             { key: "cancelado", label: "Cancelado" },
           ].map(({ key, label }) => (
-            <Badge
+          <Badge
               key={key}
               variant={statusFilter === key ? "default" : "outline"}
-              className="cursor-pointer hover:bg-muted transition-colors"
+              className="cursor-pointer hover:bg-muted transition-colors px-4 py-2 text-sm"
               onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
             >
               {label}: {dashboardStatusCounts[key] || 0}

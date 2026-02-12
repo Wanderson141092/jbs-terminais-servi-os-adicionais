@@ -71,7 +71,7 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
         : undefined,
   });
 
-  // 4. Deferimento (if requested)
+  // 4. Deferimento (only if showDeferimento is true - controlled by parent with 3 conditions)
   if (s.solicitar_deferimento) {
     items.push({
       label: "Deferimento enviado",

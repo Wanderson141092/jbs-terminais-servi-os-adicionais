@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     const { data: servicoData, error: servicoError } = await supabaseAdmin
       .from("servicos")
-      .select("nome")
+      .select("nome, deferimento_status_ativacao, aprovacao_administrativo, aprovacao_operacional")
       .eq("id", servico_id)
       .eq("ativo", true)
       .maybeSingle();
@@ -139,6 +139,11 @@ Deno.serve(async (req) => {
       JSON.stringify({
         solicitacao: solicitacao,
         deferimento_docs: docsWithSignedUrls,
+        servico_config: {
+          deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],
+          aprovacao_administrativo: servicoData.aprovacao_administrativo ?? false,
+          aprovacao_operacional: servicoData.aprovacao_operacional ?? false,
+        },
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -327,17 +327,17 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               aprovacaoAdministrativo={aprovacaoAdministrativo}
               aprovacaoOperacional={aprovacaoOperacional}
               solicitarDeferimento={showDeferimento}
-              deferimentoStatus={generalStatus}
+              deferimentoStatus={showDeferimento ? generalStatus : null}
             />
           </div>
 
           {/* Checklist */}
           <ProcessChecklist
-            solicitacao={solicitacao as any}
+            solicitacao={{...solicitacao, solicitar_deferimento: showDeferimento} as any}
             aprovacaoAtivada={aprovacaoAdministrativo || aprovacaoOperacional}
             aprovacaoAdministrativo={aprovacaoAdministrativo}
             aprovacaoOperacional={aprovacaoOperacional}
-            deferimentoStatus={generalStatus}
+            deferimentoStatus={showDeferimento ? generalStatus : null}
             compact
             hideInternal
           />

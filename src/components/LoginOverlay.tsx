@@ -41,7 +41,7 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
   }, [navigate, onOpenChange]);
 
   const handleMicrosoftLogin = () => {
-    toast.info("Autenticação Microsoft será disponibilizada em breve.");
+    toast.info("Acesso não permitido.");
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {

@@ -143,78 +143,85 @@ const Index = () => {
     <div className="min-h-screen bg-primary">
       <ExternalHeader />
 
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* Main Container */}
-        <div className="bg-card rounded-2xl shadow-2xl p-8 md:p-10">
-          {/* Header */}
-          <div className="text-center mb-8 pb-6 border-b-4 border-secondary">
-            <h1 className="text-2xl md:text-3xl font-bold text-primary mb-2">
-              Serviços Adicionais
-            </h1>
-            <p className="text-muted-foreground">Status da solicitação</p>
-          </div>
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-primary-foreground mb-2">
+            Serviços Adicionais
+          </h1>
+          <p className="text-primary-foreground/70">Status da solicitação</p>
+        </div>
 
-          {/* Action Buttons - Dynamic */}
-          <div className="grid gap-4 mb-8">
-            {buttons.map((button) => (
-              <Card
-                key={button.id}
-                className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer"
-                onClick={() => handleButtonClick(button)}
-              >
-                <CardHeader className="pb-2 text-center">
-                  <div className="w-14 h-14 rounded-xl bg-secondary/20 flex items-center justify-center mb-3 mx-auto">
-                    {getIcon(button.icone)}
-                  </div>
-                  <CardTitle className="text-xl text-primary font-bold">{button.titulo}</CardTitle>
-                  {button.descricao && (
-                    <p className="text-sm text-muted-foreground mt-1">{button.descricao}</p>
-                  )}
-                </CardHeader>
-              </Card>
-            ))}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Panel - Action Buttons */}
+          <div className="bg-card rounded-2xl shadow-2xl p-6 md:p-8">
+            <h2 className="text-lg font-semibold text-primary mb-4 pb-3 border-b-4 border-secondary">
+              Cadastro / Serviços
+            </h2>
+            <div className="grid gap-4">
+              {buttons.map((button) => (
+                <Card
+                  key={button.id}
+                  className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer"
+                  onClick={() => handleButtonClick(button)}
+                >
+                  <CardHeader className="pb-2 text-center">
+                    <div className="w-14 h-14 rounded-xl bg-secondary/20 flex items-center justify-center mb-3 mx-auto">
+                      {getIcon(button.icone)}
+                    </div>
+                    <CardTitle className="text-xl text-primary font-bold">{button.titulo}</CardTitle>
+                    {button.descricao && (
+                      <p className="text-sm text-muted-foreground mt-1">{button.descricao}</p>
+                    )}
+                  </CardHeader>
+                </Card>
+              ))}
 
-            {buttons.length === 0 && (
-              <Card className="border-2 border-dashed border-muted">
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">
-                    Nenhum botão configurado. Configure em Parâmetros → Página Externa.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Consultation Section */}
-          <div className="space-y-6">
-            <div className="bg-muted/30 rounded-xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Consulta de Status</h2>
-              <ConsultaForm onSearch={handleSearch} isLoading={isLoading} />
+              {buttons.length === 0 && (
+                <Card className="border-2 border-dashed border-muted">
+                  <CardContent className="py-8 text-center">
+                    <p className="text-muted-foreground">
+                      Nenhum botão configurado. Configure em Parâmetros → Página Externa.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
+          </div>
 
-            {/* Results */}
-            {isLoading && (
-              <div className="text-center py-8">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
-                <p className="text-sm text-muted-foreground mt-3">Consultando...</p>
+          {/* Right Panel - Consultation */}
+          <div className="bg-card rounded-2xl shadow-2xl p-6 md:p-8">
+            <h2 className="text-lg font-semibold text-primary mb-4 pb-3 border-b-4 border-secondary">
+              Consulta de Status
+            </h2>
+            <div className="space-y-6">
+              <div className="bg-muted/30 rounded-xl p-6">
+                <ConsultaForm onSearch={handleSearch} isLoading={isLoading} />
               </div>
-            )}
 
-            {!isLoading && resultado && (
-              <ConsultaResultado
-                solicitacao={resultado}
-                deferimentoDocs={deferimentoDocs}
-                onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor)}
-              />
-            )}
+              {isLoading && (
+                <div className="text-center py-8">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+                  <p className="text-sm text-muted-foreground mt-3">Consultando...</p>
+                </div>
+              )}
 
-            {!isLoading && hasSearched && !resultado && (
-              <Card className="border-0 bg-muted/30">
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">Nenhuma solicitação encontrada.</p>
-                </CardContent>
-              </Card>
-            )}
+              {!isLoading && resultado && (
+                <ConsultaResultado
+                  solicitacao={resultado}
+                  deferimentoDocs={deferimentoDocs}
+                  onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor)}
+                />
+              )}
+
+              {!isLoading && hasSearched && !resultado && (
+                <Card className="border-0 bg-muted/30">
+                  <CardContent className="py-12 text-center">
+                    <p className="text-muted-foreground">Nenhuma solicitação encontrada.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
       </main>

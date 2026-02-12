@@ -41,7 +41,6 @@ Deno.serve(async (req) => {
       return errorResponse("Login ou senha incorretos.");
     }
 
-    console.log("DEBUG pass detail:", JSON.stringify({ inputLen: password.length, expectedLen: adminPass.trim().length, inputChars: [...password].map(c => c.charCodeAt(0)), expectedChars: [...adminPass.trim()].map(c => c.charCodeAt(0)) }));
     if (username.toLowerCase().trim() !== adminUsername.toLowerCase().trim() || password !== adminPass.trim()) {
       return errorResponse("Login ou senha incorretos.");
     }

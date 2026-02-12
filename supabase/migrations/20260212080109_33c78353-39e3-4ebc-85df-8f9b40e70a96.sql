@@ -1,0 +1,1 @@
+ALTER TABLE public.solicitacoes ADD COLUMN cnpj TEXT;

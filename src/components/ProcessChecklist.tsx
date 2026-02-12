@@ -16,6 +16,7 @@ interface ProcessChecklistProps {
   aprovacaoAtivada?: boolean;
   deferimentoStatus?: "recebido" | "recusado" | "aguardando" | null;
   compact?: boolean;
+  hideInternal?: boolean;
 }
 
 interface CheckItem {
@@ -25,7 +26,7 @@ interface CheckItem {
 }
 
 const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
-  const { solicitacao: s, aprovacaoAtivada = false, deferimentoStatus } = props;
+  const { solicitacao: s, aprovacaoAtivada = false, deferimentoStatus, hideInternal = false } = props;
   const items: CheckItem[] = [];
 
   // 1. Solicitação registrada
@@ -81,12 +82,16 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
     });
   }
 
-  // 5. Confirmação de lançamento
-  if (vistoriaConcluida || s.lancamento_confirmado !== null) {
-    items.push({
-      label: "Lançamento confirmado",
-      status: s.lancamento_confirmado === true ? "done" : "waiting",
-    });
+  // 5. Confirmação de lançamento (internal only)
+  if (!hideInternal) {
+    const vistoriaStatuses2 = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
+    const vistoriaConcluida2 = vistoriaStatuses2.includes(s.status);
+    if (vistoriaConcluida2 || s.lancamento_confirmado !== null) {
+      items.push({
+        label: "Lançamento confirmado",
+        status: s.lancamento_confirmado === true ? "done" : "waiting",
+      });
+    }
   }
 
   return items;

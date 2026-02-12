@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const tipoOperacao = servicoData.nome;
     const valorUpper = valor.toUpperCase().trim();
 
-    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lancamento_confirmado, lpco, cliente_nome";
+    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento";
 
     let solicitacao = null;
 

@@ -143,18 +143,18 @@ const Index = () => {
     <div className="min-h-screen bg-primary">
       <ExternalHeader />
 
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-6xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-primary-foreground mb-2">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary-foreground mb-2">
             Serviços Adicionais
           </h1>
           
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Left Panel - Action Buttons */}
-          <div className="bg-card rounded-2xl shadow-2xl p-6 md:p-8">
+          <div className="bg-card rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8">
             <h2 className="text-lg font-semibold text-primary mb-4 pb-3 border-b-4 border-secondary">
               Cadastro / Serviços
             </h2>
@@ -190,12 +190,12 @@ const Index = () => {
           </div>
 
           {/* Right Panel - Consultation */}
-          <div className="bg-card rounded-2xl shadow-2xl p-6 md:p-8">
+          <div className="bg-card rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8">
             <h2 className="text-lg font-semibold text-primary mb-4 pb-3 border-b-4 border-secondary">
               Consulta de Status
             </h2>
             <div className="space-y-6">
-              <div className="bg-muted/30 rounded-xl p-6">
+              <div className="bg-muted/30 rounded-xl p-4 sm:p-6">
                 <ConsultaForm onSearch={handleSearch} isLoading={isLoading} />
               </div>
 

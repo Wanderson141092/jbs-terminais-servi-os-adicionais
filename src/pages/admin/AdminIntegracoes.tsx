@@ -21,7 +21,7 @@ interface Integracao {
   nome: string;
   tipo: string;
   url: string | null;
-  api_key: string | null;
+  api_key?: string | null;
   config: Record<string, any>;
   ativo: boolean;
 }
@@ -65,7 +65,7 @@ const AdminIntegracoes = () => {
 
   const fetchData = async () => {
     const [integracoesRes, mappingsRes] = await Promise.all([
-      supabase.from("integracoes").select("*").order("nome"),
+      supabase.from("integracoes").select("id, nome, tipo, url, config, ativo, created_at, updated_at").order("nome"),
       supabase.from("field_mappings").select("*").order("campo_interno")
     ]);
 
@@ -114,16 +114,20 @@ const AdminIntegracoes = () => {
     }
 
     if (editingIntegracao) {
+      const updateData: Record<string, any> = {
+        nome: formData.nome,
+        tipo: formData.tipo,
+        url: formData.url || null,
+        config: configJson,
+        updated_at: new Date().toISOString()
+      };
+      // Only update api_key if a new value was provided
+      if (formData.api_key) {
+        updateData.api_key = formData.api_key;
+      }
       const { error } = await supabase
         .from("integracoes")
-        .update({
-          nome: formData.nome,
-          tipo: formData.tipo,
-          url: formData.url || null,
-          api_key: formData.api_key || null,
-          config: configJson,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq("id", editingIntegracao.id);
 
       if (error) {
@@ -161,7 +165,7 @@ const AdminIntegracoes = () => {
       nome: integracao.nome,
       tipo: integracao.tipo,
       url: integracao.url || "",
-      api_key: integracao.api_key || "",
+      api_key: "",
       config: JSON.stringify(integracao.config, null, 2)
     });
     setShowDialog(true);
@@ -349,8 +353,13 @@ const AdminIntegracoes = () => {
                         type="password"
                         value={formData.api_key}
                         onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-                        placeholder="Chave de API"
+                        placeholder={editingIntegracao ? "Deixe vazio para manter a chave atual" : "Chave de API"}
                       />
+                      {editingIntegracao && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          A chave atual não é exibida por segurança. Preencha apenas para alterar.
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label>Configuração Extra (JSON)</Label>

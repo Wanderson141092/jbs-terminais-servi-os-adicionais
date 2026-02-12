@@ -151,7 +151,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
 
   // Show deferimento if solicitar_deferimento is true on the process
   const showDeferimento = solicitacao.solicitar_deferimento === true;
-  const canUpload = showDeferimento && (allDocs.length === 0 || generalStatus === "recusado");
+  const canUpload = showDeferimento && (allDocs.length === 0 || generalStatus === "recusado") && generalStatus !== "aguardando";
 
   const getDeferimentoStatusSection = () => {
     if (generalStatus === "recebido") {
@@ -175,7 +175,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
           <Alert className="border-red-500 bg-red-50">
             <X className="h-4 w-4 text-red-600" />
             <AlertDescription className="ml-2">
-              <span className="font-semibold text-red-700">Deferimento Recusado</span>
+              <span className="font-semibold text-red-700">Reenviar anexo para nova análise e validação do recebimento</span>
               {recusedDoc?.motivo_recusa && (
                 <p className="text-sm text-red-600 mt-1">
                   <strong>Motivo:</strong> {recusedDoc.motivo_recusa}
@@ -184,9 +184,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
             </AlertDescription>
           </Alert>
           
-          <div className="bg-muted/30 border rounded-lg p-4">
-            <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <Upload className="h-4 w-4 text-primary" />
+          <div className="bg-red-50 border border-red-300 rounded-lg p-4">
+            <p className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
+              <Upload className="h-4 w-4 text-red-600" />
               Reenviar Deferimento
             </p>
             <Input
@@ -194,7 +194,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={handleFileSelect}
               disabled={uploading}
-              className="text-sm"
+              className="text-sm border-red-300 focus:ring-red-500"
             />
           </div>
         </div>
@@ -217,12 +217,12 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
 
     if (canUpload) {
       return (
-        <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-4">
-          <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-            <Upload className="h-4 w-4 text-secondary" />
-            Upload de Deferimento de Liberação
+        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+          <p className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+            <Upload className="h-4 w-4 text-yellow-600" />
+            Aguardando confirmação do deferimento
           </p>
-          <p className="text-xs text-muted-foreground mb-3">
+          <p className="text-xs text-yellow-600 mb-3">
             Envie o deferimento de liberação do órgão (PDF, JPG ou PNG).
           </p>
           <Input
@@ -230,7 +230,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
             accept=".pdf,.jpg,.jpeg,.png"
             onChange={handleFileSelect}
             disabled={uploading}
-            className="text-sm"
+            className="text-sm border-yellow-300 focus:ring-yellow-500"
           />
         </div>
       );

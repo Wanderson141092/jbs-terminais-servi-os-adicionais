@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Check, X, Download, Eye, RefreshCw } from "lucide-react";
+import { FileText, Check, X, Download, Eye, RefreshCw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -56,7 +56,38 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
       .eq("solicitacao_id", solicitacao.id)
       .eq("document_type", "deferimento")
       .order("created_at", { ascending: false });
-    setDocuments(data || []);
+    
+    // Generate signed URLs for private bucket files
+    const docsWithSignedUrls: DeferimentoDoc[] = [];
+    if (data) {
+      for (const doc of data) {
+        let signedUrl = doc.file_url;
+        
+        if (doc.file_url && doc.file_url.includes("/storage/v1/object/public/deferimento/")) {
+          const pathMatch = doc.file_url.split("/storage/v1/object/public/deferimento/");
+          if (pathMatch.length === 2) {
+            const storagePath = decodeURIComponent(pathMatch[1]);
+            const { data: signedData } = await supabase.storage
+              .from("deferimento")
+              .createSignedUrl(storagePath, 3600);
+            if (signedData) {
+              signedUrl = signedData.signedUrl;
+            }
+          }
+        } else if (doc.file_url && !doc.file_url.startsWith("http")) {
+          const { data: signedData } = await supabase.storage
+            .from("deferimento")
+            .createSignedUrl(doc.file_url, 3600);
+          if (signedData) {
+            signedUrl = signedData.signedUrl;
+          }
+        }
+        
+        docsWithSignedUrls.push({ ...doc, file_url: signedUrl });
+      }
+    }
+    
+    setDocuments(docsWithSignedUrls);
   };
 
   const fetchServicoConfig = async () => {
@@ -207,9 +238,11 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
               </p>
 
               {documents.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  Nenhum documento de deferimento enviado.
-                </p>
+                <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 text-center">
+                  <Clock className="h-5 w-5 text-yellow-600 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-yellow-700">Aguardando confirmação do deferimento</p>
+                  <p className="text-xs text-yellow-600 mt-1">Nenhum documento de deferimento enviado pelo cliente.</p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {documents.map((doc) => (

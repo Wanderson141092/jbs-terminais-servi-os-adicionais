@@ -13,7 +13,7 @@ import AdminSetores from "./pages/admin/AdminSetores";
 import AdminServicos from "./pages/admin/AdminServicos";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminIntegracoes from "./pages/admin/AdminIntegracoes";
-import AdminAdmins from "./pages/admin/AdminAdmins";
+
 import AdminHistoricoIntegracoes from "./pages/admin/AdminHistoricoIntegracoes";
 import AdminFormularios from "./pages/admin/AdminFormularios";
 import NotFound from "./pages/NotFound";
@@ -37,7 +37,7 @@ const App = () => (
           <Route path="/interno/admin/servicos" element={<AdminServicos />} />
           <Route path="/interno/admin/logs" element={<AdminLogs />} />
           <Route path="/interno/admin/integracoes" element={<AdminIntegracoes />} />
-          <Route path="/interno/admin/admins" element={<AdminAdmins />} />
+          
           <Route path="/interno/admin/historico-integracoes" element={<AdminHistoricoIntegracoes />} />
           <Route path="/interno/admin/formularios" element={<AdminFormularios />} />
           <Route path="*" element={<NotFound />} />

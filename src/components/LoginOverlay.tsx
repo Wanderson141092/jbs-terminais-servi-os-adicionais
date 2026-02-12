@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -109,17 +109,17 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader className="text-center pb-2">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">
             <img src={jbsLogo} alt="JBS Terminais" className="h-14 w-auto" />
           </div>
-          <SheetTitle className="text-xl font-bold">Acesso Interno</SheetTitle>
+          <DialogTitle className="text-xl font-bold">Acesso Interno</DialogTitle>
           <p className="text-sm text-muted-foreground">
             Painel de Gestão de Posicionamento
           </p>
-        </SheetHeader>
+        </DialogHeader>
 
         <div className="mt-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -223,8 +223,8 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
             </TabsContent>
           </Tabs>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 };
 

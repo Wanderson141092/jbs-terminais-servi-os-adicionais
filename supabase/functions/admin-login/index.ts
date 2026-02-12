@@ -6,68 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// PBKDF2 password verification
-async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const combined = Uint8Array.from(atob(storedHash), c => c.charCodeAt(0));
-  const salt = combined.slice(0, 16);
-  const storedDerivedBits = combined.slice(16);
-
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: salt,
-      iterations: 100000,
-      hash: "SHA-256",
-    },
-    keyMaterial,
-    256
-  );
-  const newHash = new Uint8Array(derivedBits);
-  if (newHash.length !== storedDerivedBits.length) return false;
-
-  let result = 0;
-  for (let i = 0; i < newHash.length; i++) {
-    result |= newHash[i] ^ storedDerivedBits[i];
-  }
-  return result === 0;
-}
-
-// Hash password with PBKDF2
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: salt,
-      iterations: 100000,
-      hash: "SHA-256",
-    },
-    keyMaterial,
-    256
-  );
-  const hashArray = new Uint8Array(derivedBits);
-  const combined = new Uint8Array(salt.length + hashArray.length);
-  combined.set(salt);
-  combined.set(hashArray, salt.length);
-  return "$pbkdf2$" + btoa(String.fromCharCode(...combined));
-}
-
 const errorResponse = (message: string, status = 401) =>
   new Response(
     JSON.stringify({ error: message }),
@@ -80,10 +18,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { cpf, password, username } = await req.json();
+    const { password, username } = await req.json();
 
-    // Input validation
     if (!password || typeof password !== "string" || password.length > 100) {
+      return errorResponse("Credenciais inválidas.", 400);
+    }
+
+    if (!username || typeof username !== "string") {
       return errorResponse("Credenciais inválidas.", 400);
     }
 
@@ -92,117 +33,47 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // CPF-based admin login
-    if (cpf && typeof cpf === "string") {
-      const cpfNumeros = cpf.replace(/\D/g, "");
-      if (cpfNumeros.length !== 11) {
-        return errorResponse("CPF inválido.", 400);
-      }
+    const adminUsername = Deno.env.get("ADMIN_DEFAULT_USERNAME");
+    const adminPass = Deno.env.get("ADMIN_DEFAULT_PASSWORD");
+    const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
 
-      const { data: adminAccount, error: lookupError } = await supabaseAdmin
-        .from("admin_accounts")
-        .select("id, nome, senha_hash, ativo, cpf")
-        .eq("cpf", cpfNumeros)
-        .eq("ativo", true)
-        .maybeSingle();
-
-      if (lookupError || !adminAccount) {
-        return errorResponse("CPF ou senha incorretos.");
-      }
-
-      // Verify password
-      let passwordValid = false;
-      const storedHash = adminAccount.senha_hash;
-
-      if (storedHash.startsWith("$pbkdf2$")) {
-        const hashPart = storedHash.substring(8);
-        passwordValid = await verifyPassword(password, hashPart);
-      } else {
-        passwordValid = storedHash === password;
-        if (passwordValid) {
-          const newHash = await hashPassword(password);
-          await supabaseAdmin
-            .from("admin_accounts")
-            .update({ senha_hash: newHash, updated_at: new Date().toISOString() })
-            .eq("id", adminAccount.id);
-        }
-      }
-
-      if (!passwordValid) {
-        return errorResponse("CPF ou senha incorretos.");
-      }
-
-      // Sign in with admin auth account
-      const adminEmail = "admin@jbsterminais.com.br";
-      const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
-      if (!adminAuthPassword) {
-        // Config missing - return generic auth error, not 500
-        return errorResponse("Login ou senha incorretos.");
-      }
-
-      const session = await ensureAdminSession(supabaseAdmin, adminEmail, adminAuthPassword);
-      if (!session) {
-        return errorResponse("Login ou senha incorretos.");
-      }
-
-      return new Response(
-        JSON.stringify({ session, adminNome: adminAccount.nome }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!adminUsername || !adminPass || !adminAuthPassword) {
+      return errorResponse("Login ou senha incorretos.");
     }
 
-    // Default admin login (username-based)
-    if (username && typeof username === "string") {
-      const adminUsername = Deno.env.get("ADMIN_DEFAULT_USERNAME");
-      const adminPass = Deno.env.get("ADMIN_DEFAULT_PASSWORD");
-      const adminAuthPassword = Deno.env.get("ADMIN_AUTH_PASSWORD");
-
-      // If any config is missing, return auth error (not 500)
-      if (!adminUsername || !adminPass || !adminAuthPassword) {
-        return errorResponse("Login ou senha incorretos.");
-      }
-
-      if (username.toLowerCase().trim() !== adminUsername.toLowerCase().trim() || password !== adminPass.trim()) {
-        return errorResponse("Login ou senha incorretos.");
-      }
-
-      const adminEmail = "admin@jbsterminais.com.br";
-
-      const session = await ensureAdminSession(supabaseAdmin, adminEmail, adminAuthPassword);
-      if (!session) {
-        return errorResponse("Erro ao autenticar. Tente novamente.");
-      }
-
-      return new Response(
-        JSON.stringify({ session, adminNome: "Administrador" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (username.toLowerCase().trim() !== adminUsername.toLowerCase().trim() || password !== adminPass.trim()) {
+      return errorResponse("Login ou senha incorretos.");
     }
 
-    return errorResponse("Credenciais inválidas.");
+    const adminEmail = "admin@jbsterminais.com.br";
+
+    const session = await ensureAdminSession(supabaseAdmin, adminEmail, adminAuthPassword);
+    if (!session) {
+      return errorResponse("Erro ao autenticar. Tente novamente.");
+    }
+
+    return new Response(
+      JSON.stringify({ session, adminNome: "Administrador" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (err) {
     console.error("admin-login error:", err);
     return errorResponse("Erro interno do servidor.", 500);
   }
 });
 
-// Helper: ensure admin user exists, password matches, and return session
 async function ensureAdminSession(supabaseAdmin: any, email: string, password: string) {
-  // Try sign in first
   const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
     email,
     password,
   });
 
   if (!signInError && signInData?.session) {
-    // Ensure profile and role exist
     await setupAdminProfile(supabaseAdmin, signInData.user.id, email);
     return signInData.session;
   }
 
-  // Sign in failed - try to create or fix the user
   try {
-    // Try create
     const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -215,7 +86,6 @@ async function ensureAdminSession(supabaseAdmin: any, email: string, password: s
       return newSignIn?.session || null;
     }
 
-    // User exists but password mismatch - update password
     const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = users?.find((u: any) => u.email === email);
 

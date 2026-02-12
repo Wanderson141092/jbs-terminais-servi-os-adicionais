@@ -401,11 +401,6 @@ const InternoDashboard = () => {
                     Formulários
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/interno/admin/admins")}>
-                    <Users className="h-4 w-4 mr-2" />
-                    Administradores CPF
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("/interno/admin/logs")}>
                     <FileText className="h-4 w-4 mr-2" />
                     Histórico (Logs)

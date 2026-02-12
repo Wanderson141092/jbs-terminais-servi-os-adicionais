@@ -37,6 +37,27 @@ interface Setor {
 // ID do Admin Master - primeiro admin criado no sistema
 const ADMIN_MASTER_EMAIL = "admin@jbsterminais.com.br";
 
+// Hook to check if the current logged-in user is the Admin Master
+const useCurrentUserIsMaster = () => {
+  const [isMaster, setIsMaster] = useState(false);
+  
+  useEffect(() => {
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", session.user.id)
+          .maybeSingle();
+        setIsMaster(profile?.email === ADMIN_MASTER_EMAIL);
+      }
+    };
+    check();
+  }, []);
+  
+  return isMaster;
+};
 const AdminUsuarios = () => {
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -57,6 +78,8 @@ const AdminUsuarios = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [passwordData, setPasswordData] = useState({ senhaAtual: "", novaSenha: "", confirmarSenha: "" });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  
+  const currentUserIsMaster = useCurrentUserIsMaster();
 
   useEffect(() => {
     fetchData();
@@ -552,16 +575,29 @@ const AdminUsuarios = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant={isUserAdmin ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => toggleAdminRole(profile.id)}
-                        disabled={isMaster && isUserAdmin}
-                        title={isMaster && isUserAdmin ? "Admin Master não pode perder permissão" : ""}
-                      >
-                        <Shield className="h-4 w-4 mr-1" />
-                        {isUserAdmin ? "Admin" : "Usuário"}
-                      </Button>
+                      {currentUserIsMaster ? (
+                        <Button
+                          variant={isUserAdmin ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleAdminRole(profile.id)}
+                          disabled={isMaster && isUserAdmin}
+                          title={isMaster && isUserAdmin ? "Admin Master não pode perder permissão" : ""}
+                        >
+                          <Shield className="h-4 w-4 mr-1" />
+                          {isUserAdmin ? "Admin" : "Usuário"}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant={isUserAdmin ? "default" : "outline"}
+                          size="sm"
+                          disabled
+                          title="Apenas o Admin Master pode alterar permissões"
+                          className="cursor-not-allowed opacity-60"
+                        >
+                          <Shield className="h-4 w-4 mr-1" />
+                          {isUserAdmin ? "Admin" : "Usuário"}
+                        </Button>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(profile.created_at).toLocaleDateString("pt-BR")}

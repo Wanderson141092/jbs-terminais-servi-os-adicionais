@@ -50,6 +50,7 @@ interface ServicoConfig {
   aprovacao_ativada?: boolean | null;
   aprovacao_administrativo?: boolean | null;
   aprovacao_operacional?: boolean | null;
+  deferimento_status_ativacao?: string[] | null;
 }
 
 interface ConsultaResultadoProps {
@@ -74,7 +75,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
       const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
       const { data } = await supabase
         .from("servicos")
-        .select("tipo_agendamento, aprovacao_ativada, aprovacao_administrativo, aprovacao_operacional")
+        .select("tipo_agendamento, aprovacao_ativada, aprovacao_administrativo, aprovacao_operacional, deferimento_status_ativacao")
         .eq("nome", tipoOperacao)
         .maybeSingle();
       setServicoConfig(data as ServicoConfig | null);
@@ -153,8 +154,13 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
     setShowConfirmDialog(false);
   };
 
-  // Show deferimento if solicitar_deferimento is true on the process
-  const showDeferimento = solicitacao.solicitar_deferimento === true;
+  // Show deferimento only when ALL 3 conditions are met:
+  // 1. Service = Posicionamento
+  // 2. Current status is in deferimento_status_ativacao list
+  // 3. solicitar_deferimento toggle is active on the process
+  const isServicePosicionamento = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
+  const statusInDeferimentoActivation = servicoConfig?.deferimento_status_ativacao?.includes(solicitacao.status) ?? false;
+  const showDeferimento = isServicePosicionamento && statusInDeferimentoActivation && solicitacao.solicitar_deferimento === true;
   const canUpload = showDeferimento && (allDocs.length === 0 || generalStatus === "recusado") && generalStatus !== "aguardando";
 
   const getDeferimentoStatusSection = () => {
@@ -320,7 +326,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               aprovacaoAtivada={aprovacaoAdministrativo || aprovacaoOperacional}
               aprovacaoAdministrativo={aprovacaoAdministrativo}
               aprovacaoOperacional={aprovacaoOperacional}
-              solicitarDeferimento={solicitacao.solicitar_deferimento}
+              solicitarDeferimento={showDeferimento}
               deferimentoStatus={generalStatus}
             />
           </div>

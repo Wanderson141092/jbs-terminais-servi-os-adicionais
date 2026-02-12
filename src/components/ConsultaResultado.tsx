@@ -273,7 +273,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
   };
 
   const infoItems = [
-    { icon: <User className="h-4 w-4" />, label: "Cliente", value: solicitacao.cliente_nome },
     solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
     solicitacao.numero_conteiner ? { icon: <Package className="h-4 w-4" />, label: "Contêiner", value: solicitacao.numero_conteiner } : null,
     { icon: <Calendar className="h-4 w-4" />, label: getDateLabel(), value: getDateValue() !== "—" ? getDateValue() : null },
@@ -326,6 +325,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
             aprovacaoAtivada={aprovacaoAtivada}
             deferimentoStatus={generalStatus}
             compact
+            hideInternal
           />
 
           <Separator />

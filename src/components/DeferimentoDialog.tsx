@@ -277,6 +277,18 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
                               </Button>
                             </>
                           )}
+                          {doc.status === "aceito" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                              onClick={() => setShowRecusaDialog(doc.id)}
+                              disabled={loading}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Alterar para Recusado
+                            </Button>
+                          )}
                           {!showEmbeddedPreview && (
                             <Button variant="outline" size="sm" onClick={() => setPreviewUrl(doc.file_url)}>
                               <Eye className="h-4 w-4 mr-1" />

@@ -112,13 +112,12 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         </p>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <Input
             value={valor}
             onChange={(e) => {
               const raw = e.target.value.toUpperCase();
-              // Se parece contêiner (começa com letras, não é protocolo JBS), aplicar máscara
               if (/^[A-Z]{0,4}/.test(raw) && !raw.startsWith("JBS") && !/^[A-Z]\d/.test(raw)) {
                 setValor(formatContainerInput(raw));
               } else {
@@ -133,7 +132,7 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         <Button 
           type="submit" 
           disabled={isLoading || !valor.trim() || !servicoSelecionado} 
-          className="jbs-btn-primary px-6"
+          className="jbs-btn-primary px-6 w-full sm:w-auto"
         >
           <Search className="h-4 w-4 mr-2" />
           Consultar

@@ -358,14 +358,14 @@ const InternoDashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="jbs-header sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white rounded-lg p-2">
-              <img src={jbsLogo} alt="JBS Terminais" className="h-8 w-auto" />
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="bg-white rounded-lg p-1.5 sm:p-2 shrink-0">
+              <img src={jbsLogo} alt="JBS Terminais" className="h-6 sm:h-8 w-auto" />
             </div>
-            <div>
-              <h1 className="text-sm font-bold">Serviços Adicionais</h1>
-              <p className="text-xs text-primary-foreground/70">
+            <div className="min-w-0">
+              <h1 className="text-xs sm:text-sm font-bold truncate">Serviços Adicionais</h1>
+              <p className="text-[10px] sm:text-xs text-primary-foreground/70 truncate">
                 {profile?.nome} · {isAdmin ? "Admin" : getSetorLabel(profile?.setor)}
               </p>
             </div>
@@ -448,7 +448,7 @@ const InternoDashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {showNotifications && user && (
           <NotificationsPanel userId={user.id} onClose={() => {
             setShowNotifications(false);
@@ -459,11 +459,11 @@ const InternoDashboard = () => {
         {/* Weekly Dashboard */}
         <Card className="mb-6 border-0 shadow-sm">
           <CardContent className="py-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Visão Semanal</h2>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+              <h2 className="text-base sm:text-lg font-semibold">Visão Semanal</h2>
+              <div className="flex flex-wrap items-center gap-2">
                 <Select value={tipoServicoFilter} onValueChange={setTipoServicoFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[140px] sm:w-[180px] text-xs sm:text-sm">
                     <SelectValue placeholder="Tipo de Serviço" />
                   </SelectTrigger>
                   <SelectContent>
@@ -472,19 +472,19 @@ const InternoDashboard = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium min-w-[100px] text-center">
+                <span className="text-xs sm:text-sm font-medium min-w-[80px] sm:min-w-[100px] text-center">
                   {format(currentWeekStart, "'Semana de' dd/MM", { locale: ptBR })}
                 </span>
-                <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
               {weekDays.map((day, i) => (
                 <div key={i} className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground uppercase">
@@ -500,7 +500,7 @@ const InternoDashboard = () => {
         </Card>
 
         {/* Stats Cards - horizontal row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
           <StatCard 
             label={tipoServicoFilter === "Todos" ? "Serviços" : tipoServicoFilter} 
             value={dashboardFiltered.length} 
@@ -536,7 +536,7 @@ const InternoDashboard = () => {
         )}
 
         {/* Status breakdown - only actionable statuses */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6">
           {[
             { key: "aguardando_confirmacao", label: "Aguardando Confirmação" },
             { key: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
@@ -546,7 +546,7 @@ const InternoDashboard = () => {
           <Badge
               key={key}
               variant={statusFilter === key ? "default" : "outline"}
-              className="cursor-pointer hover:bg-muted transition-colors px-4 py-2 text-sm"
+              className="cursor-pointer hover:bg-muted transition-colors px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm"
               onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
             >
               {label}: {dashboardStatusCounts[key] || 0}
@@ -557,8 +557,8 @@ const InternoDashboard = () => {
         {/* Filters */}
         <Card className="mb-6 border-0 shadow-sm">
           <CardContent className="py-4">
-            <div className="flex flex-wrap gap-3 items-center">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
+              <div className="flex items-center gap-2 flex-1 min-w-[150px] sm:min-w-[200px]">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por protocolo, LPCO, contêiner ou cliente..."
@@ -568,7 +568,7 @@ const InternoDashboard = () => {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[150px] sm:w-[200px] text-xs sm:text-sm">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filtrar por status" />
                 </SelectTrigger>
@@ -580,8 +580,8 @@ const InternoDashboard = () => {
                 </SelectContent>
               </Select>
               <Select value={lancamentoFilter} onValueChange={(v) => setLancamentoFilter(v as any)}>
-                <SelectTrigger className="w-[180px]">
-                  <DollarSign className="h-4 w-4 mr-2" />
+                <SelectTrigger className="w-[140px] sm:w-[180px] text-xs sm:text-sm">
+                  <DollarSign className="h-4 w-4 mr-1 sm:mr-2 shrink-0" />
                   <SelectValue placeholder="Lançamento" />
                 </SelectTrigger>
                 <SelectContent>
@@ -591,8 +591,8 @@ const InternoDashboard = () => {
                 </SelectContent>
               </Select>
               <Select value={aprovacaoFilter} onValueChange={(v) => setAprovacaoFilter(v as any)}>
-                <SelectTrigger className="w-[180px]">
-                  <ShieldCheck className="h-4 w-4 mr-2" />
+                <SelectTrigger className="w-[140px] sm:w-[180px] text-xs sm:text-sm">
+                  <ShieldCheck className="h-4 w-4 mr-1 sm:mr-2 shrink-0" />
                   <SelectValue placeholder="Aprovação" />
                 </SelectTrigger>
                 <SelectContent>
@@ -649,9 +649,9 @@ const InternoDashboard = () => {
         </Card>
 
         {/* Table - removed Vistoria column */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-0">
-            <Table>
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardContent className="p-0 overflow-x-auto">
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow className="bg-primary hover:bg-primary">
                   <TableHead className="text-primary-foreground w-[40px]">
@@ -905,11 +905,11 @@ const InternoDashboard = () => {
 // Helper Components
 const StatCard = ({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color?: string }) => (
   <Card className="border-0 shadow-sm">
-    <CardContent className="py-4 px-5 flex items-center gap-4">
-      <div className={`${color || "text-primary"}`}>{icon}</div>
-      <div>
-        <p className="text-2xl font-bold">{value}</p>
-        <p className="text-xs text-muted-foreground">{label}</p>
+    <CardContent className="py-3 sm:py-4 px-3 sm:px-5 flex items-center gap-3 sm:gap-4">
+      <div className={`${color || "text-primary"} shrink-0`}>{icon}</div>
+      <div className="min-w-0">
+        <p className="text-xl sm:text-2xl font-bold">{value}</p>
+        <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{label}</p>
       </div>
     </CardContent>
   </Card>

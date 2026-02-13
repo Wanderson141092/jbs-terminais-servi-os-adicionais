@@ -82,38 +82,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setClienteNome(solicitacao.cliente_nome || "");
       setClienteCnpj(solicitacao.cnpj || "");
       
-      // Filter status options by service
+      // Filter status options by service - use ONLY options from parametros_campos
       const currentServicoId = servicoRes.data?.id;
       const filteredStatus = (statusRes.data || []).filter((s: any) => 
         s.servico_ids.length === 0 || (currentServicoId && s.servico_ids.includes(currentServicoId))
       );
       
-      // Combine with default options if needed, or replace
-      // For now, let's merge with hardcoded defaults to ensure core flow works
-      const defaultOptions = [
-        { value: "aguardando_confirmacao", label: "Aguardando Confirmação" },
-        { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
-        { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
-        { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
-        { value: "nao_vistoriado", label: "Não Vistoriado" },
-        { value: "recusado", label: "Recusado" },
-        { value: "cancelado", label: "Cancelado" },
-      ];
-      
+      // Map sigla (DB enum value) -> valor (display label)
       const dynamicOptions = filteredStatus.map((s: any) => ({
-        value: s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ã/g, 'a').replace(/ç/g, 'c').replace(/é/g, 'e').replace(/ê/g, 'e'),
+        value: s.sigla || s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
         label: s.valor
       }));
       
-      // Merge unique options
-      const mergedOptions = [...defaultOptions];
-      dynamicOptions.forEach(opt => {
-        if (!mergedOptions.some(m => m.value === opt.value)) {
-          mergedOptions.push(opt);
-        }
-      });
-      
-      setStatusOptions(mergedOptions);
+      setStatusOptions(dynamicOptions);
       setPendenciaOpcoes(pendenciaRes.data || []);
       setPendenciasSelecionadas(solicitacao.pendencias_selecionadas || []);
     };

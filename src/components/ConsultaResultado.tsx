@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,43 +47,42 @@ interface DeferimentoDocument {
 
 interface ServicoConfig {
   tipo_agendamento: string | null;
-  aprovacao_ativada?: boolean | null;
-  aprovacao_administrativo?: boolean | null;
-  aprovacao_operacional?: boolean | null;
-  deferimento_status_ativacao?: string[] | null;
+  aprovacao_administrativo?: boolean;
+  aprovacao_operacional?: boolean;
+  deferimento_status_ativacao?: string[];
+}
+
+interface ObservacaoItem {
+  observacao: string;
+  status_no_momento: string;
+  created_at: string;
+}
+
+interface StatusLabel {
+  sigla: string | null;
+  valor: string;
+  ordem: number;
 }
 
 interface ConsultaResultadoProps {
   solicitacao: Solicitacao;
   deferimentoDocs?: DeferimentoDocument[];
+  servicoConfig?: ServicoConfig | null;
+  observacoes?: ObservacaoItem[];
+  statusLabels?: StatusLabel[];
   onRefresh: () => void;
 }
 
-const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: ConsultaResultadoProps) => {
+const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], onRefresh }: ConsultaResultadoProps) => {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
-  const [aprovacaoAdministrativo, setAprovacaoAdministrativo] = useState(false);
-  const [aprovacaoOperacional, setAprovacaoOperacional] = useState(false);
+
+  const aprovacaoAdministrativo = servicoConfig?.aprovacao_administrativo ?? false;
+  const aprovacaoOperacional = servicoConfig?.aprovacao_operacional ?? false;
 
   const allDocs = deferimentoDocs.filter(d => d.document_type === "deferimento" || !d.document_type);
   const existingDoc = allDocs.length > 0 ? allDocs[0] : null;
-
-  useEffect(() => {
-    const fetchServicoConfig = async () => {
-      const tipoOperacao = solicitacao.tipo_operacao || "Posicionamento";
-      const { data } = await supabase
-        .from("servicos")
-        .select("tipo_agendamento, aprovacao_ativada, aprovacao_administrativo, aprovacao_operacional, deferimento_status_ativacao")
-        .eq("nome", tipoOperacao)
-        .maybeSingle();
-      setServicoConfig(data as ServicoConfig | null);
-      setAprovacaoAdministrativo((data as any)?.aprovacao_administrativo ?? false);
-      setAprovacaoOperacional((data as any)?.aprovacao_operacional ?? false);
-    };
-    fetchServicoConfig();
-  }, [solicitacao.tipo_operacao]);
 
   const getGeneralDeferimentoStatus = (): "recebido" | "recusado" | "aguardando" | null => {
     if (allDocs.length === 0) return null;
@@ -328,6 +327,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               aprovacaoOperacional={aprovacaoOperacional}
               solicitarDeferimento={showDeferimento}
               deferimentoStatus={showDeferimento ? generalStatus : null}
+              statusLabels={statusLabels}
             />
           </div>
 
@@ -349,6 +349,28 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], onRefresh }: Con
               <InfoItem key={i} icon={item.icon} label={item.label} value={item.value} />
             ))}
           </div>
+
+          {/* Observações (do histórico interno, visíveis externamente) */}
+          {observacoes.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                  <FileText className="h-3.5 w-3.5" /> Acompanhamento
+                </p>
+                <div className="space-y-2">
+                  {observacoes.map((obs, i) => (
+                    <div key={i} className="bg-muted/30 rounded-lg p-3 border">
+                      <p className="text-sm">{obs.observacao}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(obs.created_at).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {showDeferimento && (
             <>

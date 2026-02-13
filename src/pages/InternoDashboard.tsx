@@ -22,7 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import StatusBadge, { STATUS_LABELS } from "@/components/StatusBadge";
+import StatusBadge from "@/components/StatusBadge";
+import { useStatusProcesso } from "@/hooks/useStatusProcesso";
 import AnaliseDialog from "@/components/AnaliseDialog";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import ReclassificacaoDialog from "@/components/ReclassificacaoDialog";
@@ -81,6 +82,7 @@ const InternoDashboard = () => {
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   
   const { isAdmin } = useAdminCheck(user?.id || null);
+  const { statusOptions, statusLabels } = useStatusProcesso();
   
   useNotifications(user?.id || null);
 
@@ -532,12 +534,7 @@ const InternoDashboard = () => {
 
         {/* Status breakdown - only actionable statuses */}
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6">
-          {[
-            { key: "aguardando_confirmacao", label: "Aguardando Confirmação" },
-            { key: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
-            { key: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
-            { key: "cancelado", label: "Cancelado" },
-          ].map(({ key, label }) => (
+          {statusOptions.map(({ value: key, label }) => (
           <Badge
               key={key}
               variant={statusFilter === key ? "default" : "outline"}
@@ -569,8 +566,8 @@ const InternoDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
-                  {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  {statusOptions.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

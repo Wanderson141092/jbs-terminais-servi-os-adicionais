@@ -114,7 +114,7 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
                 className="h-10 rounded-lg border-input focus:ring-2 focus:ring-primary/20"
               />
               <p className="text-[11px] text-muted-foreground">
-                E-mail corporativo ou usuário administrativo
+                Informe o seu email ou usuário.
               </p>
             </div>
             <div className="space-y-1.5">

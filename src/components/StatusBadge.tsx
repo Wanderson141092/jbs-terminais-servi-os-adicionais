@@ -1,24 +1,18 @@
-const STATUS_LABELS: Record<string, string> = {
-  aguardando_confirmacao: "Aguardando Confirmação",
-  cancelado: "Cancelado",
-  recusado: "Recusado",
-  confirmado_aguardando_vistoria: "Confirmado - Aguardando Vistoria",
-  vistoria_finalizada: "Vistoria Finalizada",
-  vistoriado_com_pendencia: "Vistoriado com Pendência",
-  nao_vistoriado: "Não Vistoriado",
-};
+import { useStatusProcesso } from "@/hooks/useStatusProcesso";
 
 interface StatusBadgeProps {
   status: string;
 }
 
 const StatusBadge = ({ status }: StatusBadgeProps) => {
+  const { getLabel } = useStatusProcesso();
+
   return (
     <span className={`status-badge status-${status}`}>
-      {STATUS_LABELS[status] || status}
+      {getLabel(status)}
     </span>
   );
 };
 
-export { STATUS_LABELS };
+export { StatusBadge };
 export default StatusBadge;

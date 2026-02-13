@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Download, FileSpreadsheet } from "lucide-react";
-import { useStatusProcesso } from "@/hooks/useStatusProcesso";
+import { STATUS_LABELS } from "@/components/StatusBadge";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import ExcelJS from "exceljs";
 
@@ -39,11 +39,9 @@ const AVAILABLE_COLUMNS = [
 ];
 
 const ExcelExportDialog = ({ open, onClose }: ExcelExportDialogProps) => {
-  const { statusOptions: allStatusOptions, asLabelMap, getLabel } = useStatusProcesso();
-  const STATUS_LABELS = asLabelMap();
   const [servicos, setServicos] = useState<{ id: string; nome: string }[]>([]);
   const [selectedServico, setSelectedServico] = useState("todos");
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(Object.keys(STATUS_LABELS));
   const [dateType, setDateType] = useState<"posicionamento" | "agendamento" | "solicitacao">("posicionamento");
   const [dateMode, setDateMode] = useState<"specific" | "range">("range");
   const [dateFrom, setDateFrom] = useState("");
@@ -56,12 +54,8 @@ const ExcelExportDialog = ({ open, onClose }: ExcelExportDialogProps) => {
     if (open) {
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome")
         .then(({ data }) => setServicos(data || []));
-      // Select all statuses by default
-      if (selectedStatuses.length === 0 && allStatusOptions.length > 0) {
-        setSelectedStatuses(allStatusOptions.map(s => s.sigla));
-      }
     }
-  }, [open, allStatusOptions]);
+  }, [open]);
 
   const toggleStatus = (status: string) => {
     setSelectedStatuses(prev =>

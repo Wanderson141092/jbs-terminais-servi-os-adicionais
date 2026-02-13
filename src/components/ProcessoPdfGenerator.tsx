@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatTipoCarga } from "@/lib/tipoCarga";
-import { fetchStatusProcessoOptions } from "@/hooks/useStatusProcesso";
+import { STATUS_LABELS } from "@/components/StatusBadge";
 
 interface PdfOptions {
   includeChecklist?: boolean;
@@ -73,10 +73,7 @@ const getStageFlow = (solicitacao: any, options: PdfOptions = {}) => {
   return { stages, currentIdx };
 };
 
-export const generateProcessoPdf = async (solicitacao: any, options: PdfOptions = {}): Promise<jsPDF> => {
-  const statusOpts = await fetchStatusProcessoOptions();
-  const statusLabels: Record<string, string> = {};
-  statusOpts.forEach(s => { statusLabels[s.sigla] = s.valor; });
+export const generateProcessoPdf = (solicitacao: any, options: PdfOptions = {}): jsPDF => {
   const doc = new jsPDF();
   const { includeChecklist = true } = options;
   
@@ -96,7 +93,7 @@ export const generateProcessoPdf = async (solicitacao: any, options: PdfOptions 
   // Process data
   const fields = [
     ["Protocolo", solicitacao.protocolo],
-    ["Status", statusLabels[solicitacao.status] || solicitacao.status],
+    ["Status", STATUS_LABELS[solicitacao.status] || solicitacao.status],
     ["Serviço Adicional", solicitacao.tipo_operacao || "—"],
     ["Categoria", solicitacao.categoria || "—"],
     ["Contêiner", solicitacao.numero_conteiner || "—"],
@@ -129,15 +126,15 @@ export const generateProcessoPdf = async (solicitacao: any, options: PdfOptions 
   return doc;
 };
 
-export const downloadProcessoPdf = async (solicitacao: any, options: PdfOptions = {}) => {
-  const doc = await generateProcessoPdf(solicitacao, options);
+export const downloadProcessoPdf = (solicitacao: any, options: PdfOptions = {}) => {
+  const doc = generateProcessoPdf(solicitacao, options);
   doc.save(`${solicitacao.protocolo}.pdf`);
 };
 
 export const downloadBatchPdfs = async (solicitacoes: any[], options: PdfOptions = {}) => {
   const limit = Math.min(solicitacoes.length, 10);
   for (let i = 0; i < limit; i++) {
-    const doc = await generateProcessoPdf(solicitacoes[i], options);
+    const doc = generateProcessoPdf(solicitacoes[i], options);
     doc.save(`${solicitacoes[i].protocolo}.pdf`);
     if (i < limit - 1) await new Promise(r => setTimeout(r, 300));
   }

@@ -17,7 +17,6 @@ import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, 
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 import ParametrosCamposManager from "@/components/ParametrosCamposManager";
-import { useStatusProcesso } from "@/hooks/useStatusProcesso";
 
 interface RegraServico {
   id: string;
@@ -156,12 +155,15 @@ const AdminParametros = () => {
     { key: "email", label: "E-mail" },
   ];
 
-  const { statusOptions: statusProcessoOptions, getLabel: getStatusLabel } = useStatusProcesso();
-
-  const STATUS_GATILHO_OPTIONS = statusProcessoOptions.map(s => ({
-    value: s.sigla,
-    label: s.valor
-  }));
+  const STATUS_GATILHO_OPTIONS = [
+    { value: "aguardando_confirmacao", label: "Aguardando Confirmação" },
+    { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
+    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
+    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
+    { value: "nao_vistoriado", label: "Não Vistoriado" },
+    { value: "recusado", label: "Recusado" },
+    { value: "cancelado", label: "Cancelado" },
+  ];
 
   useEffect(() => {
     fetchAllData();

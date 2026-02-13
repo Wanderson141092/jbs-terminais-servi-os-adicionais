@@ -34,7 +34,6 @@ interface Servico {
 interface StatusProcesso {
   id: string;
   valor: string;
-  sigla: string;
   servico_ids: string[];
 }
 
@@ -81,15 +80,11 @@ const AdminServicos = () => {
   const fetchStatusProcesso = async () => {
     const { data } = await supabase
       .from("parametros_campos")
-      .select("id, valor, sigla, servico_ids")
+      .select("id, valor, servico_ids")
       .eq("grupo", "status_processo")
       .eq("ativo", true)
       .order("ordem");
-    const mapped = (data || []).map((s: any) => ({
-      ...s,
-      sigla: s.sigla || s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    }));
-    setStatusProcesso(mapped as StatusProcesso[]);
+    setStatusProcesso((data || []) as StatusProcesso[]);
   };
 
   const checkHasRecords = async (servicoNome: string): Promise<boolean> => {
@@ -340,10 +335,31 @@ const AdminServicos = () => {
                     <div key={sp.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`def-${sp.id}`}
-                        checked={formData.deferimento_status_ativacao.includes(sp.sigla)}
-                        onCheckedChange={() => toggleDeferimentoStatus(sp.sigla)}
+                        checked={formData.deferimento_status_ativacao.includes(sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ã/g, 'a').replace(/ç/g, 'c').replace(/é/g, 'e').replace(/ê/g, 'e'))}
+                        onCheckedChange={() => {
+                          const key = sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                          toggleDeferimentoStatus(key);
+                        }}
                       />
                       <label htmlFor={`def-${sp.id}`} className="text-sm cursor-pointer">{sp.valor}</label>
+                    </div>
+                  ))}
+                  {/* Fallback hardcoded options */}
+                  {[
+                    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
+                    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
+                    { value: "nao_vistoriado", label: "Não Vistoriado" },
+                  ].filter(opt => !getStatusOptions().some(sp => {
+                    const key = sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    return key === opt.value;
+                  })).map(opt => (
+                    <div key={opt.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`def-fb-${opt.value}`}
+                        checked={formData.deferimento_status_ativacao.includes(opt.value)}
+                        onCheckedChange={() => toggleDeferimentoStatus(opt.value)}
+                      />
+                      <label htmlFor={`def-fb-${opt.value}`} className="text-sm cursor-pointer">{opt.label}</label>
                     </div>
                   ))}
                 </div>

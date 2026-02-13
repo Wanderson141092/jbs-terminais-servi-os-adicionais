@@ -113,8 +113,8 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
         {/* Header com faixa azul institucional */}
         <div className="bg-primary rounded-t-xl px-6 pt-6 pb-5">
           <div className="flex justify-center mb-3">
-            <div className="bg-white rounded-lg p-2.5 shadow-md">
-              <img src={jbsLogo} alt="JBS Terminais" className="h-10 w-auto" />
+          <div className="bg-white rounded-lg p-2.5 shadow-md" style={{ minHeight: 52, minWidth: 52 }}>
+              <img src={jbsLogo} alt="JBS Terminais" className="h-10 w-auto" loading="eager" decoding="sync" />
             </div>
           </div>
           <DialogHeader className="text-center">

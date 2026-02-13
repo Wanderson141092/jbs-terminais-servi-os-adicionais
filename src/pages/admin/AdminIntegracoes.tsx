@@ -324,6 +324,7 @@ const AdminIntegracoes = () => {
                         onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                         placeholder="Ex: Hashdata, SmartNX"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">Nome identificador do sistema externo que será integrado.</p>
                     </div>
                     <div>
                       <Label>Tipo</Label>
@@ -338,6 +339,7 @@ const AdminIntegracoes = () => {
                           <SelectItem value="iframe">iFrame</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground mt-1">Método de comunicação: API (requisições REST), Webhook (notificações automáticas), Formulário (envio de dados) ou iFrame (incorporação de página).</p>
                     </div>
                     <div>
                       <Label>URL</Label>
@@ -346,6 +348,7 @@ const AdminIntegracoes = () => {
                         onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                         placeholder="https://..."
                       />
+                      <p className="text-xs text-muted-foreground mt-1">Endereço (endpoint) do sistema externo para onde os dados serão enviados ou consultados.</p>
                     </div>
                     <div>
                       <Label>API Key (opcional)</Label>
@@ -355,11 +358,11 @@ const AdminIntegracoes = () => {
                         onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
                         placeholder={editingIntegracao ? "Deixe vazio para manter a chave atual" : "Chave de API"}
                       />
-                      {editingIntegracao && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          A chave atual não é exibida por segurança. Preencha apenas para alterar.
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {editingIntegracao
+                          ? "A chave atual não é exibida por segurança. Preencha apenas para alterar."
+                          : "Chave de autenticação fornecida pelo sistema externo para autorizar as requisições."}
+                      </p>
                     </div>
                     <div>
                       <Label>Configuração Extra (JSON)</Label>
@@ -370,6 +373,7 @@ const AdminIntegracoes = () => {
                         rows={4}
                         className="font-mono text-sm"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">Parâmetros adicionais em formato JSON, como headers customizados, timeout ou configurações específicas do sistema.</p>
                     </div>
                   </div>
                   <DialogFooter className="mt-4">
@@ -551,6 +555,7 @@ const AdminIntegracoes = () => {
                       <SelectItem value="outro">Outro</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Sistema externo ao qual este campo pertence. Define de/para qual plataforma o dado será traduzido.</p>
                 </div>
                 <div>
                   <Label>Campo Interno (na página)</Label>
@@ -559,6 +564,7 @@ const AdminIntegracoes = () => {
                     onChange={(e) => setMappingFormData({ ...mappingFormData, campo_interno: e.target.value })}
                     placeholder="Ex: data_solicitacao"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">Identificador do campo usado internamente no sistema. Deve corresponder ao nome técnico do campo na solicitação.</p>
                 </div>
                 <div>
                   <Label>Campo Externo (no sistema)</Label>
@@ -567,6 +573,7 @@ const AdminIntegracoes = () => {
                     onChange={(e) => setMappingFormData({ ...mappingFormData, campo_externo: e.target.value })}
                     placeholder="Ex: DATA_SOLICITACAO"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">Nome do campo correspondente no sistema externo. É o identificador que a API/sistema parceiro utiliza.</p>
                 </div>
                 <div>
                   <Label>Descrição (opcional)</Label>
@@ -575,6 +582,7 @@ const AdminIntegracoes = () => {
                     onChange={(e) => setMappingFormData({ ...mappingFormData, descricao: e.target.value })}
                     placeholder="Descrição do campo"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">Texto livre para documentar a finalidade deste mapeamento, facilitando a manutenção futura.</p>
                 </div>
                 <div>
                   <Label>Integração Vinculada (opcional)</Label>
@@ -592,6 +600,7 @@ const AdminIntegracoes = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Associa este mapeamento a uma integração cadastrada em "Sistemas Externos", permitindo agrupar campos por sistema.</p>
                 </div>
               </div>
               <DialogFooter className="mt-4">

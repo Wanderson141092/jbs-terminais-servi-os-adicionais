@@ -22,7 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import StatusBadge, { STATUS_LABELS } from "@/components/StatusBadge";
+import StatusBadge from "@/components/StatusBadge";
+import { useStatusProcesso } from "@/hooks/useStatusProcesso";
 import AnaliseDialog from "@/components/AnaliseDialog";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import ReclassificacaoDialog from "@/components/ReclassificacaoDialog";
@@ -77,6 +78,8 @@ const InternoDashboard = () => {
   const [userPerfis, setUserPerfis] = useState<string[]>([]);
   const [deferimentoSolicitacao, setDeferimentoSolicitacao] = useState<any>(null);
   const [showExcelExport, setShowExcelExport] = useState(false);
+  const { asLabelMap, statusOptions: allStatusOptions } = useStatusProcesso();
+  const STATUS_LABELS = asLabelMap();
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   

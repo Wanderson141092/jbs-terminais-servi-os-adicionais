@@ -1,6 +1,12 @@
 import { Check, Clock, X, CircleDot, FileCheck, Shield, Eye, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface StatusLabel {
+  sigla: string | null;
+  valor: string;
+  ordem: number;
+}
+
 interface ProcessStageStepperProps {
   status: string;
   comexAprovado?: boolean | null;
@@ -10,6 +16,7 @@ interface ProcessStageStepperProps {
   aprovacaoOperacional?: boolean;
   solicitarDeferimento?: boolean;
   deferimentoStatus?: "recebido" | "recusado" | "aguardando" | null;
+  statusLabels?: StatusLabel[];
   compact?: boolean;
 }
 
@@ -86,42 +93,78 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     });
   }
 
-  // Stage 3: Aguardando Vistoria
-  {
-    let state: Stage["state"] = "pending";
-    if (isTerminal) {
-      state = isRecusado ? "error" : "pending";
-    } else if (status === "confirmado_aguardando_vistoria") {
-      state = "current";
-    } else if (["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
-      state = "completed";
-    } else if (!aprovacaoAtivada && status === "aguardando_confirmacao") {
-      state = "current";
+  // Dynamic stages from status labels (replaces hardcoded "Aguardando Vistoria" and "Vistoria")
+  // Use statusLabels if provided, otherwise fall back to generic stages
+  const dynamicLabels = props.statusLabels || [];
+  
+  if (dynamicLabels.length > 0) {
+    // Build stages from configured status labels
+    const terminalStatuses = ["cancelado", "recusado"];
+    
+    for (const sl of dynamicLabels) {
+      const key = sl.sigla || sl.valor.toLowerCase().replace(/ /g, '_');
+      let state: Stage["state"] = "pending";
+      
+      if (isTerminal && !terminalStatuses.includes(status)) {
+        // Terminal but we passed through this stage
+      }
+      
+      if (status === key) {
+        state = "current";
+      } else {
+        // Check if current status order is past this stage
+        const currentStatusLabel = dynamicLabels.find(s => (s.sigla || s.valor.toLowerCase().replace(/ /g, '_')) === status);
+        if (currentStatusLabel && sl.ordem < currentStatusLabel.ordem) {
+          state = "completed";
+        }
+      }
+      
+      // Special handling for error statuses
+      if (key === "nao_vistoriado" && status === key) state = "error";
+      if (key === "vistoriado_com_pendencia" && status === key) state = "error";
+      
+      stages.push({
+        key,
+        label: sl.valor,
+        icon: <Clock className="h-4 w-4" />,
+        state: isTerminal && state !== "completed" ? "pending" : state,
+      });
     }
-    stages.push({
-      key: "aguardando_vistoria",
-      label: "Aguardando Vistoria",
-      icon: <Clock className="h-4 w-4" />,
-      state: isTerminal && !["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status) ? "pending" : state,
-    });
-  }
+  } else {
+    // Fallback: generic stages without "Vistoria" label
+    {
+      let state: Stage["state"] = "pending";
+      if (isTerminal) {
+        state = isRecusado ? "error" : "pending";
+      } else if (status === "confirmado_aguardando_vistoria") {
+        state = "current";
+      } else if (["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
+        state = "completed";
+      } else if (!aprovacaoAtivada && status === "aguardando_confirmacao") {
+        state = "current";
+      }
+      stages.push({
+        key: "em_andamento",
+        label: "Em Andamento",
+        icon: <Clock className="h-4 w-4" />,
+        state: isTerminal && !["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status) ? "pending" : state,
+      });
+    }
 
-  // Stage 4: Vistoria
-  {
-    let state: Stage["state"] = "pending";
-    if (status === "vistoria_finalizada") {
-      state = "completed";
-    } else if (status === "vistoriado_com_pendencia") {
-      state = "error";
-    } else if (status === "nao_vistoriado") {
-      state = "error";
+    {
+      let state: Stage["state"] = "pending";
+      if (status === "vistoria_finalizada") {
+        state = "completed";
+      } else if (status === "vistoriado_com_pendencia" || status === "nao_vistoriado") {
+        state = "error";
+      }
+      stages.push({
+        key: "concluido",
+        label: "Concluído",
+        icon: <Eye className="h-4 w-4" />,
+        state,
+      });
     }
-    stages.push({
-      key: "vistoria",
-      label: "Vistoria",
-      icon: <Eye className="h-4 w-4" />,
-      state,
-    });
   }
 
   // Stage 5: Deferimento (only if applicable)

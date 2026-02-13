@@ -45,6 +45,9 @@ const isValidUrl = (url: string): boolean => {
 const Index = () => {
   const [resultado, setResultado] = useState<any>(null);
   const [deferimentoDocs, setDeferimentoDocs] = useState<any[]>([]);
+  const [servicoConfig, setServicoConfig] = useState<any>(null);
+  const [observacoes, setObservacoes] = useState<any[]>([]);
+  const [statusLabels, setStatusLabels] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [buttons, setButtons] = useState<ExternalButton[]>([]);
@@ -83,6 +86,9 @@ const Index = () => {
         toast.error("Erro na consulta.");
         setResultado(null);
         setDeferimentoDocs([]);
+        setServicoConfig(null);
+        setObservacoes([]);
+        setStatusLabels([]);
         setIsLoading(false);
         return;
       }
@@ -91,12 +97,18 @@ const Index = () => {
         toast.error(response.error);
         setResultado(null);
         setDeferimentoDocs([]);
+        setServicoConfig(null);
+        setObservacoes([]);
+        setStatusLabels([]);
         setIsLoading(false);
         return;
       }
 
       setResultado(response?.solicitacao || null);
       setDeferimentoDocs(response?.deferimento_docs || []);
+      setServicoConfig(response?.servico_config || null);
+      setObservacoes(response?.observacoes || []);
+      setStatusLabels(response?.status_labels || []);
 
       if (!response?.solicitacao) {
         toast.info("Nenhuma solicitação encontrada para este serviço com os dados informados.");
@@ -105,6 +117,9 @@ const Index = () => {
       toast.error("Erro na consulta: " + err.message);
       setResultado(null);
       setDeferimentoDocs([]);
+      setServicoConfig(null);
+      setObservacoes([]);
+      setStatusLabels([]);
     } finally {
       setIsLoading(false);
     }
@@ -210,6 +225,9 @@ const Index = () => {
                 <ConsultaResultado
                   solicitacao={resultado}
                   deferimentoDocs={deferimentoDocs}
+                  servicoConfig={servicoConfig}
+                  observacoes={observacoes}
+                  statusLabels={statusLabels}
                   onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor)}
                 />
               )}

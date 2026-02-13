@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     const { data: servicoData, error: servicoError } = await supabaseAdmin
       .from("servicos")
-      .select("nome, deferimento_status_ativacao, aprovacao_administrativo, aprovacao_operacional")
+      .select("id, nome, tipo_agendamento, deferimento_status_ativacao, aprovacao_administrativo, aprovacao_operacional")
       .eq("id", servico_id)
       .eq("ativo", true)
       .maybeSingle();
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const tipoOperacao = servicoData.nome;
     const valorUpper = valor.toUpperCase().trim();
 
-    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, pendencias_selecionadas";
+    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, pendencias_selecionadas, observacoes";
 
     let solicitacao = null;
 
@@ -93,12 +93,38 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch deferimento documents
-    const { data: deferimentoDocs } = await supabaseAdmin
-      .from("deferimento_documents")
-      .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
-      .eq("solicitacao_id", solicitacao.id)
-      .order("created_at", { ascending: false });
+    // Fetch deferimento documents, observations, and status labels in parallel
+    const [deferimentoRes, observacoesRes, statusLabelsRes] = await Promise.all([
+      supabaseAdmin
+        .from("deferimento_documents")
+        .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
+        .eq("solicitacao_id", solicitacao.id)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("observacao_historico")
+        .select("observacao, status_no_momento, created_at")
+        .eq("solicitacao_id", solicitacao.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabaseAdmin
+        .from("parametros_campos")
+        .select("valor, sigla, ordem, servico_ids")
+        .eq("grupo", "status_processo")
+        .eq("ativo", true)
+        .order("ordem"),
+    ]);
+
+    const deferimentoDocs = deferimentoRes.data;
+    const observacoes = observacoesRes.data || [];
+
+    // Filter status labels by service
+    const statusLabels = (statusLabelsRes.data || [])
+      .filter((s: any) => s.servico_ids.length === 0 || s.servico_ids.includes(servicoData.id))
+      .map((s: any) => ({
+        sigla: s.sigla,
+        valor: s.valor,
+        ordem: s.ordem,
+      }));
 
     // Generate signed URLs for each document (private buckets)
     const docsWithSignedUrls = [];
@@ -106,16 +132,14 @@ Deno.serve(async (req) => {
       for (const doc of deferimentoDocs) {
         let signedUrl = doc.file_url;
         
-        // If file_url is a storage path (not a full URL), generate signed URL
         if (doc.file_url && !doc.file_url.startsWith("http")) {
           const { data: signedData } = await supabaseAdmin.storage
             .from("deferimento")
-            .createSignedUrl(doc.file_url, 3600); // 1 hour
+            .createSignedUrl(doc.file_url, 3600);
           if (signedData) {
             signedUrl = signedData.signedUrl;
           }
         } else if (doc.file_url && doc.file_url.includes("/storage/v1/object/public/deferimento/")) {
-          // Legacy: extract path from old public URL and generate signed URL
           const pathMatch = doc.file_url.split("/storage/v1/object/public/deferimento/");
           if (pathMatch.length === 2) {
             const storagePath = decodeURIComponent(pathMatch[1]);
@@ -135,11 +159,18 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Sanitize: remove client name for privacy
+    const sanitizedSolicitacao = { ...solicitacao };
+    delete sanitizedSolicitacao.cliente_nome;
+
     return new Response(
       JSON.stringify({
-        solicitacao: solicitacao,
+        solicitacao: sanitizedSolicitacao,
         deferimento_docs: docsWithSignedUrls,
+        observacoes,
+        status_labels: statusLabels,
         servico_config: {
+          tipo_agendamento: servicoData.tipo_agendamento,
           deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],
           aprovacao_administrativo: servicoData.aprovacao_administrativo ?? false,
           aprovacao_operacional: servicoData.aprovacao_operacional ?? false,

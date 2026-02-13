@@ -155,19 +155,27 @@ const AdminParametros = () => {
     { key: "email", label: "E-mail" },
   ];
 
-  const STATUS_GATILHO_OPTIONS = [
-    { value: "aguardando_confirmacao", label: "Aguardando Confirmação" },
-    { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
-    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
-    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
-    { value: "nao_vistoriado", label: "Não Vistoriado" },
-    { value: "recusado", label: "Recusado" },
-    { value: "cancelado", label: "Cancelado" },
-  ];
+  // Dynamic status options from parametros_campos
+  const [statusProcessoOptions, setStatusProcessoOptions] = useState<{ value: string; label: string }[]>([]);
 
   useEffect(() => {
     fetchAllData();
+    fetchStatusProcesso();
   }, []);
+
+  const fetchStatusProcesso = async () => {
+    const { data } = await supabase
+      .from("parametros_campos")
+      .select("valor, sigla")
+      .eq("grupo", "status_processo")
+      .eq("ativo", true)
+      .order("ordem");
+    const options = (data || []).map((s: any) => ({
+      value: s.sigla || s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+      label: s.valor
+    }));
+    setStatusProcessoOptions(options);
+  };
 
   const fetchAllData = async () => {
     const [regrasRes, servicosRes, protocolRes, pageConfigRes, routingRes, fieldMappingsRes, setorEmailsRes, notifRulesRes] = await Promise.all([
@@ -840,7 +848,7 @@ const AdminParametros = () => {
                   {notifRules.map(rule => (
                     <TableRow key={rule.id} className={!rule.ativo ? "opacity-50" : ""}>
                       <TableCell className="font-medium">{getServicoNome(rule.servico_id)}</TableCell>
-                      <TableCell>{STATUS_GATILHO_OPTIONS.find(s => s.value === rule.status_gatilho)?.label || rule.status_gatilho}</TableCell>
+                      <TableCell>{statusProcessoOptions.find(s => s.value === rule.status_gatilho)?.label || rule.status_gatilho}</TableCell>
                       <TableCell className="text-xs">
                         {rule.setor_ids && rule.setor_ids.length > 0 ? (
                           rule.setor_ids.map(id => getSetorLabel(id)).join(", ")
@@ -1249,7 +1257,7 @@ const AdminParametros = () => {
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_GATILHO_OPTIONS.map(s => (
+                  {statusProcessoOptions.map(s => (
                     <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                   ))}
                 </SelectContent>

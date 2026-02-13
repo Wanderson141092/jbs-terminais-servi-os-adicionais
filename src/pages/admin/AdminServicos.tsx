@@ -34,6 +34,7 @@ interface Servico {
 interface StatusProcesso {
   id: string;
   valor: string;
+  sigla: string | null;
   servico_ids: string[];
 }
 
@@ -80,7 +81,7 @@ const AdminServicos = () => {
   const fetchStatusProcesso = async () => {
     const { data } = await supabase
       .from("parametros_campos")
-      .select("id, valor, servico_ids")
+      .select("id, valor, sigla, servico_ids")
       .eq("grupo", "status_processo")
       .eq("ativo", true)
       .order("ordem");
@@ -331,37 +332,19 @@ const AdminServicos = () => {
                 <Label className="flex items-center gap-2"><FileText className="h-4 w-4" />Deferimento - Status de Ativação</Label>
                 <p className="text-xs text-muted-foreground mb-2">Selecione quais status ativam o botão de Deferimento na página interna</p>
                 <div className="space-y-2 border rounded-md p-3 max-h-48 overflow-auto">
-                  {getStatusOptions().map(sp => (
-                    <div key={sp.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`def-${sp.id}`}
-                        checked={formData.deferimento_status_ativacao.includes(sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ã/g, 'a').replace(/ç/g, 'c').replace(/é/g, 'e').replace(/ê/g, 'e'))}
-                        onCheckedChange={() => {
-                          const key = sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                          toggleDeferimentoStatus(key);
-                        }}
-                      />
-                      <label htmlFor={`def-${sp.id}`} className="text-sm cursor-pointer">{sp.valor}</label>
-                    </div>
-                  ))}
-                  {/* Fallback hardcoded options */}
-                  {[
-                    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
-                    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
-                    { value: "nao_vistoriado", label: "Não Vistoriado" },
-                  ].filter(opt => !getStatusOptions().some(sp => {
-                    const key = sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    return key === opt.value;
-                  })).map(opt => (
-                    <div key={opt.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`def-fb-${opt.value}`}
-                        checked={formData.deferimento_status_ativacao.includes(opt.value)}
-                        onCheckedChange={() => toggleDeferimentoStatus(opt.value)}
-                      />
-                      <label htmlFor={`def-fb-${opt.value}`} className="text-sm cursor-pointer">{opt.label}</label>
-                    </div>
-                  ))}
+                  {getStatusOptions().map(sp => {
+                    const key = sp.sigla || sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    return (
+                      <div key={sp.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`def-${sp.id}`}
+                          checked={formData.deferimento_status_ativacao.includes(key)}
+                          onCheckedChange={() => toggleDeferimentoStatus(key)}
+                        />
+                        <label htmlFor={`def-${sp.id}`} className="text-sm cursor-pointer">{sp.valor}</label>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -370,21 +353,19 @@ const AdminServicos = () => {
                 <Label>Status para Confirmação de Lançamento ($)</Label>
                 <p className="text-xs text-muted-foreground mb-2">Selecione os status que acionam o alerta de lançamento pendente</p>
                 <div className="space-y-2">
-                  {[
-                    { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
-                    { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
-                    { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
-                    { value: "nao_vistoriado", label: "Não Vistoriado" },
-                  ].map(opt => (
-                    <div key={opt.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`lanc-${opt.value}`}
-                        checked={formData.status_confirmacao_lancamento.includes(opt.value)}
-                        onCheckedChange={() => toggleStatusConfirmacao(opt.value)}
-                      />
-                      <Label htmlFor={`lanc-${opt.value}`} className="cursor-pointer text-sm">{opt.label}</Label>
-                    </div>
-                  ))}
+                  {getStatusOptions().map(sp => {
+                    const key = sp.sigla || sp.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    return (
+                      <div key={sp.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`lanc-${sp.id}`}
+                          checked={formData.status_confirmacao_lancamento.includes(key)}
+                          onCheckedChange={() => toggleStatusConfirmacao(key)}
+                        />
+                        <Label htmlFor={`lanc-${sp.id}`} className="cursor-pointer text-sm">{sp.valor}</Label>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

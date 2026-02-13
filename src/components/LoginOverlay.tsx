@@ -110,7 +110,7 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="usuario@jbsterminais.com.br ou Admin_Master"
+                placeholder="E-mail corporativo ou usuário administrativo"
                 className="h-10 rounded-lg border-input focus:ring-2 focus:ring-primary/20"
               />
               <p className="text-[11px] text-muted-foreground">

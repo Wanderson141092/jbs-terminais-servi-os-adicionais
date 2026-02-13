@@ -1,4 +1,7 @@
-const STATUS_LABELS: Record<string, string> = {
+import { useStatusProcesso } from "@/hooks/useStatusProcesso";
+
+// Fallback labels for initial render before dynamic data loads
+const FALLBACK_LABELS: Record<string, string> = {
   aguardando_confirmacao: "Aguardando Confirmação",
   cancelado: "Cancelado",
   recusado: "Recusado",
@@ -13,12 +16,18 @@ interface StatusBadgeProps {
 }
 
 const StatusBadge = ({ status }: StatusBadgeProps) => {
+  const { statusLabels } = useStatusProcesso();
+
+  // Dynamic labels take priority, fallback for instant render
+  const label = statusLabels[status] || FALLBACK_LABELS[status] || status;
+
   return (
     <span className={`status-badge status-${status}`}>
-      {STATUS_LABELS[status] || status}
+      {label}
     </span>
   );
 };
 
-export { STATUS_LABELS };
+// Export dynamic hook for consumers that need the labels map
+export { FALLBACK_LABELS as STATUS_LABELS };
 export default StatusBadge;

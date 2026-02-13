@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useStatusProcesso } from "@/hooks/useStatusProcesso";
 
 interface BatchStatusDialogProps {
   solicitacoes: any[];
@@ -26,13 +27,6 @@ interface BatchStatusDialogProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-const STATUS_OPTIONS = [
-  { value: "confirmado_aguardando_vistoria", label: "Confirmado - Aguardando Vistoria" },
-  { value: "vistoria_finalizada", label: "Vistoria Finalizada" },
-  { value: "vistoriado_com_pendencia", label: "Vistoriado com Pendência" },
-  { value: "nao_vistoriado", label: "Não Vistoriado" },
-];
 
 const BatchStatusDialog = ({
   solicitacoes,
@@ -42,6 +36,7 @@ const BatchStatusDialog = ({
 }: BatchStatusDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("");
+  const { statusOptions, getStatusLabel } = useStatusProcesso();
 
   const handleBatchUpdate = async () => {
     if (!selectedStatus) {
@@ -53,13 +48,13 @@ const BatchStatusDialog = ({
 
     try {
       for (const sol of solicitacoes) {
-        const statusVistoria = STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label || "";
+        const statusLabel = getStatusLabel(selectedStatus);
         
         const { error } = await supabase
           .from("solicitacoes")
           .update({
             status: selectedStatus as any,
-            status_vistoria: statusVistoria,
+            status_vistoria: statusLabel,
           })
           .eq("id", sol.id);
 
@@ -73,7 +68,7 @@ const BatchStatusDialog = ({
           solicitacao_id: sol.id,
           usuario_id: userId,
           acao: "atualizacao_status_lote",
-          detalhes: `Status atualizado em lote para: ${statusVistoria}`,
+          detalhes: `Status atualizado em lote para: ${statusLabel}`,
         });
       }
 
@@ -121,7 +116,7 @@ const BatchStatusDialog = ({
                 <SelectValue placeholder="Selecione o novo status" />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map((opt) => (
+                {statusOptions.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
                   </SelectItem>

@@ -243,12 +243,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setLoading(true);
     
     let statusVistoria: string | null = null;
-    if (selectedStatus === "vistoria_finalizada") {
-      statusVistoria = "Vistoria Finalizada";
-    } else if (selectedStatus === "vistoriado_com_pendencia") {
-      statusVistoria = "Vistoriado com Pendência";
-    } else if (selectedStatus === "nao_vistoriado") {
-      statusVistoria = "Não Vistoriado";
+    const matchedLabel = statusOptions.find(s => s.value === selectedStatus)?.label;
+    if (matchedLabel) {
+      statusVistoria = matchedLabel;
     }
     
     const { error } = await supabase

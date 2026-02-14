@@ -153,17 +153,21 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
         }
       }
 
-      // Save form response
-      const { error: respError } = await supabase.from("formulario_respostas").insert({
-        formulario_id: formularioId,
-        respostas,
-        arquivos: uploadedFiles.length > 0 ? uploadedFiles : null,
+      // Submit via edge function (bypasses RLS for public users)
+      const { data: submitResponse, error: submitError } = await supabase.functions.invoke("enviar-formulario", {
+        body: {
+          formulario_id: formularioId,
+          respostas,
+          arquivos: uploadedFiles.length > 0 ? uploadedFiles : null,
+          mapeamentos,
+        },
       });
 
-      if (respError) throw respError;
+      if (submitError || submitResponse?.error) {
+        throw new Error(submitResponse?.error || submitError?.message || "Erro ao enviar formulário");
+      }
 
-      // Generate protocol and create solicitacao
-      const generatedProtocolo = await createSolicitacao(respostas, uploadedFiles);
+      const generatedProtocolo = submitResponse.protocolo;
 
       setProtocolo(generatedProtocolo);
       setSubmitted(true);
@@ -232,18 +236,24 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
       toast.error("Informe um e-mail válido");
       return;
     }
-    // Update the solicitacao with the notification email
-    const { error } = await supabase.from("solicitacoes")
-      .update({ cliente_email: emailParaNotificacao })
-      .eq("protocolo", protocolo);
-
-    if (error) {
+    try {
+      const { data, error } = await supabase.functions.invoke("enviar-formulario", {
+        body: {
+          action: "save_email",
+          protocolo,
+          email: emailParaNotificacao,
+        },
+      });
+      if (error || data?.error) {
+        toast.error("Erro ao salvar e-mail");
+        return;
+      }
+      setEmailSalvo(true);
+      toast.success("E-mail registrado! Você receberá atualizações sobre sua solicitação.");
+      onSuccess?.();
+    } catch {
       toast.error("Erro ao salvar e-mail");
-      return;
     }
-    setEmailSalvo(true);
-    toast.success("E-mail registrado! Você receberá atualizações sobre sua solicitação.");
-    onSuccess?.();
   };
 
   if (loading) return <FormRendererLoading />;

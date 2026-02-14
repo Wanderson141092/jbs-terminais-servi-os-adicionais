@@ -23,6 +23,7 @@ import { Plus, Save, Edit, Trash2, Search, Lock, Unlock, Image, FileText } from 
 export const QUESTION_TYPES = [
   { value: "texto", label: "Texto Curto" },
   { value: "texto_longo", label: "Texto Longo" },
+  { value: "texto_formatado", label: "Texto Formatado (Máscara)" },
   { value: "numero", label: "Número" },
   { value: "email", label: "E-mail" },
   { value: "data", label: "Data" },
@@ -64,6 +65,11 @@ const BancoPerguntasManager = () => {
     info_conteudo: "",
     info_exigir_aceite: false,
     info_texto_aceite: "Li e aceito os termos acima",
+    // texto_formatado config
+    formato_mascara: "",
+    formato_min_chars: "",
+    formato_max_chars: "",
+    formato_transformar_maiusculo: true,
   });
 
   useEffect(() => {
@@ -95,6 +101,10 @@ const BancoPerguntasManager = () => {
         info_conteudo: config?.conteudo || "",
         info_exigir_aceite: config?.exigir_aceite || false,
         info_texto_aceite: config?.texto_aceite || "Li e aceito os termos acima",
+        formato_mascara: config?.mascara || "",
+        formato_min_chars: config?.min_chars?.toString() || "",
+        formato_max_chars: config?.max_chars?.toString() || "",
+        formato_transformar_maiusculo: config?.transformar_maiusculo ?? true,
       });
     } else {
       setEditing(null);
@@ -108,6 +118,10 @@ const BancoPerguntasManager = () => {
         info_conteudo: "",
         info_exigir_aceite: false,
         info_texto_aceite: "Li e aceito os termos acima",
+        formato_mascara: "",
+        formato_min_chars: "",
+        formato_max_chars: "",
+        formato_transformar_maiusculo: true,
       });
     }
     setShowDialog(true);
@@ -130,6 +144,12 @@ const BancoPerguntasManager = () => {
       config.conteudo = formData.info_conteudo;
       config.exigir_aceite = formData.info_exigir_aceite;
       config.texto_aceite = formData.info_texto_aceite;
+    }
+    if (formData.tipo === "texto_formatado") {
+      config.mascara = formData.formato_mascara;
+      config.min_chars = formData.formato_min_chars ? parseInt(formData.formato_min_chars) : null;
+      config.max_chars = formData.formato_max_chars ? parseInt(formData.formato_max_chars) : null;
+      config.transformar_maiusculo = formData.formato_transformar_maiusculo;
     }
 
     const payload = {
@@ -310,6 +330,57 @@ const BancoPerguntasManager = () => {
               <div>
                 <Label>Opções (uma por linha)</Label>
                 <Textarea value={formData.opcoes} onChange={(e) => setFormData({ ...formData, opcoes: e.target.value })} placeholder={"Opção 1\nOpção 2\nOpção 3"} rows={4} />
+              </div>
+            )}
+
+            {formData.tipo === "texto_formatado" && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold">Configuração de Formato</Label>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Use "A" para indicar posição que aceita apenas letras, "9" para apenas números, 
+                  e qualquer outra letra será aceita como caractere literal fixo (ex: U em contêiner). 
+                  Caracteres especiais (-, /, .) são separadores fixos.
+                </p>
+                <div>
+                  <Label>Máscara de formato</Label>
+                  <Input
+                    value={formData.formato_mascara}
+                    onChange={(e) => setFormData({ ...formData, formato_mascara: e.target.value.toUpperCase() })}
+                    placeholder="Ex: AAAU9999999 ou 999.999.999-99"
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Exemplos: Contêiner = AAAU9999999 | CPF = 999.999.999-99 | CNPJ = 99.999.999/9999-99
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Mín. caracteres</Label>
+                    <Input
+                      type="number"
+                      value={formData.formato_min_chars}
+                      onChange={(e) => setFormData({ ...formData, formato_min_chars: e.target.value })}
+                      placeholder="Ex: 11"
+                    />
+                  </div>
+                  <div>
+                    <Label>Máx. caracteres</Label>
+                    <Input
+                      type="number"
+                      value={formData.formato_max_chars}
+                      onChange={(e) => setFormData({ ...formData, formato_max_chars: e.target.value })}
+                      placeholder="Ex: 14"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={formData.formato_transformar_maiusculo}
+                    onCheckedChange={(c) => setFormData({ ...formData, formato_transformar_maiusculo: !!c })}
+                    id="formato_maiusculo"
+                  />
+                  <Label htmlFor="formato_maiusculo" className="cursor-pointer">Transformar em maiúsculo automaticamente</Label>
+                </div>
               </div>
             )}
 

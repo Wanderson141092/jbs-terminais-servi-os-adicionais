@@ -136,6 +136,7 @@ export type Database = {
           servico_ids: string[]
           tipo: string
           updated_at: string
+          visivel_externo: boolean
         }
         Insert: {
           ativo?: boolean
@@ -148,6 +149,7 @@ export type Database = {
           servico_ids?: string[]
           tipo?: string
           updated_at?: string
+          visivel_externo?: boolean
         }
         Update: {
           ativo?: boolean
@@ -160,6 +162,7 @@ export type Database = {
           servico_ids?: string[]
           tipo?: string
           updated_at?: string
+          visivel_externo?: boolean
         }
         Relationships: []
       }
@@ -204,6 +207,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      campos_fixos_config: {
+        Row: {
+          ativo: boolean
+          campo_chave: string
+          campo_label: string
+          created_at: string
+          id: string
+          obrigatorio_analise: boolean
+          ordem: number
+          servico_ids: string[]
+          updated_at: string
+          visivel_analise: boolean
+          visivel_externo: boolean
+        }
+        Insert: {
+          ativo?: boolean
+          campo_chave: string
+          campo_label: string
+          created_at?: string
+          id?: string
+          obrigatorio_analise?: boolean
+          ordem?: number
+          servico_ids?: string[]
+          updated_at?: string
+          visivel_analise?: boolean
+          visivel_externo?: boolean
+        }
+        Update: {
+          ativo?: boolean
+          campo_chave?: string
+          campo_label?: string
+          created_at?: string
+          id?: string
+          obrigatorio_analise?: boolean
+          ordem?: number
+          servico_ids?: string[]
+          updated_at?: string
+          visivel_analise?: boolean
+          visivel_externo?: boolean
+        }
+        Relationships: []
       }
       deferimento_documents: {
         Row: {
@@ -269,6 +314,45 @@ export type Database = {
           id?: string
           servico_ids?: string[]
           titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      estilos_formulario: {
+        Row: {
+          ativo: boolean
+          chave: string
+          config: Json
+          created_at: string
+          descricao: string | null
+          features: string[]
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          config?: Json
+          created_at?: string
+          descricao?: string | null
+          features?: string[]
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          config?: Json
+          created_at?: string
+          descricao?: string | null
+          features?: string[]
+          id?: string
+          nome?: string
+          ordem?: number
           updated_at?: string
         }
         Relationships: []

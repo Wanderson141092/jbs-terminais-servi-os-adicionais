@@ -61,8 +61,9 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
         body: { username: trimmed, password },
       });
       const data = response.data;
+      const errorMsg = data?.error || response.error?.message;
       if (response.error || data?.error) {
-        toast.error(data?.error || "Login ou senha incorretos.");
+        toast.error("Usuário ou senha incorretos.");
         setLoading(false);
         return;
       }

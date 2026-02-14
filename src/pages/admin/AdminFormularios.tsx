@@ -24,7 +24,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import BancoPerguntasManager from "@/components/admin/BancoPerguntasManager";
 import FormularioBuilder from "@/components/admin/FormularioBuilder";
-import CamposFixosManager from "@/components/admin/CamposFixosManager";
 import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";
 import EstilosFormularioManager from "@/components/admin/EstilosFormularioManager";
 
@@ -223,10 +222,6 @@ const AdminFormularios = () => {
             <Database className="h-4 w-4" />
             Perguntas
           </TabsTrigger>
-          <TabsTrigger value="campos_fixos" className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
-            Campos Fixos
-          </TabsTrigger>
           <TabsTrigger value="campos_dinamicos" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Campos Dinâmicos
@@ -304,10 +299,6 @@ const AdminFormularios = () => {
 
         <TabsContent value="perguntas">
           <BancoPerguntasManager />
-        </TabsContent>
-
-        <TabsContent value="campos_fixos">
-          <CamposFixosManager />
         </TabsContent>
 
         <TabsContent value="campos_dinamicos">

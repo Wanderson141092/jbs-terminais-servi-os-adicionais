@@ -124,6 +124,87 @@ export type Database = {
         }
         Relationships: []
       }
+      campos_analise: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          obrigatorio: boolean
+          opcoes: Json | null
+          ordem: number
+          servico_ids: string[]
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          obrigatorio?: boolean
+          opcoes?: Json | null
+          ordem?: number
+          servico_ids?: string[]
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          obrigatorio?: boolean
+          opcoes?: Json | null
+          ordem?: number
+          servico_ids?: string[]
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      campos_analise_valores: {
+        Row: {
+          campo_id: string
+          created_at: string
+          id: string
+          solicitacao_id: string
+          updated_at: string
+          valor: string | null
+        }
+        Insert: {
+          campo_id: string
+          created_at?: string
+          id?: string
+          solicitacao_id: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Update: {
+          campo_id?: string
+          created_at?: string
+          id?: string
+          solicitacao_id?: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campos_analise_valores_campo_id_fkey"
+            columns: ["campo_id"]
+            isOneToOne: false
+            referencedRelation: "campos_analise"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campos_analise_valores_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deferimento_documents: {
         Row: {
           created_at: string
@@ -787,6 +868,7 @@ export type Database = {
       }
       pergunta_mapeamento: {
         Row: {
+          campo_analise_id: string | null
           campo_solicitacao: string
           created_at: string
           formulario_id: string
@@ -794,6 +876,7 @@ export type Database = {
           pergunta_id: string
         }
         Insert: {
+          campo_analise_id?: string | null
           campo_solicitacao: string
           created_at?: string
           formulario_id: string
@@ -801,6 +884,7 @@ export type Database = {
           pergunta_id: string
         }
         Update: {
+          campo_analise_id?: string | null
           campo_solicitacao?: string
           created_at?: string
           formulario_id?: string
@@ -808,6 +892,13 @@ export type Database = {
           pergunta_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pergunta_mapeamento_campo_analise_id_fkey"
+            columns: ["campo_analise_id"]
+            isOneToOne: false
+            referencedRelation: "campos_analise"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pergunta_mapeamento_formulario_id_fkey"
             columns: ["formulario_id"]

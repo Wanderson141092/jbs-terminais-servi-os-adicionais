@@ -1,0 +1,384 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Plus, Save, Edit, Trash2, Search, Lock, Unlock, Image, FileText } from "lucide-react";
+
+export const QUESTION_TYPES = [
+  { value: "texto", label: "Texto Curto" },
+  { value: "texto_longo", label: "Texto Longo" },
+  { value: "numero", label: "Número" },
+  { value: "email", label: "E-mail" },
+  { value: "data", label: "Data" },
+  { value: "data_hora", label: "Data e Hora" },
+  { value: "select", label: "Seleção Única" },
+  { value: "multipla_escolha", label: "Múltipla Escolha" },
+  { value: "checkbox", label: "Checkbox" },
+  { value: "arquivo", label: "Upload de Arquivo" },
+  { value: "informativo", label: "Bloco Informativo" },
+];
+
+export interface BancoPergunta {
+  id: string;
+  tipo: string;
+  rotulo: string;
+  descricao: string | null;
+  placeholder: string | null;
+  opcoes: unknown;
+  config: unknown;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+const BancoPerguntasManager = () => {
+  const [perguntas, setPerguntas] = useState<BancoPergunta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<BancoPergunta | null>(null);
+  const [formData, setFormData] = useState({
+    tipo: "texto",
+    rotulo: "",
+    descricao: "",
+    placeholder: "",
+    opcoes: "",
+    // informativo config
+    info_tipo: "texto" as "texto" | "imagem",
+    info_conteudo: "",
+    info_exigir_aceite: false,
+    info_texto_aceite: "Li e aceito os termos acima",
+  });
+
+  useEffect(() => {
+    fetchPerguntas();
+  }, []);
+
+  const fetchPerguntas = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("banco_perguntas")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setPerguntas((data as BancoPergunta[]) || []);
+    setLoading(false);
+  };
+
+  const openDialog = (pergunta?: BancoPergunta) => {
+    if (pergunta) {
+      setEditing(pergunta);
+      const opcoesArr = pergunta.opcoes as { value: string; label: string }[] | null;
+      const config = pergunta.config as Record<string, any> | null;
+      setFormData({
+        tipo: pergunta.tipo,
+        rotulo: pergunta.rotulo,
+        descricao: pergunta.descricao || "",
+        placeholder: pergunta.placeholder || "",
+        opcoes: opcoesArr?.map((o) => o.label).join("\n") || "",
+        info_tipo: config?.conteudo_tipo || "texto",
+        info_conteudo: config?.conteudo || "",
+        info_exigir_aceite: config?.exigir_aceite || false,
+        info_texto_aceite: config?.texto_aceite || "Li e aceito os termos acima",
+      });
+    } else {
+      setEditing(null);
+      setFormData({
+        tipo: "texto",
+        rotulo: "",
+        descricao: "",
+        placeholder: "",
+        opcoes: "",
+        info_tipo: "texto",
+        info_conteudo: "",
+        info_exigir_aceite: false,
+        info_texto_aceite: "Li e aceito os termos acima",
+      });
+    }
+    setShowDialog(true);
+  };
+
+  const save = async () => {
+    if (!formData.rotulo.trim()) {
+      toast.error("Rótulo é obrigatório");
+      return;
+    }
+
+    const opcoes = formData.opcoes
+      .split("\n")
+      .filter((o) => o.trim())
+      .map((o, i) => ({ value: `opt_${i}`, label: o.trim() }));
+
+    const config: Record<string, any> = {};
+    if (formData.tipo === "informativo") {
+      config.conteudo_tipo = formData.info_tipo;
+      config.conteudo = formData.info_conteudo;
+      config.exigir_aceite = formData.info_exigir_aceite;
+      config.texto_aceite = formData.info_texto_aceite;
+    }
+
+    const payload = {
+      tipo: formData.tipo,
+      rotulo: formData.rotulo,
+      descricao: formData.descricao || null,
+      placeholder: formData.placeholder || null,
+      opcoes: opcoes.length > 0 ? opcoes : null,
+      config: Object.keys(config).length > 0 ? config : {},
+    };
+
+    if (editing) {
+      const { error } = await supabase
+        .from("banco_perguntas")
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq("id", editing.id);
+      if (error) { toast.error("Erro ao atualizar pergunta"); return; }
+      toast.success("Pergunta atualizada!");
+    } else {
+      const { error } = await supabase.from("banco_perguntas").insert(payload);
+      if (error) { toast.error("Erro ao criar pergunta"); return; }
+      toast.success("Pergunta criada!");
+    }
+
+    setShowDialog(false);
+    fetchPerguntas();
+  };
+
+  const toggleAtivo = async (p: BancoPergunta) => {
+    const { error } = await supabase
+      .from("banco_perguntas")
+      .update({ ativo: !p.ativo, updated_at: new Date().toISOString() })
+      .eq("id", p.id);
+    if (error) { toast.error("Erro ao alterar status"); return; }
+    toast.success(p.ativo ? "Pergunta bloqueada" : "Pergunta desbloqueada");
+    fetchPerguntas();
+  };
+
+  const deletePergunta = async (p: BancoPergunta) => {
+    const { error } = await supabase.from("banco_perguntas").delete().eq("id", p.id);
+    if (error) {
+      if (error.message.includes("foreign key")) {
+        toast.error("Esta pergunta está vinculada a formulários. Remova os vínculos primeiro.");
+      } else {
+        toast.error("Erro ao excluir pergunta");
+      }
+      return;
+    }
+    toast.success("Pergunta excluída!");
+    fetchPerguntas();
+  };
+
+  const filtered = perguntas.filter(
+    (p) =>
+      p.rotulo.toLowerCase().includes(search.toLowerCase()) ||
+      p.tipo.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-12"><p className="text-muted-foreground">Carregando...</p></div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar pergunta..."
+            className="pl-9"
+          />
+        </div>
+        <Button onClick={() => openDialog()}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Pergunta
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Banco de Perguntas ({filtered.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Rótulo</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((p) => (
+                <TableRow key={p.id} className={!p.ativo ? "opacity-50" : ""}>
+                  <TableCell className="font-medium">{p.rotulo}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">
+                      {QUESTION_TYPES.find((t) => t.value === p.tipo)?.label || p.tipo}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                    {p.descricao || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={p.ativo ? "default" : "secondary"} className="text-xs">
+                      {p.ativo ? "Ativa" : "Bloqueada"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openDialog(p)} title="Editar">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => toggleAtivo(p)} title={p.ativo ? "Bloquear" : "Desbloquear"}>
+                        {p.ativo ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deletePergunta(p)} className="text-destructive hover:text-destructive" title="Excluir">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    Nenhuma pergunta encontrada
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Dialog de Criação/Edição */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar Pergunta" : "Nova Pergunta"}</DialogTitle>
+            <DialogDescription>Configure os detalhes da pergunta que poderá ser usada em múltiplos formulários</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Pergunta</Label>
+                <Select value={formData.tipo} onValueChange={(v) => setFormData({ ...formData, tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {QUESTION_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Rótulo / Título</Label>
+                <Input value={formData.rotulo} onChange={(e) => setFormData({ ...formData, rotulo: e.target.value })} placeholder="Ex: Nome completo" />
+              </div>
+            </div>
+            <div>
+              <Label>Descrição (texto de ajuda para o admin)</Label>
+              <Input value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} placeholder="Descrição interna" />
+            </div>
+
+            {formData.tipo !== "informativo" && formData.tipo !== "checkbox" && (
+              <div>
+                <Label>Placeholder</Label>
+                <Input value={formData.placeholder} onChange={(e) => setFormData({ ...formData, placeholder: e.target.value })} placeholder="Texto de ajuda no campo" />
+              </div>
+            )}
+
+            {(formData.tipo === "select" || formData.tipo === "multipla_escolha") && (
+              <div>
+                <Label>Opções (uma por linha)</Label>
+                <Textarea value={formData.opcoes} onChange={(e) => setFormData({ ...formData, opcoes: e.target.value })} placeholder={"Opção 1\nOpção 2\nOpção 3"} rows={4} />
+              </div>
+            )}
+
+            {formData.tipo === "informativo" && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold">Configuração do Bloco Informativo</Label>
+                <div>
+                  <Label>Tipo de Conteúdo</Label>
+                  <Select value={formData.info_tipo} onValueChange={(v) => setFormData({ ...formData, info_tipo: v as "texto" | "imagem" })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="texto">
+                        <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Texto</span>
+                      </SelectItem>
+                      <SelectItem value="imagem">
+                        <span className="flex items-center gap-2"><Image className="h-4 w-4" /> Imagem (URL)</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>{formData.info_tipo === "texto" ? "Conteúdo do Texto" : "URL da Imagem"}</Label>
+                  {formData.info_tipo === "texto" ? (
+                    <Textarea
+                      value={formData.info_conteudo}
+                      onChange={(e) => setFormData({ ...formData, info_conteudo: e.target.value })}
+                      placeholder="Digite o texto informativo que será exibido..."
+                      rows={5}
+                    />
+                  ) : (
+                    <Input
+                      value={formData.info_conteudo}
+                      onChange={(e) => setFormData({ ...formData, info_conteudo: e.target.value })}
+                      placeholder="https://exemplo.com/imagem.png"
+                    />
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={formData.info_exigir_aceite}
+                    onCheckedChange={(c) => setFormData({ ...formData, info_exigir_aceite: !!c })}
+                    id="info_aceite"
+                  />
+                  <Label htmlFor="info_aceite" className="cursor-pointer">Exigir campo de aceite</Label>
+                </div>
+                {formData.info_exigir_aceite && (
+                  <div>
+                    <Label>Texto do Aceite</Label>
+                    <Input
+                      value={formData.info_texto_aceite}
+                      onChange={(e) => setFormData({ ...formData, info_texto_aceite: e.target.value })}
+                      placeholder="Li e aceito os termos acima"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
+            <Button onClick={save}>
+              <Save className="h-4 w-4 mr-2" />
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default BancoPerguntasManager;

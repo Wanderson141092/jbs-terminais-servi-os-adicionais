@@ -85,6 +85,45 @@ export type Database = {
           },
         ]
       }
+      banco_perguntas: {
+        Row: {
+          ativo: boolean
+          config: Json | null
+          created_at: string
+          descricao: string | null
+          id: string
+          opcoes: Json | null
+          placeholder: string | null
+          rotulo: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          config?: Json | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          opcoes?: Json | null
+          placeholder?: string | null
+          rotulo: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          config?: Json | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          opcoes?: Json | null
+          placeholder?: string | null
+          rotulo?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deferimento_documents: {
         Row: {
           created_at: string
@@ -290,6 +329,48 @@ export type Database = {
             columns: ["formulario_id"]
             isOneToOne: false
             referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formulario_perguntas: {
+        Row: {
+          created_at: string
+          formulario_id: string
+          id: string
+          obrigatorio: boolean
+          ordem: number
+          pergunta_id: string
+        }
+        Insert: {
+          created_at?: string
+          formulario_id: string
+          id?: string
+          obrigatorio?: boolean
+          ordem?: number
+          pergunta_id: string
+        }
+        Update: {
+          created_at?: string
+          formulario_id?: string
+          id?: string
+          obrigatorio?: boolean
+          ordem?: number
+          pergunta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formulario_perguntas_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_perguntas_pergunta_id_fkey"
+            columns: ["pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "banco_perguntas"
             referencedColumns: ["id"]
           },
         ]
@@ -651,6 +732,97 @@ export type Database = {
           valor?: string
         }
         Relationships: []
+      }
+      pergunta_condicionais: {
+        Row: {
+          created_at: string
+          formulario_id: string
+          id: string
+          operador: string
+          pergunta_id: string
+          pergunta_pai_id: string
+          valor_gatilho: string
+        }
+        Insert: {
+          created_at?: string
+          formulario_id: string
+          id?: string
+          operador?: string
+          pergunta_id: string
+          pergunta_pai_id: string
+          valor_gatilho: string
+        }
+        Update: {
+          created_at?: string
+          formulario_id?: string
+          id?: string
+          operador?: string
+          pergunta_id?: string
+          pergunta_pai_id?: string
+          valor_gatilho?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pergunta_condicionais_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pergunta_condicionais_pergunta_id_fkey"
+            columns: ["pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "banco_perguntas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pergunta_condicionais_pergunta_pai_id_fkey"
+            columns: ["pergunta_pai_id"]
+            isOneToOne: false
+            referencedRelation: "banco_perguntas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pergunta_mapeamento: {
+        Row: {
+          campo_solicitacao: string
+          created_at: string
+          formulario_id: string
+          id: string
+          pergunta_id: string
+        }
+        Insert: {
+          campo_solicitacao: string
+          created_at?: string
+          formulario_id: string
+          id?: string
+          pergunta_id: string
+        }
+        Update: {
+          campo_solicitacao?: string
+          created_at?: string
+          formulario_id?: string
+          id?: string
+          pergunta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pergunta_mapeamento_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pergunta_mapeamento_pergunta_id_fkey"
+            columns: ["pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "banco_perguntas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

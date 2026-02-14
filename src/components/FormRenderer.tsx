@@ -1,127 +1,119 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Send, CheckCircle } from "lucide-react";
-
-interface Campo {
-  id: string;
-  tipo: string;
-  rotulo: string;
-  placeholder: string | null;
-  obrigatorio: boolean;
-  opcoes: unknown;
-  condicao: unknown;
-  ordem: number;
-}
-
-interface Formulario {
-  id: string;
-  titulo: string;
-  descricao: string | null;
-  estilo?: string;
-}
-
-interface FormRendererProps {
-  formularioId: string;
-  onSuccess?: () => void;
-}
+import FormRendererLoading from "@/components/form-renderer/FormRendererLoading";
+import FormRendererNotFound from "@/components/form-renderer/FormRendererNotFound";
+import FormRendererSuccess from "@/components/form-renderer/FormRendererSuccess";
+import FormRendererBody from "@/components/form-renderer/FormRendererBody";
+import FormRendererHeader from "@/components/form-renderer/FormRendererHeader";
+import { getStyleClasses } from "@/components/form-renderer/formStyles";
+import type { Formulario, PerguntaComCondicao, FormRendererProps } from "@/components/form-renderer/types";
 
 const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
   const [formulario, setFormulario] = useState<Formulario | null>(null);
-  const [campos, setCampos] = useState<Campo[]>([]);
+  const [perguntas, setPerguntas] = useState<PerguntaComCondicao[]>([]);
   const [values, setValues] = useState<Record<string, any>>({});
   const [files, setFiles] = useState<Record<string, { file: File; url: string }>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [protocolo, setProtocolo] = useState("");
+  const [emailParaNotificacao, setEmailParaNotificacao] = useState("");
+  const [emailSalvo, setEmailSalvo] = useState(false);
+  const [mapeamentos, setMapeamentos] = useState<{ pergunta_id: string; campo_solicitacao: string }[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [formRes, camposRes] = await Promise.all([
+
+      // Fetch form, questions (from banco_perguntas via formulario_perguntas), and conditionals
+      const [formRes, perguntasRes, condicionaisRes, mapeamentoRes] = await Promise.all([
         supabase.from("formularios").select("id, titulo, descricao, estilo").eq("id", formularioId).single(),
-        supabase.from("formulario_campos").select("*").eq("formulario_id", formularioId).order("ordem"),
+        supabase.from("formulario_perguntas")
+          .select("id, ordem, obrigatorio, pergunta_id, banco_perguntas(id, tipo, rotulo, placeholder, opcoes, config, descricao)")
+          .eq("formulario_id", formularioId)
+          .order("ordem"),
+        supabase.from("pergunta_condicionais")
+          .select("*")
+          .eq("formulario_id", formularioId),
+        supabase.from("pergunta_mapeamento")
+          .select("pergunta_id, campo_solicitacao")
+          .eq("formulario_id", formularioId),
       ]);
 
       if (formRes.data) setFormulario(formRes.data);
-      if (camposRes.data) setCampos(camposRes.data);
+      if (mapeamentoRes.data) setMapeamentos(mapeamentoRes.data);
+
+      // Build questions with conditional info
+      if (perguntasRes.data) {
+        const condicionais = condicionaisRes.data || [];
+        const built: PerguntaComCondicao[] = perguntasRes.data
+          .filter((fp: any) => fp.banco_perguntas)
+          .map((fp: any) => {
+            const bp = fp.banco_perguntas;
+            // Find if this question has a parent condition
+            const condicao = condicionais.find((c: any) => c.pergunta_id === bp.id);
+            return {
+              id: bp.id,
+              tipo: bp.tipo,
+              rotulo: bp.rotulo,
+              placeholder: bp.placeholder,
+              opcoes: bp.opcoes,
+              config: bp.config,
+              descricao: bp.descricao,
+              obrigatorio: fp.obrigatorio,
+              ordem: fp.ordem,
+              condicao: condicao ? {
+                pergunta_pai_id: condicao.pergunta_pai_id,
+                valor_gatilho: condicao.valor_gatilho,
+                operador: condicao.operador,
+              } : null,
+            };
+          });
+        setPerguntas(built);
+      }
+
       setLoading(false);
     };
     fetchData();
   }, [formularioId]);
 
-  const isFieldVisible = (campo: Campo) => {
-    if (!campo.condicao) return true;
-    const condicao = campo.condicao as { campo_id: string; operador: string; valor: string } | null;
-    if (!condicao) return true;
-    const { campo_id, operador, valor } = condicao;
-    const currentValue = values[campo_id];
+  const isFieldVisible = (pergunta: PerguntaComCondicao): boolean => {
+    if (!pergunta.condicao) return true;
+    const { pergunta_pai_id, valor_gatilho, operador } = pergunta.condicao;
+    const currentValue = values[pergunta_pai_id];
+    if (currentValue === undefined || currentValue === null || currentValue === "") return false;
 
     switch (operador) {
       case "igual":
-        return currentValue === valor;
+        return String(currentValue) === valor_gatilho;
       case "diferente":
-        return currentValue !== valor;
+        return String(currentValue) !== valor_gatilho;
       case "contem":
-        return String(currentValue || "").toLowerCase().includes(valor.toLowerCase());
+        return String(currentValue).toLowerCase().includes(valor_gatilho.toLowerCase());
       default:
         return true;
     }
   };
 
-  const handleValueChange = (campoId: string, value: any) => {
-    setValues((prev) => ({ ...prev, [campoId]: value }));
-  };
-
-  const handleFileChange = (campoId: string, file: File | null) => {
-    if (file) {
-      setFiles((prev) => ({
-        ...prev,
-        [campoId]: { file, url: URL.createObjectURL(file) },
-      }));
-    } else {
-      setFiles((prev) => {
-        const newFiles = { ...prev };
-        delete newFiles[campoId];
-        return newFiles;
-      });
-    }
-  };
-
-  const handleMultipleChoiceChange = (campoId: string, optValue: string, checked: boolean) => {
-    setValues((prev) => {
-      const current = prev[campoId] || [];
-      if (checked) {
-        return { ...prev, [campoId]: [...current, optValue] };
-      } else {
-        return { ...prev, [campoId]: current.filter((v: string) => v !== optValue) };
-      }
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields
-    const visibleCampos = campos.filter(isFieldVisible);
-    for (const campo of visibleCampos) {
-      if (campo.obrigatorio) {
-        const val = campo.tipo === "arquivo" ? files[campo.id] : values[campo.id];
+    const visiblePerguntas = perguntas.filter(isFieldVisible);
+    for (const p of visiblePerguntas) {
+      if (p.obrigatorio) {
+        // Skip informativo type from validation (unless it has aceite)
+        if (p.tipo === "informativo") {
+          const cfg = p.config as any;
+          if (cfg?.aceite && !values[p.id]) {
+            toast.error(`Você precisa aceitar o campo "${p.rotulo}"`);
+            return;
+          }
+          continue;
+        }
+        const val = p.tipo === "anexo" ? files[p.id] : values[p.id];
         if (!val || (Array.isArray(val) && val.length === 0)) {
-          toast.error(`O campo "${campo.rotulo}" é obrigatório`);
+          toast.error(`O campo "${p.rotulo}" é obrigatório`);
           return;
         }
       }
@@ -130,9 +122,9 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     setSubmitting(true);
 
     try {
-      // Upload files via edge function (secure, no direct storage access)
-      const uploadedFiles: { campo_id: string; file_url: string; file_name: string }[] = [];
-      for (const [campoId, fileData] of Object.entries(files)) {
+      // Upload files
+      const uploadedFiles: { pergunta_id: string; file_url: string; file_name: string }[] = [];
+      for (const [perguntaId, fileData] of Object.entries(files)) {
         const formData = new FormData();
         formData.append("file", fileData.file);
         formData.append("bucket", "form-uploads");
@@ -147,223 +139,157 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
         }
 
         uploadedFiles.push({
-          campo_id: campoId,
+          pergunta_id: perguntaId,
           file_url: uploadResponse.file_url,
           file_name: uploadResponse.file_name,
         });
       }
 
-      // Build responses
+      // Build respostas
       const respostas: Record<string, any> = {};
-      for (const campo of visibleCampos) {
-        if (campo.tipo !== "arquivo") {
-          respostas[campo.id] = values[campo.id];
+      for (const p of visiblePerguntas) {
+        if (p.tipo !== "anexo") {
+          respostas[p.id] = values[p.id];
         }
       }
 
-      // Save response (formulario_respostas has public INSERT policy)
-      const { error } = await supabase.from("formulario_respostas").insert({
+      // Save form response
+      const { error: respError } = await supabase.from("formulario_respostas").insert({
         formulario_id: formularioId,
         respostas,
         arquivos: uploadedFiles.length > 0 ? uploadedFiles : null,
       });
 
-      if (error) throw error;
+      if (respError) throw respError;
 
+      // Generate protocol and create solicitacao
+      const generatedProtocolo = await createSolicitacao(respostas, uploadedFiles);
+
+      setProtocolo(generatedProtocolo);
       setSubmitted(true);
-      toast.success("Formulário enviado com sucesso!");
-      onSuccess?.();
+      toast.success("Solicitação enviada com sucesso!");
     } catch (err: any) {
-      toast.error("Erro ao enviar formulário: " + err.message);
+      toast.error("Erro ao enviar: " + err.message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
+  const createSolicitacao = async (
+    respostas: Record<string, any>,
+    _arquivos: any[]
+  ): Promise<string> => {
+    // Build solicitacao fields from mapeamentos
+    const solicitacaoData: Record<string, any> = {};
+    for (const map of mapeamentos) {
+      if (respostas[map.pergunta_id] !== undefined) {
+        solicitacaoData[map.campo_solicitacao] = respostas[map.pergunta_id];
+      }
+    }
 
-  if (!formulario) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">Formulário não encontrado</div>
-    );
-  }
+    // Generate protocol number
+    const { data: configData } = await supabase
+      .from("protocol_config")
+      .select("*")
+      .limit(1)
+      .single();
+
+    const prefixo = configData?.prefixo || "JBS";
+    const nextNum = (configData?.ultimo_numero || 0) + 1;
+    const codigoLetra = solicitacaoData.tipo_operacao?.[0]?.toUpperCase() || "S";
+    const protocolo = `${prefixo}${codigoLetra}${String(nextNum).padStart(5, "0")}`;
+
+    // Update protocol counter
+    if (configData) {
+      await supabase.from("protocol_config")
+        .update({ ultimo_numero: nextNum })
+        .eq("id", configData.id);
+    }
+
+    // Insert solicitacao with mapped fields
+    const { error } = await supabase.from("solicitacoes").insert({
+      protocolo,
+      cliente_nome: solicitacaoData.cliente_nome || "Cliente via formulário",
+      cliente_email: solicitacaoData.cliente_email || "",
+      tipo_operacao: solicitacaoData.tipo_operacao || null,
+      numero_conteiner: solicitacaoData.numero_conteiner || null,
+      cnpj: solicitacaoData.cnpj || null,
+      lpco: solicitacaoData.lpco || null,
+      observacoes: solicitacaoData.observacoes || null,
+      data_posicionamento: solicitacaoData.data_posicionamento || null,
+      data_agendamento: solicitacaoData.data_agendamento || null,
+      tipo_carga: solicitacaoData.tipo_carga || null,
+      categoria: solicitacaoData.categoria || null,
+    });
+
+    if (error) throw error;
+
+    return protocolo;
+  };
+
+  const handleSaveEmail = async () => {
+    if (!emailParaNotificacao || !emailParaNotificacao.includes("@")) {
+      toast.error("Informe um e-mail válido");
+      return;
+    }
+    // Update the solicitacao with the notification email
+    const { error } = await supabase.from("solicitacoes")
+      .update({ cliente_email: emailParaNotificacao })
+      .eq("protocolo", protocolo);
+
+    if (error) {
+      toast.error("Erro ao salvar e-mail");
+      return;
+    }
+    setEmailSalvo(true);
+    toast.success("E-mail registrado! Você receberá atualizações sobre sua solicitação.");
+    onSuccess?.();
+  };
+
+  if (loading) return <FormRendererLoading />;
+  if (!formulario) return <FormRendererNotFound />;
 
   if (submitted) {
     return (
-      <div className="text-center py-12">
-        <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-foreground mb-2">Enviado com Sucesso!</h2>
-        <p className="text-muted-foreground">Sua resposta foi registrada.</p>
-      </div>
+      <FormRendererSuccess
+        protocolo={protocolo}
+        emailParaNotificacao={emailParaNotificacao}
+        emailSalvo={emailSalvo}
+        onEmailChange={setEmailParaNotificacao}
+        onSaveEmail={handleSaveEmail}
+      />
     );
   }
 
   const estilo = formulario.estilo || "jbs";
-  
-  const styleClasses: Record<string, { container: string; header: string; field: string; button: string }> = {
-    jbs: {
-      container: "bg-card rounded-lg p-6 md:p-8 max-w-2xl mx-auto",
-      header: "text-center mb-8 pb-4 border-b-2 border-secondary",
-      field: "space-y-2",
-      button: "w-full jbs-btn-primary",
-    },
-    hashdata: {
-      container: "bg-card rounded-xl p-6 md:p-10 max-w-3xl mx-auto shadow-lg border",
-      header: "mb-8 pb-4 border-b border-muted",
-      field: "space-y-2 bg-muted/30 rounded-lg p-4",
-      button: "w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg",
-    },
-    google: {
-      container: "bg-card rounded-lg max-w-2xl mx-auto border-t-4 border-t-primary shadow-md",
-      header: "p-6 md:p-8 pb-4",
-      field: "space-y-2 border rounded-lg p-4 bg-card",
-      button: "bg-primary hover:bg-primary/90 text-primary-foreground px-8",
-    },
-    jotform: {
-      container: "bg-gradient-to-b from-muted/20 to-card rounded-2xl p-6 md:p-10 max-w-2xl mx-auto shadow-xl",
-      header: "text-center mb-10 pb-6 border-b border-muted/50",
-      field: "space-y-2 bg-card rounded-xl p-5 shadow-sm border",
-      button: "w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-3 text-lg",
-    },
-    formstack: {
-      container: "bg-card max-w-2xl mx-auto p-6 md:p-8 border rounded-lg",
-      header: "mb-6 pb-3 border-b-2 border-primary",
-      field: "space-y-1",
-      button: "w-full bg-primary hover:bg-primary/90 text-primary-foreground",
-    },
-  };
-  
-  const currentStyle = styleClasses[estilo] || styleClasses.jbs;
+  const currentStyle = getStyleClasses(estilo);
 
   return (
     <div className={currentStyle.container}>
-      <div className={currentStyle.header}>
-        <h1 className="text-2xl font-bold text-primary mb-2">{formulario.titulo}</h1>
-        {formulario.descricao && (
-          <p className="text-muted-foreground">{formulario.descricao}</p>
-        )}
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {campos.filter(isFieldVisible).map((campo) => (
-          <div key={campo.id} className={currentStyle.field}>
-            <Label className="flex items-center gap-1">
-              {campo.rotulo}
-              {campo.obrigatorio && <span className="text-destructive">*</span>}
-            </Label>
-
-            {campo.tipo === "texto" && (
-              <Input
-                value={values[campo.id] || ""}
-                onChange={(e) => handleValueChange(campo.id, e.target.value)}
-                placeholder={campo.placeholder || ""}
-              />
-            )}
-
-            {campo.tipo === "texto_longo" && (
-              <Textarea
-                value={values[campo.id] || ""}
-                onChange={(e) => handleValueChange(campo.id, e.target.value)}
-                placeholder={campo.placeholder || ""}
-                rows={4}
-              />
-            )}
-
-            {campo.tipo === "numero" && (
-              <Input
-                type="number"
-                value={values[campo.id] || ""}
-                onChange={(e) => handleValueChange(campo.id, e.target.value)}
-                placeholder={campo.placeholder || ""}
-              />
-            )}
-
-            {campo.tipo === "data" && (
-              <Input
-                type="date"
-                value={values[campo.id] || ""}
-                onChange={(e) => handleValueChange(campo.id, e.target.value)}
-              />
-            )}
-
-            {campo.tipo === "select" && campo.opcoes && (
-              <Select
-                value={values[campo.id] || ""}
-                onValueChange={(v) => handleValueChange(campo.id, v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={campo.placeholder || "Selecione..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(campo.opcoes as { value: string; label: string }[]).map((opt) => (
-                    <SelectItem key={opt.value} value={opt.label}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {campo.tipo === "multipla_escolha" && campo.opcoes && (
-              <div className="space-y-2">
-                {(campo.opcoes as { value: string; label: string }[]).map((opt) => (
-                  <div key={opt.value} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`${campo.id}_${opt.value}`}
-                      checked={(values[campo.id] || []).includes(opt.label)}
-                      onCheckedChange={(checked) =>
-                        handleMultipleChoiceChange(campo.id, opt.label, !!checked)
-                      }
-                    />
-                    <Label htmlFor={`${campo.id}_${opt.value}`} className="cursor-pointer font-normal">
-                      {opt.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {campo.tipo === "checkbox" && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={campo.id}
-                  checked={values[campo.id] === true}
-                  onCheckedChange={(checked) => handleValueChange(campo.id, !!checked)}
-                />
-                <Label htmlFor={campo.id} className="cursor-pointer font-normal">
-                  {campo.placeholder || "Sim"}
-                </Label>
-              </div>
-            )}
-
-            {campo.tipo === "arquivo" && (
-              <div>
-                <Input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                  onChange={(e) => handleFileChange(campo.id, e.target.files?.[0] || null)}
-                />
-                {files[campo.id] && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Arquivo selecionado: {files[campo.id].file.name}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-
-        <Button type="submit" disabled={submitting} className={currentStyle.button}>
-          <Send className="h-4 w-4 mr-2" />
-          {submitting ? "Enviando..." : "Enviar"}
-        </Button>
-      </form>
+      <FormRendererHeader
+        titulo={formulario.titulo}
+        descricao={formulario.descricao}
+        estilo={estilo}
+        headerClass={currentStyle.header}
+      />
+      <FormRendererBody
+        perguntas={perguntas}
+        values={values}
+        files={files}
+        submitting={submitting}
+        isFieldVisible={isFieldVisible}
+        onValueChange={(id, val) => setValues((prev) => ({ ...prev, [id]: val }))}
+        onFileChange={(id, file) => {
+          if (file) {
+            setFiles((prev) => ({ ...prev, [id]: { file, url: URL.createObjectURL(file) } }));
+          } else {
+            setFiles((prev) => { const n = { ...prev }; delete n[id]; return n; });
+          }
+        }}
+        onSubmit={handleSubmit}
+        fieldClass={currentStyle.field}
+        buttonClass={currentStyle.button}
+      />
     </div>
   );
 };

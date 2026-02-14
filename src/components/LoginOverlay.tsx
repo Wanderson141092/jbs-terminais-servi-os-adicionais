@@ -69,8 +69,8 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
         body: JSON.stringify({ username: trimmed, password }),
       });
       const data = await res.json();
-      if (!res.ok || data?.error) {
-        toast.error("Usuário ou senha incorretos.");
+      if (data?.error) {
+        toast.error("Acesso incorreto. Verifique seu usuário e senha e tente novamente.");
         setLoading(false);
         return;
       }

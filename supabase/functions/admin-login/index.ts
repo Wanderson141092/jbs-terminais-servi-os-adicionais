@@ -6,10 +6,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const errorResponse = (message: string, status = 401) =>
+const errorResponse = (message: string) =>
   new Response(
     JSON.stringify({ error: message }),
-    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 
 Deno.serve(async (req) => {
@@ -21,11 +21,11 @@ Deno.serve(async (req) => {
     const { password, username } = await req.json();
 
     if (!password || typeof password !== "string" || password.length > 100) {
-      return errorResponse("Credenciais inválidas.", 400);
+      return errorResponse("Credenciais inválidas.");
     }
 
     if (!username || typeof username !== "string") {
-      return errorResponse("Credenciais inválidas.", 400);
+      return errorResponse("Credenciais inválidas.");
     }
 
     const supabaseAdmin = createClient(
@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("admin-login error:", err);
-    return errorResponse("Erro interno do servidor.", 500);
+    return errorResponse("Erro interno do servidor.");
   }
 });
 

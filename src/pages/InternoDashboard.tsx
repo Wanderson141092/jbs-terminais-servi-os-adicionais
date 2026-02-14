@@ -381,7 +381,7 @@ const InternoDashboard = () => {
                     Admin
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-48 z-[100] bg-popover"  sideOffset={8}>
                   <DropdownMenuItem onClick={() => navigate("/interno/admin/parametros")}>
                     <Settings className="h-4 w-4 mr-2" />
                     Parâmetros

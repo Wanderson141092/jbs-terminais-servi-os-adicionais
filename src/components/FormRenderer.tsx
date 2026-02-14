@@ -20,7 +20,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
   const [protocolo, setProtocolo] = useState("");
   const [emailParaNotificacao, setEmailParaNotificacao] = useState("");
   const [emailSalvo, setEmailSalvo] = useState(false);
-  const [mapeamentos, setMapeamentos] = useState<{ pergunta_id: string; campo_solicitacao: string }[]>([]);
+  const [mapeamentos, setMapeamentos] = useState<{ pergunta_id: string; campo_solicitacao: string; campo_analise_id?: string | null }[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,7 +37,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
           .select("*")
           .eq("formulario_id", formularioId),
         supabase.from("pergunta_mapeamento")
-          .select("pergunta_id, campo_solicitacao")
+          .select("pergunta_id, campo_solicitacao, campo_analise_id")
           .eq("formulario_id", formularioId),
       ]);
 

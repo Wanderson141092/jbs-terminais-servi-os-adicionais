@@ -60,12 +60,23 @@ Deno.serve(async (req) => {
 
     if (respError) throw respError;
 
-    // 2. Build solicitacao data from mapeamentos
+    // 2. Build solicitacao data from mapeamentos + collect dynamic field mappings
     const solicitacaoData: Record<string, any> = {};
+    const dynamicFieldValues: { campo_id: string; valor: string }[] = [];
+
     if (mapeamentos && Array.isArray(mapeamentos)) {
       for (const map of mapeamentos) {
         if (respostas[map.pergunta_id] !== undefined) {
-          solicitacaoData[map.campo_solicitacao] = respostas[map.pergunta_id];
+          if (map.campo_analise_id) {
+            // Dynamic field mapping
+            dynamicFieldValues.push({
+              campo_id: map.campo_analise_id,
+              valor: String(respostas[map.pergunta_id]),
+            });
+          } else if (map.campo_solicitacao && map.campo_solicitacao !== "__dinamico__") {
+            // Fixed field mapping
+            solicitacaoData[map.campo_solicitacao] = respostas[map.pergunta_id];
+          }
         }
       }
     }
@@ -107,6 +118,25 @@ Deno.serve(async (req) => {
     });
 
     if (solError) throw solError;
+
+    // 6. Save dynamic field values
+    if (dynamicFieldValues.length > 0) {
+      // Get solicitacao id by protocolo
+      const { data: solData } = await supabase
+        .from("solicitacoes")
+        .select("id")
+        .eq("protocolo", protocolo)
+        .single();
+
+      if (solData) {
+        const inserts = dynamicFieldValues.map((dv) => ({
+          solicitacao_id: solData.id,
+          campo_id: dv.campo_id,
+          valor: dv.valor,
+        }));
+        await supabase.from("campos_analise_valores").insert(inserts);
+      }
+    }
 
     return new Response(
       JSON.stringify({ protocolo }),

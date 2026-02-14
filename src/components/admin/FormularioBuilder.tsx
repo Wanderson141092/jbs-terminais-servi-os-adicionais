@@ -45,6 +45,18 @@ interface PerguntaMapeamento {
   formulario_id: string;
   pergunta_id: string;
   campo_solicitacao: string;
+  campo_analise_id?: string | null;
+}
+
+interface CampoAnalise {
+  id: string;
+  nome: string;
+  tipo: string;
+  opcoes: any;
+  servico_ids: string[];
+  obrigatorio: boolean;
+  ordem: number;
+  ativo: boolean;
 }
 
 interface FormularioBuilderProps {
@@ -71,6 +83,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
   const [vinculadas, setVinculadas] = useState<FormularioPergunta[]>([]);
   const [condicionais, setCondicionais] = useState<PerguntaCondicional[]>([]);
   const [mapeamentos, setMapeamentos] = useState<PerguntaMapeamento[]>([]);
+  const [camposAnalise, setCamposAnalise] = useState<CampoAnalise[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
@@ -85,6 +98,13 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
   const [showMapDialog, setShowMapDialog] = useState(false);
   const [mapPergunta, setMapPergunta] = useState<string>("");
   const [mapCampo, setMapCampo] = useState<string>("");
+  const [mapTipo, setMapTipo] = useState<"fixo" | "dinamico">("fixo");
+  const [mapCampoAnaliseId, setMapCampoAnaliseId] = useState<string>("");
+
+  // New dynamic field dialog
+  const [showNewFieldDialog, setShowNewFieldDialog] = useState(false);
+  const [newFieldNome, setNewFieldNome] = useState("");
+  const [newFieldTipo, setNewFieldTipo] = useState("texto");
 
   useEffect(() => {
     fetchAll();
@@ -92,11 +112,12 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
 
   const fetchAll = async () => {
     setLoading(true);
-    const [bancoPerguntasRes, vinculadasRes, condRes, mapRes] = await Promise.all([
+    const [bancoPerguntasRes, vinculadasRes, condRes, mapRes, camposRes] = await Promise.all([
       supabase.from("banco_perguntas").select("*").eq("ativo", true).order("rotulo"),
       supabase.from("formulario_perguntas").select("*").eq("formulario_id", formularioId).order("ordem"),
       supabase.from("pergunta_condicionais").select("*").eq("formulario_id", formularioId),
       supabase.from("pergunta_mapeamento").select("*").eq("formulario_id", formularioId),
+      supabase.from("campos_analise").select("*").eq("ativo", true).order("ordem"),
     ]);
 
     const banco = (bancoPerguntasRes.data as BancoPergunta[]) || [];
@@ -113,6 +134,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
 
     setCondicionais((condRes.data as PerguntaCondicional[]) || []);
     setMapeamentos((mapRes.data as PerguntaMapeamento[]) || []);
+    setCamposAnalise((camposRes.data as CampoAnalise[]) || []);
     setLoading(false);
   };
 
@@ -184,20 +206,52 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
 
   // Mapeamentos
   const saveMapeamento = async () => {
-    if (!mapPergunta || !mapCampo) {
-      toast.error("Preencha todos os campos");
+    if (!mapPergunta) {
+      toast.error("Selecione a pergunta");
       return;
     }
-    const { error } = await supabase.from("pergunta_mapeamento").insert({
+    if (mapTipo === "fixo" && !mapCampo) {
+      toast.error("Selecione o campo destino");
+      return;
+    }
+    if (mapTipo === "dinamico" && !mapCampoAnaliseId) {
+      toast.error("Selecione o campo de análise");
+      return;
+    }
+
+    const insertData: any = {
       formulario_id: formularioId,
       pergunta_id: mapPergunta,
-      campo_solicitacao: mapCampo,
-    });
+      campo_solicitacao: mapTipo === "fixo" ? mapCampo : "__dinamico__",
+    };
+    if (mapTipo === "dinamico") {
+      insertData.campo_analise_id = mapCampoAnaliseId;
+    }
+
+    const { error } = await supabase.from("pergunta_mapeamento").insert(insertData);
     if (error) { toast.error("Erro ao salvar mapeamento"); return; }
     toast.success("Mapeamento criado!");
     setShowMapDialog(false);
-    setMapPergunta(""); setMapCampo("");
+    setMapPergunta(""); setMapCampo(""); setMapTipo("fixo"); setMapCampoAnaliseId("");
     fetchAll();
+  };
+
+  const saveNewField = async () => {
+    if (!newFieldNome.trim()) {
+      toast.error("Nome do campo é obrigatório");
+      return;
+    }
+    const { data, error } = await supabase.from("campos_analise").insert({
+      nome: newFieldNome.trim(),
+      tipo: newFieldTipo,
+    }).select().single();
+    if (error) { toast.error("Erro ao criar campo"); return; }
+    toast.success("Campo de análise criado!");
+    setShowNewFieldDialog(false);
+    setNewFieldNome(""); setNewFieldTipo("texto");
+    setCamposAnalise(prev => [...prev, data as CampoAnalise]);
+    // Auto-select the new field
+    setMapCampoAnaliseId(data.id);
   };
 
   const deleteMapeamento = async (id: string) => {
@@ -261,7 +315,13 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
                     {maps.length > 0 && (
                       <Badge variant="default" className="text-xs">
                         <Link2 className="h-3 w-3 mr-1" />
-                        {maps.map((m) => CAMPOS_SOLICITACAO.find((c) => c.value === m.campo_solicitacao)?.label || m.campo_solicitacao).join(", ")}
+                        {maps.map((m) => {
+                          if (m.campo_analise_id) {
+                            const campo = camposAnalise.find(c => c.id === m.campo_analise_id);
+                            return campo?.nome || "Campo dinâmico";
+                          }
+                          return CAMPOS_SOLICITACAO.find((c) => c.value === m.campo_solicitacao)?.label || m.campo_solicitacao;
+                        }).join(", ")}
                       </Badge>
                     )}
                   </div>
@@ -303,13 +363,17 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
       {mapeamentos.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Mapeamentos para Solicitação</CardTitle>
+            <CardTitle className="text-base">Mapeamentos para Solicitação / Análise</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {mapeamentos.map((m) => (
               <div key={m.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
                 <span>
-                  <strong>{getPerguntaLabel(m.pergunta_id)}</strong> → {CAMPOS_SOLICITACAO.find((c) => c.value === m.campo_solicitacao)?.label || m.campo_solicitacao}
+                  <strong>{getPerguntaLabel(m.pergunta_id)}</strong> → {
+                    m.campo_analise_id
+                      ? <Badge variant="secondary" className="text-xs ml-1">{camposAnalise.find(c => c.id === m.campo_analise_id)?.nome || "Campo dinâmico"}</Badge>
+                      : (CAMPOS_SOLICITACAO.find((c) => c.value === m.campo_solicitacao)?.label || m.campo_solicitacao)
+                  }
                 </span>
                 <Button variant="ghost" size="icon" onClick={() => deleteMapeamento(m.id)} className="text-destructive hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
@@ -423,7 +487,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo Mapeamento</DialogTitle>
-            <DialogDescription>Vincule a resposta desta pergunta a um campo da solicitação</DialogDescription>
+            <DialogDescription>Vincule a resposta desta pergunta a um campo fixo da solicitação ou a um campo dinâmico de análise</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -440,20 +504,84 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
               </Select>
             </div>
             <div>
-              <Label>Campo da Solicitação</Label>
-              <Select value={mapCampo} onValueChange={setMapCampo}>
-                <SelectTrigger><SelectValue placeholder="Selecione o campo destino" /></SelectTrigger>
+              <Label>Tipo de destino</Label>
+              <Select value={mapTipo} onValueChange={(v) => setMapTipo(v as "fixo" | "dinamico")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CAMPOS_SOLICITACAO.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
+                  <SelectItem value="fixo">Campo fixo da solicitação</SelectItem>
+                  <SelectItem value="dinamico">Campo dinâmico de análise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {mapTipo === "fixo" ? (
+              <div>
+                <Label>Campo da Solicitação</Label>
+                <Select value={mapCampo} onValueChange={setMapCampo}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o campo destino" /></SelectTrigger>
+                  <SelectContent>
+                    {CAMPOS_SOLICITACAO.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Campo de Análise</Label>
+                <div className="flex gap-2">
+                  <Select value={mapCampoAnaliseId} onValueChange={setMapCampoAnaliseId}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione ou crie um campo" /></SelectTrigger>
+                    <SelectContent>
+                      {camposAnalise.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="icon" onClick={() => setShowNewFieldDialog(true)} title="Criar novo campo">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {camposAnalise.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhum campo criado. Clique em + para criar.</p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMapDialog(false)}>Cancelar</Button>
+            <Button onClick={saveMapeamento}>Salvar Mapeamento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Dynamic Field Dialog */}
+      <Dialog open={showNewFieldDialog} onOpenChange={setShowNewFieldDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Campo de Análise</DialogTitle>
+            <DialogDescription>Crie um campo dinâmico que aparecerá na tela de análise interna</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome do campo</Label>
+              <Input value={newFieldNome} onChange={(e) => setNewFieldNome(e.target.value)} placeholder="Ex: Quadra, Peso, Referência..." />
+            </div>
+            <div>
+              <Label>Tipo</Label>
+              <Select value={newFieldTipo} onValueChange={setNewFieldTipo}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="texto">Texto</SelectItem>
+                  <SelectItem value="numero">Número</SelectItem>
+                  <SelectItem value="data">Data</SelectItem>
+                  <SelectItem value="checkbox">Checkbox</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMapDialog(false)}>Cancelar</Button>
-            <Button onClick={saveMapeamento}>Salvar Mapeamento</Button>
+            <Button variant="outline" onClick={() => setShowNewFieldDialog(false)}>Cancelar</Button>
+            <Button onClick={saveNewField}>Criar Campo</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

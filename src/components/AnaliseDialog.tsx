@@ -62,16 +62,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [solicitarDeferimento, setSolicitarDeferimento] = useState(false);
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
+  const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
+
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
         supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false }),
         supabase.from("parametros_campos").select("*").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
-        supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem")
+        supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
+        supabase.from("campos_analise_valores").select("campo_id, valor, campos_analise(nome)").eq("solicitacao_id", solicitacao.id),
       ]);
 
       setAttachments(attachRes.data || []);
@@ -97,6 +100,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setStatusOptions(dynamicOptions);
       setPendenciaOpcoes(pendenciaRes.data || []);
       setPendenciasSelecionadas(solicitacao.pendencias_selecionadas || []);
+
+      // Build dynamic fields display
+      const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
+        campo_nome: cv.campos_analise?.nome || "Campo",
+        valor: cv.valor || "",
+      })).filter((cv: any) => cv.valor);
+      setCamposDinamicos(camposVals);
     };
     
     fetchData();
@@ -474,6 +484,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <InfoItem icon={<Clock className="h-4 w-4" />} label="Serviço Adicional" value={solicitacao.tipo_operacao || "Posicionamento"} />
               <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
             </div>
+
+            {/* Dynamic analysis fields */}
+            {camposDinamicos.length > 0 && (
+              <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
+                <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos do Formulário</p>
+                {camposDinamicos.map((cd, idx) => (
+                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={cd.campo_nome} value={cd.valor} />
+                ))}
+              </div>
+            )}
 
             {solicitacao.observacoes && (
               <div className="bg-muted/50 rounded-lg p-3">

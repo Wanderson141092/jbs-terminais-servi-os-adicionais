@@ -57,12 +57,19 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
 
     // Otherwise treat as admin username
     try {
-      const response = await supabase.functions.invoke("admin-login", {
-        body: { username: trimmed, password },
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/admin-login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ username: trimmed, password }),
       });
-      const data = response.data;
-      const errorMsg = data?.error || response.error?.message;
-      if (response.error || data?.error) {
+      const data = await res.json();
+      if (!res.ok || data?.error) {
         toast.error("Usuário ou senha incorretos.");
         setLoading(false);
         return;
@@ -74,7 +81,7 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
         });
         toast.success(`Bem-vindo, ${data.adminNome || "Administrador"}!`);
       } else {
-        toast.error("Credenciais inválidas.");
+        toast.error("Usuário ou senha incorretos.");
       }
     } catch {
       toast.error("Erro ao conectar ao servidor.");

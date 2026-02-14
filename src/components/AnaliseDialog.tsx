@@ -280,6 +280,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     await logAudit("status_atualizado", details);
     await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
     
+    // Dispatch email/notification via edge function
+    supabase.functions.invoke("notificar-status", {
+      body: { solicitacao_id: solicitacao.id, novo_status: selectedStatus, usuario_id: userId },
+    }).catch(() => {}); // Fire and forget
+    
     toast.success("Atualização realizada com sucesso!");
     setLoading(false);
     onClose();

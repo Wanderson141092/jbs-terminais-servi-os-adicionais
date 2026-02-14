@@ -126,6 +126,12 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
         p_detalhes: `Status alterado de ${solicitacao.status} para ${newStatus}. Justificativa: ${justificativa}`
       });
 
+      // Dispatch email/notification via edge function
+      const finalStatus = newStatus === 'aprovado' ? 'confirmado_aguardando_vistoria' : 'recusado';
+      supabase.functions.invoke("notificar-status", {
+        body: { solicitacao_id: solicitacao.id, novo_status: finalStatus, usuario_id: userId },
+      }).catch(() => {});
+
       toast.success(`Status alterado para ${newStatus === 'aprovado' ? 'Aprovado' : 'Recusado'}`);
       setShowStatusChangeDialog(false);
       setJustificativa("");

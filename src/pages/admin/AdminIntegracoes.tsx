@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Link2, ArrowLeft, Plus, Save, Edit, Trash2, Settings } from "lucide-react";
+import { Link2, ArrowLeft, Plus, Save, Edit, Trash2, Settings, BookOpen, Mail, Globe, Webhook } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ExcelImportMappings from "@/components/ExcelImportMappings";
 
@@ -289,9 +289,10 @@ const AdminIntegracoes = () => {
       </div>
 
       <Tabs defaultValue="integracoes" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="integracoes">Sistemas Externos</TabsTrigger>
           <TabsTrigger value="mappings">Mapeamento de Campos</TabsTrigger>
+          <TabsTrigger value="manuais">Manuais de Instrução</TabsTrigger>
         </TabsList>
 
         {/* ============= INTEGRAÇÕES ============= */}
@@ -334,6 +335,7 @@ const AdminIntegracoes = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="api">API</SelectItem>
+                          <SelectItem value="email">E-mail</SelectItem>
                           <SelectItem value="formulario">Formulário</SelectItem>
                           <SelectItem value="webhook">Webhook</SelectItem>
                           <SelectItem value="iframe">iFrame</SelectItem>
@@ -611,6 +613,156 @@ const AdminIntegracoes = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        {/* ============= MANUAIS DE INSTRUÇÃO ============= */}
+        <TabsContent value="manuais">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Smart NX */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Mail className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Smart NX — E-mail</CardTitle>
+                    <p className="text-sm text-muted-foreground">Envio de e-mails via API</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted/30 rounded-lg p-4 text-sm space-y-3">
+                  <h4 className="font-semibold text-foreground">Como configurar:</h4>
+                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                    <li>Acesse o painel Smart NX e obtenha suas credenciais de API</li>
+                    <li>Em <strong>Sistemas Externos</strong>, clique em "Adicionar Integração"</li>
+                    <li>Selecione o tipo <strong>E-mail</strong></li>
+                    <li>Informe o nome: <code className="bg-muted px-1 rounded">Smart NX</code></li>
+                    <li>Cole a URL da API (endpoint de envio de e-mail)</li>
+                    <li>Cole a API Key fornecida pela Smart NX</li>
+                    <li>Na configuração JSON, informe:
+                      <pre className="bg-muted p-2 rounded mt-1 text-xs overflow-x-auto">
+{`{
+  "provider": "smartnx",
+  "from": "noreply@suaempresa.com",
+  "auth_method": "bearer"
+}`}
+                      </pre>
+                    </li>
+                    <li>Ative a integração e salve</li>
+                  </ol>
+                  <div className="bg-primary/5 border border-primary/20 rounded p-3 mt-3">
+                    <p className="text-xs text-primary font-medium">
+                      💡 Métodos de autenticação suportados: <code>bearer</code>, <code>x-api-key</code>, <code>basic</code>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Webhook genérico */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                    <Webhook className="h-5 w-5 text-secondary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Webhook — E-mail</CardTitle>
+                    <p className="text-sm text-muted-foreground">Envio via webhook (Outlook, Gmail, etc.)</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted/30 rounded-lg p-4 text-sm space-y-3">
+                  <h4 className="font-semibold text-foreground">Como configurar:</h4>
+                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                    <li>Configure um webhook no seu provedor (Power Automate, Zapier, Make, etc.)</li>
+                    <li>O webhook deve aceitar POST com o payload:
+                      <pre className="bg-muted p-2 rounded mt-1 text-xs overflow-x-auto">
+{`{
+  "event": "send_email",
+  "data": {
+    "to": "email@dest.com",
+    "subject": "Assunto",
+    "body": "<html>Corpo</html>"
+  }
+}`}
+                      </pre>
+                    </li>
+                    <li>Em <strong>Sistemas Externos</strong>, adicione com tipo <strong>E-mail</strong></li>
+                    <li>Cole a URL do webhook</li>
+                    <li>Na configuração JSON: <code>{`{"provider": "webhook"}`}</code></li>
+                    <li>Ative e salve</li>
+                  </ol>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Hashdata */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Globe className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Hashdata — API</CardTitle>
+                    <p className="text-sm text-muted-foreground">Integração de dados</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted/30 rounded-lg p-4 text-sm space-y-3">
+                  <h4 className="font-semibold text-foreground">Como configurar:</h4>
+                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                    <li>Obtenha a URL da API e a chave de autenticação no painel Hashdata</li>
+                    <li>Adicione a integração com tipo <strong>API</strong></li>
+                    <li>Configure os mapeamentos de campos na aba <strong>Mapeamento de Campos</strong></li>
+                    <li>Defina a direção de cada campo: entrada, saída ou ambos</li>
+                  </ol>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mapeamento de campos */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                    <BookOpen className="h-5 w-5 text-secondary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Mapeamento de Campos</CardTitle>
+                    <p className="text-sm text-muted-foreground">Guia de referência</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted/30 rounded-lg p-4 text-sm space-y-3">
+                  <h4 className="font-semibold text-foreground">Campos internos disponíveis:</h4>
+                  <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                    <span><code>protocolo</code> — Número do protocolo</span>
+                    <span><code>cliente_nome</code> — Nome do cliente</span>
+                    <span><code>cliente_email</code> — E-mail</span>
+                    <span><code>cnpj</code> — CNPJ</span>
+                    <span><code>tipo_operacao</code> — Serviço</span>
+                    <span><code>numero_conteiner</code> — Contêiner</span>
+                    <span><code>lpco</code> — LPCO</span>
+                    <span><code>status</code> — Status atual</span>
+                    <span><code>tipo_carga</code> — Tipo de carga</span>
+                    <span><code>data_posicionamento</code> — Data</span>
+                  </div>
+                  <div className="bg-primary/5 border border-primary/20 rounded p-3 mt-3">
+                    <p className="text-xs text-primary font-medium">
+                      💡 Use a aba "Mapeamento de Campos" para vincular cada campo interno a seu equivalente no sistema externo.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

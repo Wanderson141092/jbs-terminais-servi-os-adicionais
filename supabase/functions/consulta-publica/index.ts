@@ -93,8 +93,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch deferimento documents, observations, and status labels in parallel
-    const [deferimentoRes, observacoesRes, statusLabelsRes] = await Promise.all([
+    // Fetch deferimento documents, observations, status labels, field config, and dynamic fields in parallel
+    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes] = await Promise.all([
       supabaseAdmin
         .from("deferimento_documents")
         .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
@@ -112,6 +112,22 @@ Deno.serve(async (req) => {
         .eq("grupo", "status_processo")
         .eq("ativo", true)
         .order("ordem"),
+      supabaseAdmin
+        .from("campos_fixos_config")
+        .select("campo_chave, campo_label, visivel_externo")
+        .eq("ativo", true)
+        .eq("visivel_externo", true)
+        .order("ordem"),
+      supabaseAdmin
+        .from("campos_analise")
+        .select("id, nome")
+        .eq("ativo", true)
+        .eq("visivel_externo", true)
+        .order("ordem"),
+      supabaseAdmin
+        .from("campos_analise_valores")
+        .select("campo_id, valor, campos_analise(nome, visivel_externo)")
+        .eq("solicitacao_id", solicitacao.id),
     ]);
 
     const deferimentoDocs = deferimentoRes.data;
@@ -159,9 +175,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Sanitize: remove client name for privacy
-    const sanitizedSolicitacao = { ...solicitacao };
-    delete sanitizedSolicitacao.cliente_nome;
+    // Build visible fields config
+    const visibleFixedFields = (camposFixosRes.data || []).map((c: any) => c.campo_chave);
+    
+    // Build visible dynamic field values
+    const dynamicFieldsForExternal = (camposValoresRes.data || [])
+      .filter((cv: any) => cv.campos_analise?.visivel_externo === true && cv.valor)
+      .map((cv: any) => ({
+        campo_nome: cv.campos_analise?.nome || "Campo",
+        valor: cv.valor,
+      }));
+
+    // Sanitize: remove client name for privacy, and filter fields based on config
+    const sanitizedSolicitacao: Record<string, any> = {};
+    const allFields = { ...solicitacao };
+    delete allFields.cliente_nome; // Always hidden externally
+    
+    for (const [key, value] of Object.entries(allFields)) {
+      if (key === "id" || key === "status" || key === "created_at" || key === "updated_at" || 
+          key === "comex_aprovado" || key === "armazem_aprovado" || key === "solicitar_deferimento" ||
+          key === "pendencias_selecionadas" || key === "status_vistoria" ||
+          visibleFixedFields.includes(key)) {
+        sanitizedSolicitacao[key] = value;
+      }
+    }
 
     return new Response(
       JSON.stringify({
@@ -169,6 +206,8 @@ Deno.serve(async (req) => {
         deferimento_docs: docsWithSignedUrls,
         observacoes,
         status_labels: statusLabels,
+        campos_dinamicos_externos: dynamicFieldsForExternal,
+        campos_visiveis: visibleFixedFields,
         servico_config: {
           tipo_agendamento: servicoData.tipo_agendamento,
           deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],

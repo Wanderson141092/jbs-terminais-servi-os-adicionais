@@ -24,6 +24,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import BancoPerguntasManager from "@/components/admin/BancoPerguntasManager";
 import FormularioBuilder from "@/components/admin/FormularioBuilder";
+import CamposFixosManager from "@/components/admin/CamposFixosManager";
+import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";
+import EstilosFormularioManager from "@/components/admin/EstilosFormularioManager";
 
 interface Formulario {
   id: string;
@@ -54,13 +57,14 @@ interface Resposta {
   created_at: string;
 }
 
-const FORM_STYLES = [
-  { value: "jbs", label: "JBS Terminais (Padrão)", description: "Design institucional JBS com cores e tipografia padrão", features: ["Campos básicos", "Upload de arquivos", "Lógica condicional", "Validação em tempo real"] },
-  { value: "hashdata", label: "Hashdata", description: "Estilo inspirado no sistema Hashdata com layout corporativo", features: ["Layout em grid", "Seções colapsáveis", "Campos agrupados", "Progresso visual"] },
-  { value: "google", label: "Google Forms", description: "Design minimalista inspirado no Google Forms", features: ["Layout vertical", "Respostas opcionais", "Múltiplas seções", "Tema claro/escuro"] },
-  { value: "jotform", label: "Jotform", description: "Layout moderno com cards e animações suaves", features: ["Cards por campo", "Animações", "Temas personalizáveis", "Progresso por etapas"] },
-  { value: "formstack", label: "Formstack", description: "Formulário empresarial com layout profissional", features: ["Campos inline", "Validação avançada", "Integração de pagamentos", "Assinaturas digitais"] },
-];
+interface FormStyle {
+  id: string;
+  chave: string;
+  nome: string;
+  descricao: string | null;
+  features: string[];
+  ativo: boolean;
+}
 
 const AdminFormularios = () => {
   const navigate = useNavigate();
@@ -68,6 +72,7 @@ const AdminFormularios = () => {
   const [formularios, setFormularios] = useState<Formulario[]>([]);
   const [campos, setCampos] = useState<Campo[]>([]);
   const [respostas, setRespostas] = useState<Resposta[]>([]);
+  const [formStyles, setFormStyles] = useState<FormStyle[]>([]);
 
   // Form dialog
   const [showFormDialog, setShowFormDialog] = useState(false);
@@ -83,13 +88,18 @@ const AdminFormularios = () => {
   const [showResponsesDialog, setShowResponsesDialog] = useState(false);
   const [selectedFormForResponses, setSelectedFormForResponses] = useState<string | null>(null);
 
-  useEffect(() => { fetchFormularios(); }, []);
+  useEffect(() => { fetchFormularios(); fetchStyles(); }, []);
 
   const fetchFormularios = async () => {
     setLoading(true);
     const { data } = await supabase.from("formularios").select("*").order("created_at", { ascending: false });
     setFormularios(data || []);
     setLoading(false);
+  };
+
+  const fetchStyles = async () => {
+    const { data } = await supabase.from("estilos_formulario").select("*").eq("ativo", true).order("ordem");
+    setFormStyles((data as FormStyle[]) || []);
   };
 
   const fetchCampos = async (formularioId: string) => {
@@ -204,14 +214,26 @@ const AdminFormularios = () => {
       </div>
 
       <Tabs defaultValue="formularios" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1 max-w-3xl">
           <TabsTrigger value="formularios" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Formulários
           </TabsTrigger>
           <TabsTrigger value="perguntas" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            Central de Perguntas
+            Perguntas
+          </TabsTrigger>
+          <TabsTrigger value="campos_fixos" className="flex items-center gap-2">
+            <Settings2 className="h-4 w-4" />
+            Campos Fixos
+          </TabsTrigger>
+          <TabsTrigger value="campos_dinamicos" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Campos Dinâmicos
+          </TabsTrigger>
+          <TabsTrigger value="estilos" className="flex items-center gap-2">
+            <Eye className="h-4 w-4" />
+            Estilos
           </TabsTrigger>
         </TabsList>
 
@@ -245,7 +267,7 @@ const AdminFormularios = () => {
                       <TableCell className="text-sm text-muted-foreground">{form.descricao || "—"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
-                          {FORM_STYLES.find((s) => s.value === (form.estilo || "jbs"))?.label || form.estilo || "JBS"}
+                          {formStyles.find((s) => s.chave === (form.estilo || "jbs"))?.nome || form.estilo || "JBS"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -283,6 +305,18 @@ const AdminFormularios = () => {
         <TabsContent value="perguntas">
           <BancoPerguntasManager />
         </TabsContent>
+
+        <TabsContent value="campos_fixos">
+          <CamposFixosManager />
+        </TabsContent>
+
+        <TabsContent value="campos_dinamicos">
+          <CamposDinamicosManager />
+        </TabsContent>
+
+        <TabsContent value="estilos">
+          <EstilosFormularioManager />
+        </TabsContent>
       </Tabs>
 
       {/* Form Dialog */}
@@ -305,21 +339,21 @@ const AdminFormularios = () => {
               <Label className="text-base font-semibold mb-3 block">Estilo do Formulário</Label>
               <p className="text-sm text-muted-foreground mb-4">Escolha o estilo visual e funcional do formulário.</p>
               <div className="grid grid-cols-1 gap-3">
-                {FORM_STYLES.map((style) => (
+                {formStyles.map((style) => (
                   <div
-                    key={style.value}
+                    key={style.chave}
                     className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                      selectedStyle === style.value ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border hover:border-muted-foreground"
+                      selectedStyle === style.chave ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border hover:border-muted-foreground"
                     }`}
-                    onClick={() => { setSelectedStyle(style.value); setFormData({ ...formData, estilo: style.value }); }}
+                    onClick={() => { setSelectedStyle(style.chave); setFormData({ ...formData, estilo: style.chave }); }}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 ${selectedStyle === style.value ? "border-primary bg-primary" : "border-muted-foreground"}`}>
-                        {selectedStyle === style.value && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-primary-foreground rounded-full" /></div>}
+                      <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 ${selectedStyle === style.chave ? "border-primary bg-primary" : "border-muted-foreground"}`}>
+                        {selectedStyle === style.chave && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-primary-foreground rounded-full" /></div>}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-foreground">{style.label}</p>
-                        <p className="text-sm text-muted-foreground mt-0.5">{style.description}</p>
+                        <p className="font-medium text-foreground">{style.nome}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">{style.descricao}</p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {style.features.map((f, i) => <Badge key={i} variant="secondary" className="text-xs">{f}</Badge>)}
                         </div>

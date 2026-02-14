@@ -17,6 +17,7 @@ import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, 
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 import ParametrosCamposManager from "@/components/ParametrosCamposManager";
+import CamposFixosManager from "@/components/admin/CamposFixosManager";
 
 interface RegraServico {
   id: string;
@@ -574,7 +575,7 @@ const AdminParametros = () => {
       </div>
 
       <Tabs defaultValue="pagina-externa" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pagina-externa" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             Pág. Externa
@@ -586,6 +587,10 @@ const AdminParametros = () => {
           <TabsTrigger value="campos-respostas" className="flex items-center gap-2">
             <List className="h-4 w-4" />
             Campos
+          </TabsTrigger>
+          <TabsTrigger value="campos-fixos" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Campos Fixos
           </TabsTrigger>
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -724,6 +729,11 @@ const AdminParametros = () => {
               <ParametrosCamposManager />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ============= CAMPOS FIXOS ============= */}
+        <TabsContent value="campos-fixos">
+          <CamposFixosManager />
         </TabsContent>
 
         {/* ============= REGRAS DE SERVIÇO ============= */}

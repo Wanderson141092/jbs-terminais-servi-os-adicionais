@@ -63,12 +63,12 @@ const BatchStatusDialog = ({
           continue;
         }
 
-        // Log audit
-        await supabase.from("audit_log").insert({
-          solicitacao_id: sol.id,
-          usuario_id: userId,
-          acao: "atualizacao_status_lote",
-          detalhes: `Status atualizado em lote para: ${statusLabel}`,
+        // Log audit via secure RPC
+        await supabase.rpc("insert_audit_log", {
+          p_solicitacao_id: sol.id,
+          p_usuario_id: userId,
+          p_acao: "atualizacao_status_lote",
+          p_detalhes: `Status atualizado em lote para: ${statusLabel}. Status anterior: ${sol.status_vistoria || sol.status}. Protocolo: ${sol.protocolo}. Total no lote: ${solicitacoes.length} processos.`,
         });
       }
 

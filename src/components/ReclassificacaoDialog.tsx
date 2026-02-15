@@ -127,11 +127,11 @@ const ReclassificacaoDialog = ({ solicitacao, userId, userSetor, userPerfis = []
     const setorLabel = selectedSetor === "COMEX" ? "Administrativo" : "Operacional";
     const detalhes = `Reclassificação de aprovação - Setor ${setorLabel}: ${getStatusLabel(selectedSetor === "COMEX" ? comexStatus : armazemStatus)} → ${novaDecisao === "aprovado" ? "Aprovado" : "Recusado"}. Justificativa: ${justificativa}`;
 
-    await supabase.from("audit_log").insert({
-      solicitacao_id: solicitacao.id,
-      usuario_id: userId,
-      acao: "reclassificação de aprovação",
-      detalhes,
+    await supabase.rpc("insert_audit_log", {
+      p_solicitacao_id: solicitacao.id,
+      p_usuario_id: userId,
+      p_acao: "reclassificacao_aprovacao",
+      p_detalhes: detalhes,
     });
 
     // Notificar usuários

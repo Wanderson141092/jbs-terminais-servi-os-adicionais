@@ -131,7 +131,7 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
     const updatedDocs = documents.map(d => d.id === docId ? { ...d, status: "aceito" } : d);
     const generalStatus = calculateGeneralStatus(updatedDocs);
     
-    await logAudit("deferimento_aceito", `Deferimento aceito - Status geral: ${generalStatus}`);
+    await logAudit("deferimento_aceito", `Deferimento aceito. Arquivo: ${documents.find(d => d.id === docId)?.file_name || docId}. Status geral: ${generalStatus}`);
     await createNotification(`Deferimento aceito para ${solicitacao.protocolo}`, "deferimento");
     toast.success("Deferimento aceito! Status: Recebido");
     setLoading(false);
@@ -156,7 +156,7 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
       return;
     }
 
-    await logAudit("deferimento_recusado", `Deferimento recusado: ${motivoRecusa}`);
+    await logAudit("deferimento_recusado", `Deferimento recusado. Arquivo: ${documents.find(d => d.id === docId)?.file_name || docId}. Motivo: ${motivoRecusa}`);
     await createNotification(`Deferimento recusado para ${solicitacao.protocolo}`, "deferimento");
     toast.success("Deferimento recusado!");
     setShowRecusaDialog(null);

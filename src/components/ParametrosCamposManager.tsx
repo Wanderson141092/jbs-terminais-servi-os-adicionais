@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, Save } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ParametroCampo {
   id: string;
@@ -185,8 +186,11 @@ const ParametrosCamposManager = () => {
                     {grupo.showTipoResultado && (
                       <TableCell>
                         {item.tipo_resultado ? (
-                          <Badge variant={item.tipo_resultado === 'conforme' ? 'default' : item.tipo_resultado === 'nao_conforme' ? 'destructive' : 'secondary'} className="text-[10px]">
-                            {item.tipo_resultado === 'conforme' ? 'Conforme' : item.tipo_resultado === 'nao_conforme' ? 'Não Conforme' : 'Neutro'}
+                          <Badge 
+                            variant={item.tipo_resultado === 'conforme' ? 'default' : item.tipo_resultado === 'nao_conforme' ? 'destructive' : 'secondary'} 
+                            className={cn("text-[10px]", item.tipo_resultado === 'em_pendencia' && "bg-amber-500 text-white hover:bg-amber-600")}
+                          >
+                            {item.tipo_resultado === 'conforme' ? 'Conforme' : item.tipo_resultado === 'nao_conforme' ? 'Não Conforme' : item.tipo_resultado === 'em_pendencia' ? 'Em Pendência' : 'Neutro'}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>
@@ -284,6 +288,7 @@ const ParametrosCamposManager = () => {
                     <SelectItem value="neutro">Neutro</SelectItem>
                     <SelectItem value="conforme">Conforme</SelectItem>
                     <SelectItem value="nao_conforme">Não Conforme</SelectItem>
+                    <SelectItem value="em_pendencia">Em Pendência</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

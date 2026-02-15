@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -64,11 +64,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [clienteCnpj, setClienteCnpj] = useState("");
   const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
   const [custoposicionamento, setCustoposicionamento] = useState<boolean | null>(solicitacao.custo_posicionamento ?? null);
+  const [cancelRecusaConfig, setCancelRecusaConfig] = useState<any[]>([]);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showRecusarDialog, setShowRecusarDialog] = useState(false);
+  const [cancelJustificativa, setCancelJustificativa] = useState("");
 
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
@@ -76,6 +80,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         supabase.from("parametros_campos").select("*").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
         supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
         supabase.from("campos_analise_valores").select("campo_id, valor, campos_analise(nome)").eq("solicitacao_id", solicitacao.id),
+        supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
       ]);
 
       setAttachments(attachRes.data || []);
@@ -98,9 +103,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         label: s.valor
       }));
       
-      setStatusOptions(dynamicOptions);
+      // Filter out cancelado and recusado from the dropdown - they are now managed by dedicated buttons
+      const filteredOptions = dynamicOptions.filter((opt: any) => 
+        opt.value !== 'cancelado' && opt.value !== 'recusado'
+      );
+      
+      setStatusOptions(filteredOptions);
       setPendenciaOpcoes(pendenciaRes.data || []);
       setPendenciasSelecionadas(solicitacao.pendencias_selecionadas || []);
+      
+      // Store cancel/recusa config filtered by service
+      const allCancelConfig = (cancelConfigRes.data || []) as any[];
+      const serviceCancelConfig = currentServicoId 
+        ? allCancelConfig.filter((c: any) => c.servico_id === currentServicoId)
+        : [];
+      setCancelRecusaConfig(serviceCancelConfig);
 
       // Build dynamic fields display
       const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
@@ -238,6 +255,125 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     const isPosic = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
     return isPosic === true && status === "cancelado" && 
       (solicitacao.status === "confirmado_aguardando_vistoria");
+  };
+
+  // Determine if cancel/refuse buttons should be enabled based on config
+  const canCancelDireto = cancelRecusaConfig.some(
+    (c: any) => c.tipo === "cancelamento_direto" && c.status_habilitados.includes(solicitacao.status)
+  );
+  const canCancelConfirmacao = cancelRecusaConfig.some(
+    (c: any) => c.tipo === "cancelamento_confirmacao" && c.status_habilitados.includes(solicitacao.status)
+  );
+  const canRecusar = cancelRecusaConfig.some(
+    (c: any) => c.tipo === "recusa" && c.status_habilitados.includes(solicitacao.status)
+  );
+  const canCancel = canCancelDireto || canCancelConfirmacao;
+
+  const handleCancelarClick = () => {
+    setCustoposicionamento(null);
+    setCancelJustificativa("");
+    setShowCancelDialog(true);
+  };
+
+  const handleRecusarClick = () => {
+    setCancelJustificativa("");
+    setShowRecusarDialog(true);
+  };
+
+  const executeCancelamento = async () => {
+    if (canCancelConfirmacao && !canCancelDireto) {
+      // Requires cost validation
+      if (custoposicionamento === null) {
+        toast.error("Informe se há custo de posicionamento antes de salvar.");
+        return;
+      }
+    }
+
+    setLoading(true);
+    const updatePayload: any = {
+      status: "cancelado",
+      status_vistoria: "Cancelado",
+      updated_at: new Date().toISOString(),
+    };
+
+    if (canCancelConfirmacao && custoposicionamento !== null) {
+      updatePayload.custo_posicionamento = custoposicionamento;
+      if (custoposicionamento === true) {
+        updatePayload.lancamento_confirmado = false;
+      }
+    }
+
+    const { error } = await supabase
+      .from("solicitacoes")
+      .update(updatePayload)
+      .eq("id", solicitacao.id);
+
+    if (error) {
+      toast.error("Erro ao cancelar: " + error.message);
+      setLoading(false);
+      return;
+    }
+
+    let details = `Status atualizado para: Cancelado`;
+    if (canCancelConfirmacao) {
+      details += `. Cancelamento com confirmação interna. Custo de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
+      if (custoposicionamento === true) {
+        details += `. Lançamento financeiro ativado.`;
+      }
+    } else {
+      details += `. Cancelamento direto (pelo cliente).`;
+    }
+    if (cancelJustificativa.trim()) {
+      details += ` Justificativa: ${cancelJustificativa.trim()}`;
+    }
+
+    await logAudit("status_atualizado", details);
+    await createNotification(`Solicitação ${solicitacao.protocolo} cancelada`, "status");
+    supabase.functions.invoke("notificar-status", {
+      body: { solicitacao_id: solicitacao.id, novo_status: "cancelado", usuario_id: userId },
+    }).catch(() => {});
+
+    toast.success("Cancelamento realizado!");
+    setLoading(false);
+    setShowCancelDialog(false);
+    onClose();
+  };
+
+  const executeRecusa = async () => {
+    if (!cancelJustificativa.trim() || cancelJustificativa.trim().length < 10) {
+      toast.error("Justificativa obrigatória (mínimo 10 caracteres).");
+      return;
+    }
+
+    setLoading(true);
+    const updatePayload: any = {
+      status: "recusado",
+      status_vistoria: "Recusado",
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from("solicitacoes")
+      .update(updatePayload)
+      .eq("id", solicitacao.id);
+
+    if (error) {
+      toast.error("Erro ao recusar: " + error.message);
+      setLoading(false);
+      return;
+    }
+
+    const details = `Status atualizado para: Recusado. Justificativa: ${cancelJustificativa.trim()}`;
+    await logAudit("status_atualizado", details);
+    await createNotification(`Solicitação ${solicitacao.protocolo} recusada: ${cancelJustificativa.trim()}`, "status");
+    supabase.functions.invoke("notificar-status", {
+      body: { solicitacao_id: solicitacao.id, novo_status: "recusado", usuario_id: userId },
+    }).catch(() => {});
+
+    toast.success("Recusa registrada!");
+    setLoading(false);
+    setShowRecusarDialog(false);
+    onClose();
   };
 
   const handleUpdateStatus = async () => {
@@ -655,50 +791,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     </SelectContent>
                   </Select>
 
-                  {/* Custo de Posicionamento - cancelamento pós-confirmação */}
-                  {isLateCancel(selectedStatus) && (
-                    <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200">
-                      <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Há custo de posicionamento?
-                      </Label>
-                      <p className="text-xs text-amber-700">
-                        Cancelamento após confirmação requer validação de custo operacional.
-                      </p>
-                      <div className="flex gap-4 mt-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="custoposicionamento"
-                            checked={custoposicionamento === true}
-                            onChange={() => setCustoposicionamento(true)}
-                            className="accent-amber-600"
-                          />
-                          <span className="text-sm font-medium">Sim</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="custoposicionamento"
-                            checked={custoposicionamento === false}
-                            onChange={() => setCustoposicionamento(false)}
-                            className="accent-amber-600"
-                          />
-                          <span className="text-sm font-medium">Não</span>
-                        </label>
-                      </div>
-                      {custoposicionamento === true && (
-                        <p className="text-xs text-amber-700 mt-1 italic">
-                          O lançamento financeiro será ativado após salvar.
-                        </p>
-                      )}
-                      {custoposicionamento === null && (
-                        <p className="text-xs text-red-600 mt-1">
-                          Selecione uma opção para habilitar o salvamento.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {/* Custo de Posicionamento removed from here - now in cancel dialog */}
 
                   {/* Pendências Checkboxes */}
                   {selectedStatus === "vistoriado_com_pendencia" && (
@@ -753,7 +846,40 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </>
             )}
 
-            {/* Confirmação de Lançamento */}
+            {/* Botões Cancelar e Recusar - baseados em configuração de parâmetros */}
+            {(canCancel || canRecusar) && solicitacao.status !== 'cancelado' && solicitacao.status !== 'recusado' && (
+              <>
+                <Separator />
+                <div className="space-y-3 bg-destructive/5 p-4 rounded-lg border border-destructive/20">
+                  <p className="text-sm font-semibold text-destructive">Ações de Cancelamento / Recusa:</p>
+                  <div className="flex gap-3">
+                    {canCancel && (
+                      <Button
+                        variant="outline"
+                        onClick={handleCancelarClick}
+                        disabled={loading}
+                        className="flex-1 border-destructive/50 text-destructive hover:bg-destructive/10"
+                      >
+                        <Ban className="h-4 w-4 mr-2" />
+                        Cancelar
+                      </Button>
+                    )}
+                    {canRecusar && (
+                      <Button
+                        variant="destructive"
+                        onClick={handleRecusarClick}
+                        disabled={loading}
+                        className="flex-1"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Recusar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
             {(() => {
               const svcConf = servicos.find(sv => sv.nome === (solicitacao.tipo_operacao || ""));
               const statusLanc = svcConf?.status_confirmacao_lancamento || [];
@@ -1004,6 +1130,123 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de Cancelamento */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Ban className="h-5 w-5" />
+              Cancelar Solicitação
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+              <p><strong>Protocolo:</strong> {solicitacao.protocolo}</p>
+              <p><strong>Cliente:</strong> {solicitacao.cliente_nome}</p>
+              <p><strong>Status atual:</strong> {solicitacao.status_vistoria || solicitacao.status}</p>
+            </div>
+
+            {canCancelConfirmacao && (
+              <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200">
+                <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Há custo de posicionamento?
+                </Label>
+                <p className="text-xs text-amber-700">
+                  Cancelamento após confirmação requer validação de custo operacional.
+                </p>
+                <div className="flex gap-4 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="custo_cancel"
+                      checked={custoposicionamento === true}
+                      onChange={() => setCustoposicionamento(true)}
+                      className="accent-amber-600"
+                    />
+                    <span className="text-sm font-medium">Sim</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="custo_cancel"
+                      checked={custoposicionamento === false}
+                      onChange={() => setCustoposicionamento(false)}
+                      className="accent-amber-600"
+                    />
+                    <span className="text-sm font-medium">Não</span>
+                  </label>
+                </div>
+                {custoposicionamento === true && (
+                  <p className="text-xs text-amber-700 mt-1 italic">
+                    O lançamento financeiro será ativado após salvar.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div>
+              <Label>Justificativa (opcional)</Label>
+              <Textarea
+                value={cancelJustificativa}
+                onChange={(e) => setCancelJustificativa(e.target.value)}
+                placeholder="Motivo do cancelamento..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={executeCancelamento}
+              disabled={loading || (canCancelConfirmacao && !canCancelDireto && custoposicionamento === null)}
+            >
+              <Ban className="h-4 w-4 mr-2" />
+              Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Recusa */}
+      <Dialog open={showRecusarDialog} onOpenChange={setShowRecusarDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="h-5 w-5" />
+              Recusar Solicitação
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+              <p><strong>Protocolo:</strong> {solicitacao.protocolo}</p>
+              <p><strong>Cliente:</strong> {solicitacao.cliente_nome}</p>
+            </div>
+            <div>
+              <Label>Justificativa (obrigatória, mín. 10 caracteres)</Label>
+              <Textarea
+                value={cancelJustificativa}
+                onChange={(e) => setCancelJustificativa(e.target.value)}
+                placeholder="Informe o motivo da recusa..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRecusarDialog(false)}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={executeRecusa}
+              disabled={loading || cancelJustificativa.trim().length < 10}
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Confirmar Recusa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

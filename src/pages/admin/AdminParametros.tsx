@@ -13,12 +13,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch, Ban } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 import ParametrosCamposManager from "@/components/ParametrosCamposManager";
 import CamposFixosManager from "@/components/admin/CamposFixosManager";
 import ConsultaEtapasManager from "@/components/admin/ConsultaEtapasManager";
+import CancelamentoRecusaManager from "@/components/admin/CancelamentoRecusaManager";
 
 interface RegraServico {
   id: string;
@@ -597,6 +598,10 @@ const AdminParametros = () => {
             <GitBranch className="h-4 w-4" />
             Consulta
           </TabsTrigger>
+          <TabsTrigger value="cancelamento-recusa" className="flex items-center gap-2">
+            <Ban className="h-4 w-4" />
+            Cancel./Recusa
+          </TabsTrigger>
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Regras
@@ -744,6 +749,11 @@ const AdminParametros = () => {
         {/* ============= CONSULTA ETAPAS ============= */}
         <TabsContent value="consulta-etapas">
           <ConsultaEtapasManager />
+        </TabsContent>
+
+        {/* ============= CANCELAMENTO / RECUSA ============= */}
+        <TabsContent value="cancelamento-recusa">
+          <CancelamentoRecusaManager />
         </TabsContent>
 
         {/* ============= REGRAS DE SERVIÇO ============= */}

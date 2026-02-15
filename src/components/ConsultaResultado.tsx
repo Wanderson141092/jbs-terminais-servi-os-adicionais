@@ -140,10 +140,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   };
   const lacreStatus = getGeneralLacreStatus();
 
-  // Lacre armador visibility
+  // Lacre armador visibility - show when solicitar_lacre_armador is true (primary condition)
   const isServicePosicionamentoLacre = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
-  const statusInLacreActivation = servicoConfig?.lacre_armador_status_ativacao?.includes(solicitacao.status) ?? false;
-  const showLacreArmador = isServicePosicionamentoLacre && statusInLacreActivation && (solicitacao as any).solicitar_lacre_armador === true;
+  const showLacreArmador = isServicePosicionamentoLacre && (solicitacao as any).solicitar_lacre_armador === true;
   const canUploadLacre = showLacreArmador && (lacreDocs.length === 0 || lacreStatus === "recusado") && lacreStatus !== "aguardando";
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

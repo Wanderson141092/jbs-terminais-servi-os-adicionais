@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [pendenciaOpcoes, setPendenciaOpcoes] = useState<any[]>([]);
   const [pendenciasSelecionadas, setPendenciasSelecionadas] = useState<string[]>([]);
   const [solicitarDeferimento, setSolicitarDeferimento] = useState(false);
+  const [solicitarLacreArmador, setSolicitarLacreArmador] = useState(false);
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
   const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
@@ -88,6 +89,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setServicos(allServicosRes.data || []);
       setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
       setSolicitarDeferimento(solicitacao.solicitar_deferimento || false);
+      setSolicitarLacreArmador(solicitacao.solicitar_lacre_armador || false);
       setClienteNome(solicitacao.cliente_nome || "");
       setClienteCnpj(solicitacao.cnpj || "");
       
@@ -428,6 +430,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       status: selectedStatus,
       status_vistoria: statusVistoria,
       solicitar_deferimento: solicitarDeferimento,
+      solicitar_lacre_armador: solicitarLacreArmador,
       pendencias_selecionadas: pendenciasSelecionadas,
       cliente_nome: clienteNome.trim(),
       cnpj: clienteCnpj.trim() || null,
@@ -872,6 +875,32 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           checked={solicitarDeferimento}
                           onCheckedChange={setSolicitarDeferimento}
                           disabled={!isPosicionamento}
+                        />
+                      </div>
+                    );
+                  })()}
+
+                  {/* Lacre Armador Toggle - ativado quando pendência contém "Lacre Armador" */}
+                  {(() => {
+                    const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
+                    const hasLacrePendencia = pendenciasSelecionadas.some(p => p.toLowerCase().includes("lacre armador"));
+                    const isActive = isPosicionamento && hasLacrePendencia;
+                    return (
+                      <div className={`flex items-center justify-between border rounded-md p-3 ${isActive ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                        <div className="flex items-center gap-2">
+                          <Lock className="h-4 w-4 text-amber-600" />
+                          <div className="flex flex-col">
+                            <Label className="cursor-pointer" htmlFor="solicitar-lacre">Regularização de Lacre Armador</Label>
+                            <span className="text-[10px] text-muted-foreground">
+                              {isActive ? "Habilita envio de lacre na pág. externa" : "Requer pendência 'Lacre Armador' ativada"}
+                            </span>
+                          </div>
+                        </div>
+                        <Switch
+                          id="solicitar-lacre"
+                          checked={solicitarLacreArmador}
+                          onCheckedChange={setSolicitarLacreArmador}
+                          disabled={!isActive}
                         />
                       </div>
                     );

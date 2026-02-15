@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
@@ -39,6 +39,7 @@ import { ptBR } from "date-fns/locale";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import useNotifications from "@/hooks/useNotifications";
 import DeferimentoDialog from "@/components/DeferimentoDialog";
+import LacreArmadorDialog from "@/components/LacreArmadorDialog";
 
 interface Servico {
   id: string;
@@ -48,6 +49,7 @@ interface Servico {
   tipo_agendamento: string | null;
   status_confirmacao_lancamento?: string[];
   deferimento_status_ativacao?: string[];
+  lacre_armador_status_ativacao?: string[];
   aprovacao_ativada?: boolean;
 }
 
@@ -77,6 +79,7 @@ const InternoDashboard = () => {
   const [showBatchStatus, setShowBatchStatus] = useState(false);
   const [userPerfis, setUserPerfis] = useState<string[]>([]);
   const [deferimentoSolicitacao, setDeferimentoSolicitacao] = useState<any>(null);
+  const [lacreArmadorSolicitacao, setLacreArmadorSolicitacao] = useState<any>(null);
   const [showExcelExport, setShowExcelExport] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
@@ -351,6 +354,12 @@ const InternoDashboard = () => {
     const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
     if (!servico?.deferimento_status_ativacao?.length) return false;
     return servico.deferimento_status_ativacao.includes(s.status);
+  };
+
+  const isLacreArmadorActive = (s: any) => {
+    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    if (!servico?.lacre_armador_status_ativacao?.length) return false;
+    return servico.lacre_armador_status_ativacao.includes(s.status);
   };
 
   // Check if service needs approval
@@ -732,6 +741,17 @@ const InternoDashboard = () => {
                           >
                             <FileText className="h-4 w-4" />
                           </Button>
+                          {/* Lacre Armador button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => isLacreArmadorActive(s) ? setLacreArmadorSolicitacao(s) : null}
+                            title="Lacre Armador"
+                            disabled={!isLacreArmadorActive(s)}
+                            className={isLacreArmadorActive(s) ? "text-amber-600 hover:text-amber-700" : "text-muted-foreground/40"}
+                          >
+                            <Lock className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -894,6 +914,18 @@ const InternoDashboard = () => {
             setDeferimentoSolicitacao(null);
             fetchSolicitacoes();
             fetchDeferimentoCounts();
+          }}
+        />
+      )}
+
+      {/* Lacre Armador Dialog */}
+      {lacreArmadorSolicitacao && user && (
+        <LacreArmadorDialog
+          solicitacao={lacreArmadorSolicitacao}
+          userId={user.id}
+          onClose={() => {
+            setLacreArmadorSolicitacao(null);
+            fetchSolicitacoes();
           }}
         />
       )}

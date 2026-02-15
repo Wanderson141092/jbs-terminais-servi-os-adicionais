@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const { data: servicoData, error: servicoError } = await supabaseAdmin
       .from("servicos")
-      .select("id, nome, tipo_agendamento, deferimento_status_ativacao, aprovacao_administrativo, aprovacao_operacional")
+      .select("id, nome, tipo_agendamento, deferimento_status_ativacao, lacre_armador_status_ativacao, aprovacao_administrativo, aprovacao_operacional")
       .eq("id", servico_id)
       .eq("ativo", true)
       .maybeSingle();
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     const tipoOperacao = servicoData.nome;
     const valorUpper = valor.toUpperCase().trim();
 
-    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, pendencias_selecionadas, observacoes, custo_posicionamento";
+    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, solicitar_lacre_armador, lacre_armador_possui, lacre_armador_aceite_custo, pendencias_selecionadas, observacoes, custo_posicionamento";
 
     let solicitacao = null;
 
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     }
 
     // Fetch deferimento documents, observations, status labels, field config, and dynamic fields in parallel
-    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes, etapasConfigRes] = await Promise.all([
+    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes, etapasConfigRes, lacreConfigRes] = await Promise.all([
       supabaseAdmin
         .from("deferimento_documents")
         .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
@@ -145,6 +145,11 @@ Deno.serve(async (req) => {
         .select("chave, titulo, tipo, grupo, ordem, etapa_equivalente, status_gatilho")
         .eq("ativo", true)
         .order("ordem"),
+      supabaseAdmin
+        .from("system_config")
+        .select("config_key, config_value")
+        .in("config_key", ["lacre_armador_mensagem_custo", "lacre_armador_tipo_aceite", "lacre_armador_titulo_externo"])
+        .eq("is_active", true),
     ]);
 
     const deferimentoDocs = deferimentoRes.data;
@@ -212,6 +217,7 @@ Deno.serve(async (req) => {
     for (const [key, value] of Object.entries(allFields)) {
       if (key === "id" || key === "status" || key === "created_at" || key === "updated_at" || 
           key === "comex_aprovado" || key === "armazem_aprovado" || key === "solicitar_deferimento" ||
+          key === "solicitar_lacre_armador" || key === "lacre_armador_possui" || key === "lacre_armador_aceite_custo" ||
           key === "pendencias_selecionadas" || key === "status_vistoria" || key === "categoria" ||
           key === "tipo_operacao" || key === "observacoes" || key === "custo_posicionamento" ||
           visibleFixedFields.includes(key)) {
@@ -229,6 +235,12 @@ Deno.serve(async (req) => {
       status_gatilho: e.status_gatilho || [],
     }));
 
+    // Build lacre config map
+    const lacreConfigMap: Record<string, string> = {};
+    (lacreConfigRes.data || []).forEach((c: any) => {
+      lacreConfigMap[c.config_key] = c.config_value;
+    });
+
     return new Response(
       JSON.stringify({
         solicitacao: sanitizedSolicitacao,
@@ -241,8 +253,14 @@ Deno.serve(async (req) => {
         servico_config: {
           tipo_agendamento: servicoData.tipo_agendamento,
           deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],
+          lacre_armador_status_ativacao: (servicoData as any).lacre_armador_status_ativacao || [],
           aprovacao_administrativo: servicoData.aprovacao_administrativo ?? false,
           aprovacao_operacional: servicoData.aprovacao_operacional ?? false,
+        },
+        lacre_armador_config: {
+          mensagem_custo: lacreConfigMap["lacre_armador_mensagem_custo"] || "",
+          tipo_aceite: lacreConfigMap["lacre_armador_tipo_aceite"] || "informativo",
+          titulo_externo: lacreConfigMap["lacre_armador_titulo_externo"] || "Regularização de Lacre Armador",
         },
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -149,14 +149,23 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // Aguardando confirmação normal
   {
     let state: Stage["state"] = "pending";
+    let label = getTitle("aguardando_confirmacao", "Aguardando Confirmação");
     if (status === "aguardando_confirmacao") {
       state = "current";
     } else if (currentOrder > 1) {
       state = completedState;
+      // Once past this stage, show resolved label
+      if (isTerminal) {
+        label = terminalLabel; // "Cancelado" or "Recusado"
+      } else if (isEmPendencia) {
+        label = currentStatusLabel?.valor || "Em Pendência";
+      } else {
+        label = "Confirmado";
+      }
     }
     stages.push({
       key: "aguardando_confirmacao",
-      label: getTitle("aguardando_confirmacao", "Aguardando Confirmação"),
+      label,
       icon: stateIcon || (state === "pending" && isEmPendencia ? <Check className="h-4 w-4" /> : null) || <Clock className="h-4 w-4" />,
       state,
     });
@@ -305,9 +314,16 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         state = isEmPendencia ? "warning" : completedState;
       }
       if (currentOrder >= 2 || finishedStatuses.includes(status)) {
+        // Show resolved label based on tipo_resultado
+        let resolvedLabel = getTitle("servico_concluido", "Serviço Concluído");
+        if (isEmPendencia) {
+          resolvedLabel = currentStatusLabel?.valor || "Em Pendência";
+        } else if (state === "completed") {
+          resolvedLabel = currentStatusLabel?.valor || "Serviço Concluído";
+        }
         stages.push({
           key: "servico_concluido",
-          label: getTitle("servico_concluido", "Serviço Concluído"),
+          label: resolvedLabel,
           icon: isEmPendencia && state === "warning" ? <AlertTriangle className="h-4 w-4" /> : stateIcon || <Check className="h-4 w-4" />,
           state,
         });

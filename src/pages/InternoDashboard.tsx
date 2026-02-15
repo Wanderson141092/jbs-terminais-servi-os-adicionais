@@ -540,15 +540,17 @@ const InternoDashboard = () => {
 
         {/* Status breakdown - only actionable statuses */}
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6">
-          {statusOptions.map(({ value: key, label }) => (
-          <Badge
-              key={key}
-              variant={statusFilter === key ? "default" : "outline"}
-              className="cursor-pointer hover:bg-muted transition-colors px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm"
-              onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
-            >
-              {label}: {dashboardStatusCounts[key] || 0}
-            </Badge>
+          {statusOptions
+            .filter(({ value, label }) => !['cancelado', 'recusado'].includes(value) && !label.toLowerCase().includes('concluído'))
+            .map(({ value: key, label }) => (
+            <Badge
+                key={key}
+                variant={statusFilter === key ? "default" : "outline"}
+                className="cursor-pointer hover:bg-muted transition-colors px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm"
+                onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
+              >
+                {label}: {dashboardStatusCounts[key] || 0}
+              </Badge>
           ))}
         </div>
 
@@ -572,7 +574,9 @@ const InternoDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
-                  {statusOptions.map(({ value, label }) => (
+                  {statusOptions
+                    .filter(({ value, label }) => !['cancelado', 'recusado'].includes(value) && !label.toLowerCase().includes('concluído'))
+                    .map(({ value, label }) => (
                     <SelectItem key={value} value={value}>{label}</SelectItem>
                   ))}
                 </SelectContent>

@@ -16,6 +16,7 @@ import AdminIntegracoes from "./pages/admin/AdminIntegracoes";
 
 import AdminHistoricoIntegracoes from "./pages/admin/AdminHistoricoIntegracoes";
 import AdminFormularios from "./pages/admin/AdminFormularios";
+import GestorRegras from "./pages/GestorRegras";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,7 +40,8 @@ const App = () => (
           <Route path="/interno/admin/integracoes" element={<AdminIntegracoes />} />
           
           <Route path="/interno/admin/historico-integracoes" element={<AdminHistoricoIntegracoes />} />
-          <Route path="/interno/admin/formularios" element={<AdminFormularios />} />
+           <Route path="/interno/admin/formularios" element={<AdminFormularios />} />
+          <Route path="/interno/gestor/regras" element={<GestorRegras />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

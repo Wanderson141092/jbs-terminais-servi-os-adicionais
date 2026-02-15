@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
@@ -422,6 +422,12 @@ const InternoDashboard = () => {
             {!isAdmin && (
               <Button variant="ghost" size="sm" onClick={() => navigate("/interno/admin/logs")} className="text-primary-foreground hover:bg-primary-foreground/10">
                 <FileText className="h-4 w-4" />
+              </Button>
+            )}
+
+            {userPerfis.includes("GESTOR") && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/interno/gestor/regras")} className="text-primary-foreground hover:bg-primary-foreground/10" title="Regras de Serviço">
+                <Shield className="h-4 w-4" />
               </Button>
             )}
             

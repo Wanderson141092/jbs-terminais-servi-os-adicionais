@@ -1602,6 +1602,11 @@ export type Database = {
         }
         Returns: undefined
       }
+      is_gestor: { Args: { _user_id: string }; Returns: boolean }
+      is_gestor_for_service: {
+        Args: { _servico_id: string; _user_id: string }
+        Returns: boolean
+      }
       setup_admin_role: { Args: never; Returns: undefined }
     }
     Enums: {

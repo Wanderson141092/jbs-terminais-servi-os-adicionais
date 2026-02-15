@@ -1,4 +1,4 @@
-import { Check, X, Clock, Circle } from "lucide-react";
+import { Check, X, Clock, Circle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EtapaConfigItem {
@@ -38,7 +38,7 @@ interface ProcessChecklistProps {
 
 interface CheckItem {
   label: string;
-  status: "done" | "pending" | "error" | "waiting";
+  status: "done" | "pending" | "error" | "waiting" | "warning";
   detail?: string;
 }
 
@@ -161,6 +161,11 @@ const statusConfig = {
     icon: <Circle className="h-3.5 w-3.5" />,
     className: "text-muted-foreground bg-muted/50 border-muted",
     iconBg: "bg-muted text-muted-foreground",
+  },
+  warning: {
+    icon: <AlertTriangle className="h-3.5 w-3.5" />,
+    className: "text-amber-600 bg-amber-50 border-amber-200",
+    iconBg: "bg-amber-500 text-white",
   },
 };
 

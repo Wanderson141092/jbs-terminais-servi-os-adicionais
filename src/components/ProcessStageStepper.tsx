@@ -1,4 +1,4 @@
-import { Check, Clock, X, CircleDot, FileCheck, Upload } from "lucide-react";
+import { Check, Clock, X, CircleDot, FileCheck, Upload, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EtapaConfigItem {
@@ -33,7 +33,7 @@ interface Stage {
   key: string;
   label: string;
   icon: React.ReactNode;
-  state: "completed" | "current" | "pending" | "error";
+  state: "completed" | "current" | "pending" | "error" | "warning";
   detail?: string;
 }
 
@@ -91,6 +91,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // Determine if terminal based on tipo_resultado from statusLabels
   const currentStatusLabel = statusLabels.find(sl => sl.sigla === status);
   const isNaoConforme = currentStatusLabel?.tipo_resultado === "nao_conforme";
+  const isEmPendencia = currentStatusLabel?.tipo_resultado === "em_pendencia";
   
   // Fallback for hardcoded terminal states if no tipo_resultado available
   const isCancelled = status === "cancelado";
@@ -107,7 +108,8 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   const currentOrder = STATUS_ORDER[status] ?? 0;
 
   // For terminal states, all completed stages become "error" to paint the whole line red
-  const completedState = isTerminal ? "error" as const : "completed" as const;
+  // For em_pendencia states, use "warning" state
+  const completedState = isTerminal ? "error" as const : isEmPendencia ? "warning" as const : "completed" as const;
 
   // Stage 1: Solicitação Recebida (always completed once exists)
   stages.push({
@@ -313,7 +315,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
 interface DeferimentoStage {
   key: string;
   label: string;
-  state: "completed" | "current" | "pending" | "error";
+  state: "completed" | "current" | "pending" | "error" | "warning";
   icon: React.ReactNode;
 }
 
@@ -383,15 +385,21 @@ const stateStyles = {
     line: "bg-red-300",
     label: "text-red-700 font-medium",
   },
+  warning: {
+    circle: "bg-amber-500 text-white border-amber-500",
+    line: "bg-amber-300",
+    label: "text-amber-700 font-medium",
+  },
 };
 
 const stateIcons: Record<string, React.ReactNode> = {
   completed: <Check className="h-3.5 w-3.5" />,
   error: <X className="h-3.5 w-3.5" />,
   current: <CircleDot className="h-3.5 w-3.5" />,
+  warning: <AlertTriangle className="h-3.5 w-3.5" />,
 };
 
-const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; label: string; state: "completed" | "current" | "pending" | "error"; icon: React.ReactNode; detail?: string }[]; compact?: boolean }) => {
+const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; label: string; state: "completed" | "current" | "pending" | "error" | "warning"; icon: React.ReactNode; detail?: string }[]; compact?: boolean }) => {
   if (compact) {
     return (
       <div className="flex items-center gap-1 flex-wrap">

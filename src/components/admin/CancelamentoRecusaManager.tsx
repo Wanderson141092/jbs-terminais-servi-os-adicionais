@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Save, Ban, XCircle, ShieldAlert } from "lucide-react";
+import { Plus, Edit, Save, Ban, XCircle, ShieldAlert, Trash2 } from "lucide-react";
 
 interface ConfigItem {
   id: string;
@@ -183,6 +183,14 @@ const CancelamentoRecusaManager = () => {
     fetchAll();
   };
 
+  const handleDelete = async (item: ConfigItem) => {
+    if (!confirm("Tem certeza que deseja excluir esta regra?")) return;
+    const { error } = await supabase.from("cancelamento_recusa_config").delete().eq("id", item.id);
+    if (error) { toast.error("Erro ao excluir"); return; }
+    toast.success("Regra excluída!");
+    fetchAll();
+  };
+
   const tipoInfo = (tipo: string) => TIPOS.find((t) => t.key === tipo);
 
   if (loading) return <p className="text-muted-foreground text-center py-8">Carregando...</p>;
@@ -254,9 +262,14 @@ const CancelamentoRecusaManager = () => {
                           <Switch checked={item.ativo} onCheckedChange={() => toggleAtivo(item)} />
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => openDialog(item)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openDialog(item)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(item)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -306,7 +319,7 @@ const CancelamentoRecusaManager = () => {
               <Select
                 value={formData.tipo}
                 onValueChange={(v) => setFormData({ ...formData, tipo: v })}
-                disabled={!!editingItem}
+                disabled={false}
               >
                 <SelectTrigger>
                   <SelectValue />

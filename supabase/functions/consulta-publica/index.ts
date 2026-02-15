@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
       supabaseAdmin
         .from("system_config")
         .select("config_key, config_value")
-        .in("config_key", ["lacre_armador_mensagem_custo", "lacre_armador_tipo_aceite", "lacre_armador_titulo_externo"])
+        .in("config_key", ["lacre_armador_mensagem_custo", "lacre_armador_tipo_aceite", "lacre_armador_titulo_externo", "lacre_armador_anexo_ativo"])
         .eq("is_active", true),
       supabaseAdmin
         .from("lacre_armador_dados")
@@ -277,6 +277,7 @@ Deno.serve(async (req) => {
           mensagem_custo: lacreConfigMap["lacre_armador_mensagem_custo"] || "",
           tipo_aceite: lacreConfigMap["lacre_armador_tipo_aceite"] || "informativo",
           titulo_externo: lacreConfigMap["lacre_armador_titulo_externo"] || "Regularização de Lacre Armador",
+          anexo_ativo: lacreConfigMap["lacre_armador_anexo_ativo"] !== "false",
         },
         lacre_armador_dados: lacreArmadorDados,
       }),

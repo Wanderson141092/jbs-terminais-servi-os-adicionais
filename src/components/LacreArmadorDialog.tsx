@@ -256,11 +256,11 @@ const LacreArmadorDialog = ({ solicitacao, userId, onClose }: LacreArmadorDialog
                     </div>
                   </div>
 
-                  {/* Foto do lacre */}
+                  {/* RIC do novo lacre */}
                   {fotoSignedUrl && (
                     <div className="border rounded-lg p-3">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> Foto do Lacre</p>
-                      <img src={fotoSignedUrl} alt="Foto do lacre" className="max-w-full max-h-[300px] rounded border mx-auto" />
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> RIC do novo lacre com imagem do novo lacre</p>
+                      <img src={fotoSignedUrl} alt="RIC do novo lacre" className="max-w-full max-h-[300px] rounded border mx-auto" />
                     </div>
                   )}
                 </div>

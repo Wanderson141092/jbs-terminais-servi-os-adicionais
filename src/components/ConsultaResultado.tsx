@@ -61,6 +61,7 @@ interface LacreArmadorConfig {
   mensagem_custo?: string;
   tipo_aceite?: string;
   titulo_externo?: string;
+  anexo_ativo?: boolean;
 }
 
 interface LacreArmadorDados {
@@ -525,10 +526,12 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> Foto do Lacre</Label>
-                      <Input type="file" accept="image/jpeg,image/png" onChange={(e) => setLacreFotoFile(e.target.files?.[0] || null)} className="text-sm" />
-                    </div>
+                    {lacreArmadorConfig?.anexo_ativo !== false && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> RIC do novo lacre com imagem do novo lacre</Label>
+                        <Input type="file" accept="image/jpeg,image/png" onChange={(e) => setLacreFotoFile(e.target.files?.[0] || null)} className="text-sm" />
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
@@ -661,8 +664,8 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                     {lacreArmadorDados.responsavel_email && <p><strong>E-mail:</strong> {lacreArmadorDados.responsavel_email}</p>}
                     {lacreArmadorDados.foto_lacre_url && (
                       <div className="mt-2">
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">Foto do Lacre</p>
-                        <img src={lacreArmadorDados.foto_lacre_url} alt="Foto do lacre" className="max-w-[200px] rounded border" />
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">RIC do novo lacre com imagem do novo lacre</p>
+                        <img src={lacreArmadorDados.foto_lacre_url} alt="RIC do novo lacre" className="max-w-[200px] rounded border" />
                       </div>
                     )}
                   </div>

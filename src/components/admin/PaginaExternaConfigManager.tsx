@@ -40,6 +40,7 @@ const LACRE_CONFIGS = [
   { key: "lacre_armador_mensagem_custo", label: "Mensagem de Custo do Lacre", description: "Mensagem exibida na consulta externa quando há custo de serviço para o lacre armador" },
   { key: "lacre_armador_titulo_externo", label: "Título Externo do Lacre", description: "Título exibido na seção de lacre armador na consulta externa" },
   { key: "lacre_armador_tipo_aceite", label: "Tipo de Aceite do Lacre", description: "Tipo de aceite para custo: 'informativo' ou 'aceite'" },
+  { key: "lacre_armador_anexo_ativo", label: "Anexo de Foto do Lacre", description: "Ativa ou desativa o campo de anexo 'RIC do novo lacre com imagem do novo lacre' no formulário externo" },
 ];
 
 const PaginaExternaConfigManager = () => {
@@ -429,6 +430,14 @@ const PaginaExternaConfigManager = () => {
                 <SelectContent>
                   <SelectItem value="informativo">Informativo</SelectItem>
                   <SelectItem value="aceite">Aceite obrigatório</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : editingConfig?.config_key === "lacre_armador_anexo_ativo" ? (
+              <Select value={editValue || "true"} onValueChange={setEditValue}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Ativo</SelectItem>
+                  <SelectItem value="false">Desativado</SelectItem>
                 </SelectContent>
               </Select>
             ) : (

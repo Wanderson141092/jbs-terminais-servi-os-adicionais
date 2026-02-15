@@ -366,10 +366,11 @@ const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "agua
   // null (falta enviar) → all yellow (warning)
 
   if (deferimentoStatus === "recusado") {
+    // Arquivo já foi enviado → cinza, somente Recusado em vermelho
     stages.push({
-      key: "aguardando_envio",
-      label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
-      icon: <Upload className="h-4 w-4" />,
+      key: "arquivo_enviado",
+      label: getTitle("arquivo_enviado", "Arquivo Enviado"),
+      icon: <FileCheck className="h-4 w-4" />,
       state: "pending", // gray
     });
     stages.push({
@@ -379,23 +380,25 @@ const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "agua
       state: "error", // red
     });
   } else if (deferimentoStatus === "recebido") {
+    // Tudo verde: arquivo enviado + recebido/deferido
     stages.push({
-      key: "aguardando_envio",
-      label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
-      icon: <Upload className="h-4 w-4" />,
+      key: "arquivo_enviado",
+      label: getTitle("arquivo_enviado", "Arquivo Enviado"),
+      icon: <FileCheck className="h-4 w-4" />,
       state: "completed", // green
     });
     stages.push({
       key: "documento_recebido",
-      label: getTitle("documento_recebido", "Documento Recebido"),
+      label: getTitle("documento_recebido", "Recebido / Deferido"),
       icon: <Check className="h-4 w-4" />,
       state: "completed", // green
     });
   } else if (deferimentoStatus === "aguardando") {
+    // Tudo azul: arquivo enviado + aguardando análise
     stages.push({
-      key: "aguardando_envio",
-      label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
-      icon: <Upload className="h-4 w-4" />,
+      key: "arquivo_enviado",
+      label: getTitle("arquivo_enviado", "Arquivo Enviado"),
+      icon: <FileCheck className="h-4 w-4" />,
       state: "current", // blue
     });
     stages.push({
@@ -405,7 +408,7 @@ const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "agua
       state: "current", // blue
     });
   } else {
-    // null = falta enviar → yellow
+    // null = falta enviar → amarelo
     stages.push({
       key: "aguardando_envio",
       label: getTitle("aguardando_envio", "Falta Enviar"),

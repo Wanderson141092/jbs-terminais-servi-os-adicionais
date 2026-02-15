@@ -399,6 +399,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       toast.error("Ambos os setores (Administrativo e Operacional) devem aprovar antes de alterar para este status.");
       return;
     }
+
+    // Validação: se deferimento está ativo, só permite vistoria_finalizada se deferimento foi recebido
+    if (solicitarDeferimento && selectedStatus === "vistoria_finalizada") {
+      const { data: defDocs } = await supabase
+        .from("deferimento_documents")
+        .select("status")
+        .eq("solicitacao_id", solicitacao.id)
+        .eq("document_type", "deferimento");
+      
+      const allAceitos = defDocs && defDocs.length > 0 && defDocs.every(d => d.status === "aceito");
+      if (!allAceitos) {
+        toast.error("O deferimento precisa estar com status 'Recebido' antes de finalizar a vistoria.");
+        return;
+      }
+    }
     
     setLoading(true);
     

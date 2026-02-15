@@ -24,9 +24,96 @@ Deno.serve(async (req) => {
   try {
     const contentType = req.headers.get("content-type") || "";
 
-    // Handle JSON requests (e.g., update_lacre_info)
+    // Handle JSON requests
     if (contentType.includes("application/json")) {
       const body = await req.json();
+
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      // Submit lacre armador form data
+      if (body.action === "submit_lacre_form") {
+        const {
+          solicitacao_id,
+          lacre_coletado,
+          data_posicionamento_lacre,
+          periodo_lacre,
+          responsavel_nome,
+          responsavel_telefone,
+          responsavel_email,
+        } = body;
+
+        if (!solicitacao_id) {
+          return new Response(
+            JSON.stringify({ error: "Solicitação não informada." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check if record already exists
+        const { data: existing } = await supabaseAdmin
+          .from("lacre_armador_dados")
+          .select("id")
+          .eq("solicitacao_id", solicitacao_id)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing
+          const { error } = await supabaseAdmin
+            .from("lacre_armador_dados")
+            .update({
+              lacre_coletado: lacre_coletado ?? null,
+              data_posicionamento_lacre: data_posicionamento_lacre || null,
+              periodo_lacre: periodo_lacre || null,
+              responsavel_nome: responsavel_nome || null,
+              responsavel_telefone: responsavel_telefone || null,
+              responsavel_email: responsavel_email || null,
+              lacre_status: "aguardando_confirmacao",
+              motivo_recusa: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+
+          if (error) {
+            console.error("Error updating lacre data:", error);
+            return new Response(
+              JSON.stringify({ error: "Erro ao atualizar dados do lacre." }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else {
+          // Insert new
+          const { error } = await supabaseAdmin
+            .from("lacre_armador_dados")
+            .insert({
+              solicitacao_id,
+              lacre_coletado: lacre_coletado ?? null,
+              data_posicionamento_lacre: data_posicionamento_lacre || null,
+              periodo_lacre: periodo_lacre || null,
+              responsavel_nome: responsavel_nome || null,
+              responsavel_telefone: responsavel_telefone || null,
+              responsavel_email: responsavel_email || null,
+              lacre_status: "aguardando_confirmacao",
+            });
+
+          if (error) {
+            console.error("Error inserting lacre data:", error);
+            return new Response(
+              JSON.stringify({ error: "Erro ao salvar dados do lacre." }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ success: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Upload lacre photo (JSON with base64 - NOT USED, photo goes via FormData)
       if (body.action === "update_lacre_info") {
         const { solicitacao_id, lacre_armador_possui, data_posicionamento } = body;
         if (!solicitacao_id) {
@@ -35,10 +122,6 @@ Deno.serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const supabaseAdmin = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
         const updateData: Record<string, any> = {
           lacre_armador_possui: lacre_armador_possui ?? null,
           updated_at: new Date().toISOString(),
@@ -61,6 +144,7 @@ Deno.serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
       return new Response(
         JSON.stringify({ error: "Ação não reconhecida." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -108,10 +192,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Sanitize file name
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
 
-    // For deferimento uploads
+    // For deferimento uploads (including lacre photo)
     if (bucket === "deferimento" && solicitacaoId) {
       const { data: solicitacao } = await supabaseAdmin
         .from("solicitacoes")
@@ -141,7 +224,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Generate signed URL (1 hour)
       const { data: signedData, error: signError } = await supabaseAdmin.storage
         .from(bucket)
         .createSignedUrl(storagePath, 3600);
@@ -153,13 +235,38 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Store the storage path (not full URL) for generating signed URLs later
+      // If this is a lacre photo, update lacre_armador_dados
+      if (documentType === "lacre_foto") {
+        const { data: lacreData } = await supabaseAdmin
+          .from("lacre_armador_dados")
+          .select("id")
+          .eq("solicitacao_id", solicitacaoId)
+          .maybeSingle();
+
+        if (lacreData) {
+          await supabaseAdmin
+            .from("lacre_armador_dados")
+            .update({
+              foto_lacre_url: signedData.signedUrl,
+              foto_lacre_path: storagePath,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", lacreData.id);
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, file_url: signedData.signedUrl, storage_path: storagePath }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Standard deferimento document
       const { error: dbError } = await supabaseAdmin
         .from("deferimento_documents")
         .insert({
           solicitacao_id: solicitacaoId,
           file_name: file.name,
-          file_url: storagePath, // Store path, not full URL
+          file_url: storagePath,
           document_type: documentType,
           status: "pendente",
         });
@@ -195,7 +302,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Generate signed URL (1 hour)
       const { data: signedData, error: signError } = await supabaseAdmin.storage
         .from(bucket)
         .createSignedUrl(storagePath, 3600);

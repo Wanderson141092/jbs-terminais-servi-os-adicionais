@@ -105,8 +105,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch deferimento documents, observations, status labels, field config, and dynamic fields in parallel
-    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes, etapasConfigRes, lacreConfigRes] = await Promise.all([
+    // Fetch deferimento documents, observations, status labels, field config, dynamic fields, lacre data in parallel
+    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes, etapasConfigRes, lacreConfigRes, lacreArmadorDadosRes] = await Promise.all([
       supabaseAdmin
         .from("deferimento_documents")
         .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
@@ -150,6 +150,11 @@ Deno.serve(async (req) => {
         .select("config_key, config_value")
         .in("config_key", ["lacre_armador_mensagem_custo", "lacre_armador_tipo_aceite", "lacre_armador_titulo_externo"])
         .eq("is_active", true),
+      supabaseAdmin
+        .from("lacre_armador_dados")
+        .select("*")
+        .eq("solicitacao_id", solicitacao.id)
+        .maybeSingle(),
     ]);
 
     const deferimentoDocs = deferimentoRes.data;
@@ -241,6 +246,17 @@ Deno.serve(async (req) => {
       lacreConfigMap[c.config_key] = c.config_value;
     });
 
+    // Process lacre armador dados - generate signed URL for photo if exists
+    let lacreArmadorDados = lacreArmadorDadosRes.data || null;
+    if (lacreArmadorDados?.foto_lacre_path) {
+      const { data: signedData } = await supabaseAdmin.storage
+        .from("deferimento")
+        .createSignedUrl(lacreArmadorDados.foto_lacre_path, 3600);
+      if (signedData) {
+        lacreArmadorDados = { ...lacreArmadorDados, foto_lacre_url: signedData.signedUrl };
+      }
+    }
+
     return new Response(
       JSON.stringify({
         solicitacao: sanitizedSolicitacao,
@@ -262,6 +278,7 @@ Deno.serve(async (req) => {
           tipo_aceite: lacreConfigMap["lacre_armador_tipo_aceite"] || "informativo",
           titulo_externo: lacreConfigMap["lacre_armador_titulo_externo"] || "Regularização de Lacre Armador",
         },
+        lacre_armador_dados: lacreArmadorDados,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

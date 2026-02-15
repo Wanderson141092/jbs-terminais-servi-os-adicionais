@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
-import { downloadProcessoPdf, downloadBatchPdfs } from "@/components/ProcessoPdfGenerator";
+import { downloadInternalPdf, downloadBatchPdfs } from "@/components/ProcessoPdfGenerator";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -735,7 +735,7 @@ const InternoDashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => downloadProcessoPdf(s)}
+                            onClick={() => downloadInternalPdf(s)}
                             title="Salvar PDF"
                           >
                             <Download className="h-4 w-4" />

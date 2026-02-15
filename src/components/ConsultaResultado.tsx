@@ -13,7 +13,7 @@ import ProcessChecklist from "./ProcessChecklist";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatTipoCarga } from "@/lib/tipoCarga";
-import { downloadProcessoPdf } from "./ProcessoPdfGenerator";
+import { downloadExternalPdf } from "./ProcessoPdfGenerator";
 
 interface Solicitacao {
   id: string;
@@ -314,7 +314,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               <CardTitle className="text-lg font-bold text-foreground">
                 Protocolo: {solicitacao.protocolo}
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => downloadProcessoPdf(solicitacao, { includeChecklist: true, aprovacaoAtivada: aprovacaoAdministrativo || aprovacaoOperacional, deferimentoStatus: generalStatus })} title="Baixar PDF">
+              <Button variant="outline" size="sm" onClick={() => downloadExternalPdf(solicitacao, { includeChecklist: true, aprovacaoAtivada: aprovacaoAdministrativo || aprovacaoOperacional, deferimentoStatus: generalStatus })} title="Baixar PDF">
                 <Download className="h-4 w-4" />
               </Button>
             </div>

@@ -244,9 +244,9 @@ const Index = () => {
               )}
 
               {!isLoading && hasSearched && !resultado && (
-                <Card className="border-2 border-amber-400 bg-amber-50">
+                <Card className="border border-amber-300 bg-amber-50/60">
                   <CardContent className="py-12 text-center">
-                    <p className="text-amber-700 font-semibold">Nenhuma solicitação encontrada.</p>
+                    <p className="text-amber-600">Nenhuma solicitação encontrada.</p>
                   </CardContent>
                 </Card>
               )}

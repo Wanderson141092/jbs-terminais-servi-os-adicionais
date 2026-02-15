@@ -152,21 +152,33 @@ const CancelamentoRecusaManager = () => {
     };
 
     if (editingItem) {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("cancelamento_recusa_config")
         .update(data)
-        .eq("id", editingItem.id);
+        .eq("id", editingItem.id)
+        .select();
       if (error) {
-        toast.error("Erro ao atualizar");
+        toast.error("Erro ao atualizar: " + error.message);
+        return;
+      }
+      if (!updated || updated.length === 0) {
+        toast.error("Não foi possível atualizar. Verifique se sua sessão está ativa e faça login novamente.");
         return;
       }
       toast.success("Atualizado!");
     } else {
-      const { error } = await supabase.from("cancelamento_recusa_config").insert(data);
+      const { data: inserted, error } = await supabase
+        .from("cancelamento_recusa_config")
+        .insert(data)
+        .select();
       if (error) {
         if (error.code === "23505")
           toast.error("Já existe uma configuração para este serviço e tipo");
-        else toast.error("Erro ao criar");
+        else toast.error("Erro ao criar: " + error.message);
+        return;
+      }
+      if (!inserted || inserted.length === 0) {
+        toast.error("Não foi possível criar. Verifique se sua sessão está ativa e faça login novamente.");
         return;
       }
       toast.success("Configuração criada!");
@@ -176,17 +188,30 @@ const CancelamentoRecusaManager = () => {
   };
 
   const toggleAtivo = async (item: ConfigItem) => {
-    await supabase
+    const { data: updated, error } = await supabase
       .from("cancelamento_recusa_config")
       .update({ ativo: !item.ativo })
-      .eq("id", item.id);
+      .eq("id", item.id)
+      .select();
+    if (error || !updated || updated.length === 0) {
+      toast.error("Não foi possível alterar. Verifique sua sessão e faça login novamente.");
+      return;
+    }
     fetchAll();
   };
 
   const handleDelete = async (item: ConfigItem) => {
     if (!confirm("Tem certeza que deseja excluir esta regra?")) return;
-    const { error } = await supabase.from("cancelamento_recusa_config").delete().eq("id", item.id);
-    if (error) { toast.error("Erro ao excluir"); return; }
+    const { data: deleted, error } = await supabase
+      .from("cancelamento_recusa_config")
+      .delete()
+      .eq("id", item.id)
+      .select();
+    if (error) { toast.error("Erro ao excluir: " + error.message); return; }
+    if (!deleted || deleted.length === 0) {
+      toast.error("Não foi possível excluir. Verifique se sua sessão está ativa e faça login novamente.");
+      return;
+    }
     toast.success("Regra excluída!");
     fetchAll();
   };

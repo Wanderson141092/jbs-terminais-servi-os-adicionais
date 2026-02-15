@@ -91,6 +91,17 @@ Deno.serve(async (req) => {
         }),
       });
 
+      // Log the resend action in audit_log
+      const { usuario_id: resendUsuarioId } = body;
+      if (resendUsuarioId) {
+        await supabaseAdmin.rpc("insert_audit_log", {
+          p_solicitacao_id: solicitacao_id,
+          p_usuario_id: resendUsuarioId,
+          p_acao: "reenvio_chave_consulta",
+          p_detalhes: `Chave de consulta reenviada para ${sol.cliente_email}`,
+        });
+      }
+
       return new Response(
         JSON.stringify({ success: true }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

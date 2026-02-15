@@ -101,9 +101,23 @@ Deno.serve(async (req) => {
         .eq("id", configData.id);
     }
 
-    // 5. Insert solicitacao
+    // 5. Generate unique validation key (6 chars alphanumeric = 2.17B combinations)
+    const generateChaveConsulta = (): string => {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      let key = "";
+      const array = new Uint8Array(6);
+      crypto.getRandomValues(array);
+      for (let i = 0; i < 6; i++) {
+        key += chars[array[i] % chars.length];
+      }
+      return key;
+    };
+    const chaveConsulta = generateChaveConsulta();
+
+    // 6. Insert solicitacao
     const { error: solError } = await supabase.from("solicitacoes").insert({
       protocolo,
+      chave_consulta: chaveConsulta,
       cliente_nome: solicitacaoData.cliente_nome || "Cliente via formulário",
       cliente_email: solicitacaoData.cliente_email || "nao-informado@formulario.local",
       tipo_operacao: solicitacaoData.tipo_operacao || null,
@@ -139,7 +153,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ protocolo }),
+      JSON.stringify({ protocolo, chave_consulta: chaveConsulta }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {

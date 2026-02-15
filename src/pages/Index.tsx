@@ -55,6 +55,7 @@ const Index = () => {
   const [activeDialog, setActiveDialog] = useState<{ type: "iframe" | "form"; data: ExternalButton } | null>(null);
   const [lastSearchServicoId, setLastSearchServicoId] = useState<string>("");
   const [lastSearchValor, setLastSearchValor] = useState<string>("");
+  const [lastSearchChave, setLastSearchChave] = useState<string>("");
 
   // Carregar botões externos
   useEffect(() => {
@@ -73,14 +74,15 @@ const Index = () => {
   }, []);
 
   // Secure consultation via edge function (no direct DB access)
-  const handleSearch = useCallback(async (servicoId: string, valor: string) => {
+  const handleSearch = useCallback(async (servicoId: string, valor: string, chave: string) => {
     setIsLoading(true);
     setHasSearched(true);
     setLastSearchServicoId(servicoId);
     setLastSearchValor(valor);
+    setLastSearchChave(chave);
     try {
       const { data: response, error } = await supabase.functions.invoke("consulta-publica", {
-        body: { servico_id: servicoId, valor },
+        body: { servico_id: servicoId, valor, chave },
       });
 
       if (error) {
@@ -231,7 +233,7 @@ const Index = () => {
                   observacoes={observacoes}
                   statusLabels={statusLabels}
                   etapasConfig={etapasConfig}
-                  onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor)}
+                  onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor, lastSearchChave)}
                 />
               )}
 

@@ -1375,6 +1375,7 @@ export type Database = {
           armazem_justificativa: string | null
           armazem_usuario_id: string | null
           categoria: string | null
+          chave_consulta: string
           cliente_email: string
           cliente_nome: string
           cnpj: string | null
@@ -1408,6 +1409,7 @@ export type Database = {
           armazem_justificativa?: string | null
           armazem_usuario_id?: string | null
           categoria?: string | null
+          chave_consulta?: string
           cliente_email: string
           cliente_nome: string
           cnpj?: string | null
@@ -1441,6 +1443,7 @@ export type Database = {
           armazem_justificativa?: string | null
           armazem_usuario_id?: string | null
           categoria?: string | null
+          chave_consulta?: string
           cliente_email?: string
           cliente_nome?: string
           cnpj?: string | null

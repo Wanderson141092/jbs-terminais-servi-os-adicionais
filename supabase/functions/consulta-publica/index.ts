@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { servico_id, valor } = await req.json();
+    const { servico_id, valor, chave } = await req.json();
 
     if (!servico_id || typeof servico_id !== "string") {
       return new Response(
@@ -27,6 +27,15 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (!chave || typeof chave !== "string" || chave.trim().length !== 6) {
+      return new Response(
+        JSON.stringify({ error: "Chave de validação obrigatória (6 caracteres)." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const chaveUpper = chave.toUpperCase().trim();
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -60,6 +69,7 @@ Deno.serve(async (req) => {
       .select(selectFields)
       .eq("protocolo", valorUpper)
       .eq("tipo_operacao", tipoOperacao)
+      .eq("chave_consulta", chaveUpper)
       .maybeSingle();
 
     solicitacao = byProtocolo;
@@ -71,6 +81,7 @@ Deno.serve(async (req) => {
         .select(selectFields)
         .eq("numero_conteiner", valorUpper)
         .eq("tipo_operacao", tipoOperacao)
+        .eq("chave_consulta", chaveUpper)
         .maybeSingle();
       solicitacao = byContainer;
     }
@@ -82,6 +93,7 @@ Deno.serve(async (req) => {
         .select(selectFields)
         .eq("lpco", valorUpper)
         .eq("tipo_operacao", tipoOperacao)
+        .eq("chave_consulta", chaveUpper)
         .maybeSingle();
       solicitacao = byLpco;
     }

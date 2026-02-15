@@ -31,7 +31,73 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { solicitacao_id, novo_status, usuario_id } = await req.json();
+    const body = await req.json();
+
+    // Handle resend validation key action
+    if (body.action === "reenviar_chave") {
+      const { solicitacao_id } = body;
+      if (!solicitacao_id) {
+        return new Response(
+          JSON.stringify({ error: "solicitacao_id é obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: sol } = await supabaseAdmin
+        .from("solicitacoes")
+        .select("protocolo, cliente_email, chave_consulta")
+        .eq("id", solicitacao_id)
+        .single();
+
+      if (!sol || !sol.cliente_email || !sol.chave_consulta) {
+        return new Response(
+          JSON.stringify({ error: "Solicitação não encontrada ou sem e-mail/chave." }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+      await fetch(`${supabaseUrl}/functions/v1/enviar-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
+          to: sol.cliente_email,
+          subject: `Chave de Consulta — ${sol.protocolo}`,
+          body: `Sua chave de consulta para o protocolo ${sol.protocolo} é: ${sol.chave_consulta}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #0B1B4D; padding: 20px; text-align: center;">
+                <h2 style="color: #FFFFFF; margin: 0;">JBS Terminais</h2>
+              </div>
+              <div style="padding: 30px; background-color: #F4F6F8;">
+                <h3 style="color: #333333;">Chave de Consulta</h3>
+                <p style="color: #666666;">Utilize a chave abaixo para consultar o status da sua solicitação no portal:</p>
+                <div style="background: white; border-left: 4px solid #7AC143; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                  <p style="margin: 0;"><strong>Protocolo:</strong> ${sol.protocolo}</p>
+                  <p style="margin: 8px 0 0;"><strong>Chave:</strong> <span style="font-size: 20px; font-family: monospace; letter-spacing: 4px; color: #0B1B4D; font-weight: bold;">${sol.chave_consulta}</span></p>
+                </div>
+                <p style="color: #999; font-size: 12px;">Não compartilhe esta chave com terceiros.</p>
+              </div>
+              <div style="padding: 15px; text-align: center; background-color: #0B1B4D;">
+                <p style="color: #FFFFFF; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} JBS Terminais — Serviços Adicionais</p>
+              </div>
+            </div>
+          `,
+        }),
+      });
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { solicitacao_id, novo_status, usuario_id } = body;
 
     if (!solicitacao_id || !novo_status || !usuario_id) {
       return new Response(

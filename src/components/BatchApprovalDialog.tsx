@@ -51,12 +51,12 @@ const BatchApprovalDialog = ({
           continue;
         }
 
-        // Log audit
-        await supabase.from("audit_log").insert({
-          solicitacao_id: sol.id,
-          usuario_id: userId,
-          acao: "aprovacao_lote",
-          detalhes: `Aprovação Operacional em lote${observacao ? `: ${observacao}` : ""}`,
+        // Log audit via secure RPC
+        await supabase.rpc("insert_audit_log", {
+          p_solicitacao_id: sol.id,
+          p_usuario_id: userId,
+          p_acao: "aprovacao_lote",
+          p_detalhes: `Aprovação Operacional em lote. Protocolo: ${sol.protocolo}. Cliente: ${sol.cliente_nome || "N/A"}. Status anterior: ${sol.status_vistoria || sol.status}. Total no lote: ${solicitacoes.length} processos.${observacao ? ` Observação: ${observacao}` : ""}`,
         });
 
         // Record for integration queue

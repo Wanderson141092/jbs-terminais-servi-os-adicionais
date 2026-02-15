@@ -524,7 +524,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (error) {
       toast.error("Erro ao confirmar lançamento");
     } else {
-      await logAudit("lancamento", "Lançamento do serviço confirmado");
+      await logAudit("lancamento_confirmado", `Lançamento do serviço confirmado. Protocolo: ${solicitacao.protocolo}. Serviço: ${solicitacao.tipo_operacao || "N/A"}. Cliente: ${solicitacao.cliente_nome}`);
       toast.success("Lançamento confirmado!");
       setShowLancamentoDialog(false);
       onClose();

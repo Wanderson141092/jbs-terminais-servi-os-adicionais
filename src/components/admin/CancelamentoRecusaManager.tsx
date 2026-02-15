@@ -382,7 +382,7 @@ const CancelamentoRecusaManager = () => {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-row justify-between sm:justify-between">
             <Button variant="outline" size="sm" onClick={() => setShowDialog(false)}>
               Cancelar
             </Button>

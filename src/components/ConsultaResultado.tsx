@@ -98,11 +98,12 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   const getGeneralDeferimentoStatus = (): "recebido" | "recusado" | "aguardando" | null => {
     if (allDocs.length === 0) return null;
     // Se existe qualquer documento pendente (aguardando análise), o status geral é "aguardando"
-    // Isso garante que após reenvio, o "recusado" anterior não persista na timeline
     const hasPendente = allDocs.some(d => d.status === "pendente" || d.status === "aguardando");
     if (hasPendente) return "aguardando";
-    const allAceitos = allDocs.every(d => d.status === "aceito");
-    if (allAceitos) return "recebido";
+    // Se QUALQUER documento foi aceito, o deferimento está "recebido"
+    // (documentos anteriores recusados são substituídos pelo novo aceito)
+    const hasAceito = allDocs.some(d => d.status === "aceito");
+    if (hasAceito) return "recebido";
     const hasRecusado = allDocs.some(d => d.status === "recusado");
     if (hasRecusado) return "recusado";
     return "aguardando";

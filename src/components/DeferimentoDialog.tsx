@@ -106,11 +106,12 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
   const calculateGeneralStatus = (docs: DeferimentoDoc[]): "recebido" | "recusado" | "aguardando" => {
     if (docs.length === 0) return "aguardando";
     
+    const hasPendente = docs.some(d => !d.status || d.status === "pendente");
+    if (hasPendente) return "aguardando";
+    const hasAceito = docs.some(d => d.status === "aceito");
+    if (hasAceito) return "recebido";
     const hasRecusado = docs.some(d => d.status === "recusado");
-    const allAceitos = docs.every(d => d.status === "aceito");
-    
     if (hasRecusado) return "recusado";
-    if (allAceitos) return "recebido";
     return "aguardando";
   };
 

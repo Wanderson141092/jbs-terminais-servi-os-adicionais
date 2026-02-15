@@ -61,6 +61,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [pendenciasSelecionadas, setPendenciasSelecionadas] = useState<string[]>([]);
   const [solicitarDeferimento, setSolicitarDeferimento] = useState(false);
   const [solicitarLacreArmador, setSolicitarLacreArmador] = useState(false);
+  const [custoLacreArmador, setCustoLacreArmador] = useState<boolean | null>(null);
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
   const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
@@ -90,6 +91,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
       setSolicitarDeferimento(solicitacao.solicitar_deferimento || false);
       setSolicitarLacreArmador(solicitacao.solicitar_lacre_armador || false);
+      setCustoLacreArmador(solicitacao.lacre_armador_aceite_custo ?? null);
       setClienteNome(solicitacao.cliente_nome || "");
       setClienteCnpj(solicitacao.cnpj || "");
       
@@ -382,8 +384,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (!selectedStatus) return;
     if (selectedStatus === solicitacao.status && 
         solicitarDeferimento === solicitacao.solicitar_deferimento && 
+        solicitarLacreArmador === solicitacao.solicitar_lacre_armador &&
+        custoLacreArmador === (solicitacao.lacre_armador_aceite_custo ?? null) &&
         JSON.stringify(pendenciasSelecionadas) === JSON.stringify(solicitacao.pendencias_selecionadas)) {
       toast.info("Nenhuma alteração detectada.");
+      return;
+    }
+    
+    // Validação: se lacre armador ativado, exigir resposta sobre custo
+    if (solicitarLacreArmador && custoLacreArmador === null) {
+      toast.error("Informe se há custo de serviço para o lacre armador antes de salvar.");
       return;
     }
     
@@ -431,6 +441,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       status_vistoria: statusVistoria,
       solicitar_deferimento: solicitarDeferimento,
       solicitar_lacre_armador: solicitarLacreArmador,
+      lacre_armador_aceite_custo: solicitarLacreArmador ? custoLacreArmador : null,
       pendencias_selecionadas: pendenciasSelecionadas,
       cliente_nome: clienteNome.trim(),
       cnpj: clienteCnpj.trim() || null,
@@ -444,6 +455,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         // Mark lancamento as pending (same as financial launch flow)
         updatePayload.lancamento_confirmado = false;
       }
+    }
+    
+    // If lacre armador with cost, trigger lançamento
+    if (solicitarLacreArmador && custoLacreArmador === true) {
+      updatePayload.lancamento_confirmado = false;
     }
     
     const { error } = await supabase
@@ -468,6 +484,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
     if (solicitarDeferimento !== solicitacao.solicitar_deferimento) {
       details += `. Solicitar Deferimento: ${solicitarDeferimento ? "Ativado" : "Desativado"}`;
+    }
+    if (solicitarLacreArmador !== solicitacao.solicitar_lacre_armador) {
+      details += `. Lacre Armador: ${solicitarLacreArmador ? "Ativado" : "Desativado"}`;
+      if (solicitarLacreArmador && custoLacreArmador !== null) {
+        details += `. Custo de serviço: ${custoLacreArmador ? "Sim" : "Não"}`;
+        if (custoLacreArmador) details += `. Lançamento financeiro ativado.`;
+      }
     }
     if (JSON.stringify(pendenciasSelecionadas) !== JSON.stringify(solicitacao.pendencias_selecionadas)) {
       details += `. Pendências atualizadas.`;
@@ -886,23 +909,68 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     const hasLacrePendencia = pendenciasSelecionadas.some(p => p.toLowerCase().includes("lacre armador"));
                     const isActive = isPosicionamento && hasLacrePendencia;
                     return (
-                      <div className={`flex items-center justify-between border rounded-md p-3 ${isActive ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
-                        <div className="flex items-center gap-2">
-                          <Lock className="h-4 w-4 text-amber-600" />
-                          <div className="flex flex-col">
-                            <Label className="cursor-pointer" htmlFor="solicitar-lacre">Regularização de Lacre Armador</Label>
-                            <span className="text-[10px] text-muted-foreground">
-                              {isActive ? "Habilita envio de lacre na pág. externa" : "Requer pendência 'Lacre Armador' ativada"}
-                            </span>
+                      <>
+                        <div className={`flex items-center justify-between border rounded-md p-3 ${isActive ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                          <div className="flex items-center gap-2">
+                            <Lock className="h-4 w-4 text-amber-600" />
+                            <div className="flex flex-col">
+                              <Label className="cursor-pointer" htmlFor="solicitar-lacre">Regularização de Lacre Armador</Label>
+                              <span className="text-[10px] text-muted-foreground">
+                                {isActive ? "Habilita envio de lacre na pág. externa" : "Requer pendência 'Lacre Armador' ativada"}
+                              </span>
+                            </div>
                           </div>
+                          <Switch
+                            id="solicitar-lacre"
+                            checked={solicitarLacreArmador}
+                            onCheckedChange={(checked) => {
+                              setSolicitarLacreArmador(checked);
+                              if (!checked) setCustoLacreArmador(null);
+                            }}
+                            disabled={!isActive}
+                          />
                         </div>
-                        <Switch
-                          id="solicitar-lacre"
-                          checked={solicitarLacreArmador}
-                          onCheckedChange={setSolicitarLacreArmador}
-                          disabled={!isActive}
-                        />
-                      </div>
+
+                        {/* Custo de Serviço para Lacre Armador */}
+                        {solicitarLacreArmador && isActive && (
+                          <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200 ml-6">
+                            <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                              <DollarSign className="h-4 w-4" />
+                              Há custo de serviço (lacre armador)?
+                            </Label>
+                            <p className="text-xs text-amber-700">
+                              Confirme se houve custo operacional para o lacre armador. Se sim, o lançamento financeiro será exigido.
+                            </p>
+                            <div className="flex gap-4 mt-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="custo_lacre"
+                                  checked={custoLacreArmador === true}
+                                  onChange={() => setCustoLacreArmador(true)}
+                                  className="accent-amber-600"
+                                />
+                                <span className="text-sm font-medium">Sim</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="custo_lacre"
+                                  checked={custoLacreArmador === false}
+                                  onChange={() => setCustoLacreArmador(false)}
+                                  className="accent-amber-600"
+                                />
+                                <span className="text-sm font-medium">Não</span>
+                              </label>
+                            </div>
+                            {custoLacreArmador === true && (
+                              <p className="text-xs text-amber-700 mt-1 italic">
+                                O lançamento financeiro será ativado após salvar.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
                     );
                   })()}
 

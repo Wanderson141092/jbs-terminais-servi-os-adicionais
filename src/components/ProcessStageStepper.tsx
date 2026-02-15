@@ -340,6 +340,20 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     }
   }
 
+  // Se deferimento está ativo e não está "recebido", a etapa atual/última fica em âmbar
+  if (solicitarDeferimento && deferimentoStatus !== "recebido" && !isTerminal) {
+    // Encontrar a última etapa que está "current" ou "completed" e transformar em warning
+    const lastActiveIdx = stages.length - 1;
+    if (lastActiveIdx >= 0 && (stages[lastActiveIdx].state === "current" || stages[lastActiveIdx].state === "completed")) {
+      stages[lastActiveIdx] = {
+        ...stages[lastActiveIdx],
+        state: "warning",
+        icon: <AlertTriangle className="h-4 w-4" />,
+        detail: "Aguardando conclusão de deferimento",
+      };
+    }
+  }
+
   return stages;
 };
 

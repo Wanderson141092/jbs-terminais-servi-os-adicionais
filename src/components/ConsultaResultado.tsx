@@ -328,18 +328,23 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               solicitarDeferimento={showDeferimento}
               deferimentoStatus={showDeferimento ? generalStatus : null}
               statusLabels={statusLabels}
+              categoria={solicitacao.categoria}
+              tipoOperacao={solicitacao.tipo_operacao}
+              pendenciasSelecionadas={solicitacao.pendencias_selecionadas}
+              observacoes={observacoes?.map(o => o.observacao)}
             />
           </div>
 
           {/* Checklist */}
           <ProcessChecklist
-            solicitacao={{...solicitacao, solicitar_deferimento: showDeferimento} as any}
+            solicitacao={{...solicitacao, solicitar_deferimento: showDeferimento, observacoes: observacoes?.[0]?.observacao || null} as any}
             aprovacaoAtivada={aprovacaoAdministrativo || aprovacaoOperacional}
             aprovacaoAdministrativo={aprovacaoAdministrativo}
             aprovacaoOperacional={aprovacaoOperacional}
             deferimentoStatus={showDeferimento ? generalStatus : null}
             compact
             hideInternal
+            serviceName={solicitacao.tipo_operacao || undefined}
           />
 
           <Separator />

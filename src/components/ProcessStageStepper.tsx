@@ -1,11 +1,5 @@
-import { Check, Clock, X, CircleDot, FileCheck, Shield, Eye, AlertTriangle } from "lucide-react";
+import { Check, Clock, X, CircleDot, FileCheck, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface StatusLabel {
-  sigla: string | null;
-  valor: string;
-  ordem: number;
-}
 
 interface ProcessStageStepperProps {
   status: string;
@@ -16,8 +10,12 @@ interface ProcessStageStepperProps {
   aprovacaoOperacional?: boolean;
   solicitarDeferimento?: boolean;
   deferimentoStatus?: "recebido" | "recusado" | "aguardando" | null;
-  statusLabels?: StatusLabel[];
+  statusLabels?: { sigla: string | null; valor: string; ordem: number }[];
   compact?: boolean;
+  categoria?: string | null;
+  tipoOperacao?: string | null;
+  pendenciasSelecionadas?: string[] | null;
+  observacoes?: string[];
 }
 
 interface Stage {
@@ -25,172 +23,253 @@ interface Stage {
   label: string;
   icon: React.ReactNode;
   state: "completed" | "current" | "pending" | "error";
+  detail?: string;
 }
+
+// Motivos that route to "Aguardando Serviço" instead of "Aguardando Vistoria"
+const MOTIVOS_SERVICO = [
+  "fumigação / expurgo",
+  "fumigacao / expurgo",
+  "laudo técnico | rfb",
+  "laudo tecnico | rfb",
+  "lacre armador pendente",
+  "pendência de lacre armador",
+  "pendencia de lacre armador",
+];
+
+const isMotivosServico = (categoria?: string | null): boolean => {
+  if (!categoria) return false;
+  const lower = categoria.toLowerCase().trim();
+  return MOTIVOS_SERVICO.some(m => lower.includes(m) || m.includes(lower));
+};
+
+const isPosicionamento = (tipoOperacao?: string | null): boolean => {
+  return (tipoOperacao || "").toLowerCase().includes("posicionamento");
+};
+
+// Status ordering for determining progression
+const STATUS_ORDER: Record<string, number> = {
+  aguardando_confirmacao: 1,
+  confirmado_aguardando_vistoria: 2,
+  vistoria_finalizada: 3,
+  vistoriado_com_pendencia: 3,
+  nao_vistoriado: 3,
+  cancelado: 99,
+  recusado: 99,
+};
 
 const getStages = (props: ProcessStageStepperProps): Stage[] => {
   const {
     status,
-    comexAprovado,
-    armazemAprovado,
-    aprovacaoAtivada = false,
-    aprovacaoAdministrativo = false,
-    aprovacaoOperacional = false,
     solicitarDeferimento = false,
     deferimentoStatus,
+    categoria,
+    tipoOperacao,
+    pendenciasSelecionadas,
+    observacoes,
   } = props;
 
   const isCancelled = status === "cancelado";
   const isRecusado = status === "recusado";
   const isTerminal = isCancelled || isRecusado;
+  const isPosic = isPosicionamento(tipoOperacao);
+  const isServico = isPosic && isMotivosServico(categoria);
 
   const stages: Stage[] = [];
+  const currentOrder = STATUS_ORDER[status] ?? 0;
 
-  // Stage 1: Solicitação criada (always completed unless cancelled at start)
+  // Stage 1: Solicitação Recebida (always completed once exists)
   stages.push({
-    key: "criada",
-    label: "Solicitação Criada",
+    key: "recebida",
+    label: "Solicitação Recebida",
     icon: <FileCheck className="h-4 w-4" />,
     state: "completed",
   });
 
-  // Stage 2: Aprovação Administrativo (only if enabled)
-  if (aprovacaoAdministrativo) {
-    let approvalState: Stage["state"] = "pending";
-    if (isRecusado && comexAprovado === false) {
-      approvalState = "error";
-    } else if (comexAprovado === true) {
-      approvalState = "completed";
-    } else if (status === "aguardando_confirmacao") {
-      approvalState = "current";
-    } else if (comexAprovado !== null && comexAprovado !== undefined) {
-      approvalState = "current";
-    }
-    stages.push({
-      key: "aprovacao_admin",
-      label: "Aprovação Administrativo",
-      icon: <Shield className="h-4 w-4" />,
-      state: approvalState,
-    });
-  }
-
-  // Stage 2b: Aprovação Operacional (only if enabled)
-  if (aprovacaoOperacional) {
-    let approvalState: Stage["state"] = "pending";
-    if (isRecusado && armazemAprovado === false) {
-      approvalState = "error";
-    } else if (armazemAprovado === true) {
-      approvalState = "completed";
-    } else if (status === "aguardando_confirmacao") {
-      approvalState = "current";
-    } else if (armazemAprovado !== null && armazemAprovado !== undefined) {
-      approvalState = "current";
-    }
-    stages.push({
-      key: "aprovacao_oper",
-      label: "Aprovação Operacional",
-      icon: <Shield className="h-4 w-4" />,
-      state: approvalState,
-    });
-  }
-
-  // Dynamic stages from status labels (replaces hardcoded "Aguardando Vistoria" and "Vistoria")
-  // Use statusLabels if provided, otherwise fall back to generic stages
-  const dynamicLabels = props.statusLabels || [];
-  
-  if (dynamicLabels.length > 0) {
-    // Build stages from configured status labels
-    const terminalStatuses = ["cancelado", "recusado"];
-    
-    for (const sl of dynamicLabels) {
-      const key = sl.sigla || sl.valor.toLowerCase().replace(/ /g, '_');
-      let state: Stage["state"] = "pending";
-      
-      if (isTerminal && !terminalStatuses.includes(status)) {
-        // Terminal but we passed through this stage
-      }
-      
-      if (status === key) {
-        state = "current";
-      } else {
-        // Check if current status order is past this stage
-        const currentStatusLabel = dynamicLabels.find(s => (s.sigla || s.valor.toLowerCase().replace(/ /g, '_')) === status);
-        if (currentStatusLabel && sl.ordem < currentStatusLabel.ordem) {
-          state = "completed";
-        }
-      }
-      
-      // Special handling for error statuses
-      if (key === "nao_vistoriado" && status === key) state = "error";
-      if (key === "vistoriado_com_pendencia" && status === key) state = "error";
-      
-      stages.push({
-        key,
-        label: sl.valor,
-        icon: <Clock className="h-4 w-4" />,
-        state: isTerminal && state !== "completed" ? "pending" : state,
-      });
-    }
-  } else {
-    // Fallback: generic stages without "Vistoria" label
-    {
-      let state: Stage["state"] = "pending";
-      if (isTerminal) {
-        state = isRecusado ? "error" : "pending";
-      } else if (status === "confirmado_aguardando_vistoria") {
-        state = "current";
-      } else if (["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
-        state = "completed";
-      } else if (!aprovacaoAtivada && status === "aguardando_confirmacao") {
-        state = "current";
-      }
-      stages.push({
-        key: "em_andamento",
-        label: "Em Andamento",
-        icon: <Clock className="h-4 w-4" />,
-        state: isTerminal && !["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status) ? "pending" : state,
-      });
-    }
-
-    {
-      let state: Stage["state"] = "pending";
-      if (status === "vistoria_finalizada") {
-        state = "completed";
-      } else if (status === "vistoriado_com_pendencia" || status === "nao_vistoriado") {
-        state = "error";
-      }
-      stages.push({
-        key: "concluido",
-        label: "Concluído",
-        icon: <Eye className="h-4 w-4" />,
-        state,
-      });
-    }
-  }
-
-  // Stage 5: Deferimento (only if applicable)
-  if (solicitarDeferimento) {
+  // Stage 2: Aguardando Confirmação
+  {
     let state: Stage["state"] = "pending";
-    if (deferimentoStatus === "recebido") state = "completed";
-    else if (deferimentoStatus === "recusado") state = "error";
-    else if (deferimentoStatus === "aguardando") state = "current";
-    else if (status === "vistoria_finalizada") state = "current";
-
+    if (isTerminal && currentOrder <= 1) {
+      // Terminal happened at or before this stage
+      state = "completed"; // They were at this stage
+    } else if (status === "aguardando_confirmacao") {
+      state = "current";
+    } else if (currentOrder > 1) {
+      state = "completed";
+    }
     stages.push({
-      key: "deferimento",
-      label: "Deferimento",
-      icon: <FileCheck className="h-4 w-4" />,
+      key: "aguardando_confirmacao",
+      label: "Aguardando Confirmação",
+      icon: <Clock className="h-4 w-4" />,
       state,
     });
   }
 
-  // Terminal state override
-  if (isCancelled) {
-    // Mark all pending as pending, add cancelled stage
+  if (isPosic) {
+    if (isServico) {
+      // Branch: Confirmado - Aguardando Serviço → Serviço Finalizado
+      {
+        let state: Stage["state"] = "pending";
+        if (status === "confirmado_aguardando_vistoria") {
+          state = "current";
+        } else if (currentOrder > 2 && !isTerminal) {
+          state = "completed";
+        }
+        // Only show if we've passed aguardando_confirmacao
+        if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
+          stages.push({
+            key: "aguardando_servico",
+            label: "Confirmado - Aguardando Serviço",
+            icon: <Clock className="h-4 w-4" />,
+            state: isTerminal ? "completed" : state,
+          });
+        }
+      }
+
+      // Serviço Finalizado
+      {
+        let state: Stage["state"] = "pending";
+        if (status === "vistoria_finalizada") {
+          state = "completed";
+        } else if (status === "vistoriado_com_pendencia" || status === "nao_vistoriado") {
+          state = "completed"; // service motivos still finalize
+        }
+        if (currentOrder >= 2 || ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
+          stages.push({
+            key: "servico_finalizado",
+            label: "Serviço Finalizado",
+            icon: <Check className="h-4 w-4" />,
+            state: isTerminal ? "pending" : state,
+          });
+        }
+      }
+    } else {
+      // Branch: Confirmado - Aguardando Vistoria → Vistoria result
+      {
+        let state: Stage["state"] = "pending";
+        if (status === "confirmado_aguardando_vistoria") {
+          state = "current";
+        } else if (currentOrder > 2 && !isTerminal) {
+          state = "completed";
+        }
+        if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
+          stages.push({
+            key: "aguardando_vistoria",
+            label: "Confirmado - Aguardando Vistoria",
+            icon: <Clock className="h-4 w-4" />,
+            state: isTerminal ? "completed" : state,
+          });
+        }
+      }
+
+      // Vistoria result (only show when reached)
+      if (["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
+        if (status === "vistoria_finalizada") {
+          stages.push({
+            key: "vistoria_finalizada",
+            label: "Vistoria Finalizada",
+            icon: <Check className="h-4 w-4" />,
+            state: "completed",
+          });
+        } else if (status === "vistoriado_com_pendencia") {
+          const pendDetail = pendenciasSelecionadas?.length
+            ? `Pendências: ${pendenciasSelecionadas.join(", ")}`
+            : undefined;
+          const obsDetail = observacoes?.length ? observacoes[0] : undefined;
+          const detail = [pendDetail, obsDetail].filter(Boolean).join(" — ");
+          stages.push({
+            key: "vistoriado_com_pendencia",
+            label: "Vistoriado com Pendência",
+            icon: <X className="h-4 w-4" />,
+            state: "error",
+            detail,
+          });
+        } else if (status === "nao_vistoriado") {
+          stages.push({
+            key: "nao_vistoriado",
+            label: "Não Vistoriado",
+            icon: <X className="h-4 w-4" />,
+            state: "error",
+          });
+        }
+      }
+    }
+  } else {
+    // Non-Posicionamento services: → Serviço Concluído
+    {
+      let state: Stage["state"] = "pending";
+      const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado", "confirmado_aguardando_vistoria"];
+      if (finishedStatuses.includes(status)) {
+        state = "completed";
+      }
+      if (currentOrder >= 2 || finishedStatuses.includes(status)) {
+        stages.push({
+          key: "servico_concluido",
+          label: "Serviço Concluído",
+          icon: <Check className="h-4 w-4" />,
+          state: isTerminal ? "pending" : state,
+        });
+      }
+    }
+  }
+
+  // Terminal overlay: show Cancelado/Recusado as independent final state
+  if (isTerminal) {
     stages.push({
-      key: "cancelado",
-      label: "Cancelado",
+      key: status,
+      label: isCancelled ? "Cancelado" : "Recusado",
       icon: <X className="h-4 w-4" />,
       state: "error",
+    });
+  }
+
+  return stages;
+};
+
+// Deferimento sub-timeline stages
+interface DeferimentoStage {
+  key: string;
+  label: string;
+  state: "completed" | "current" | "pending" | "error";
+  icon: React.ReactNode;
+}
+
+const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "aguardando" | null): DeferimentoStage[] => {
+  const stages: DeferimentoStage[] = [];
+
+  // Always show "Aguardando envio do arquivo"
+  let envioState: DeferimentoStage["state"] = "current";
+  if (deferimentoStatus === "aguardando" || deferimentoStatus === "recebido" || deferimentoStatus === "recusado") {
+    envioState = "completed";
+  }
+  stages.push({
+    key: "aguardando_envio",
+    label: "Aguardando Envio do Arquivo",
+    icon: <Upload className="h-4 w-4" />,
+    state: envioState,
+  });
+
+  // Show result only when there is one
+  if (deferimentoStatus === "recebido") {
+    stages.push({
+      key: "documento_recebido",
+      label: "Documento Recebido",
+      icon: <Check className="h-4 w-4" />,
+      state: "completed",
+    });
+  } else if (deferimentoStatus === "recusado") {
+    stages.push({
+      key: "documento_recusado",
+      label: "Documento Recusado",
+      icon: <X className="h-4 w-4" />,
+      state: "error",
+    });
+  } else if (deferimentoStatus === "aguardando") {
+    stages.push({
+      key: "aguardando_analise",
+      label: "Aguardando Análise",
+      icon: <Clock className="h-4 w-4" />,
+      state: "current",
     });
   }
 
@@ -226,10 +305,7 @@ const stateIcons: Record<string, React.ReactNode> = {
   current: <CircleDot className="h-3.5 w-3.5" />,
 };
 
-const ProcessStageStepper = (props: ProcessStageStepperProps) => {
-  const stages = getStages(props);
-  const { compact = false } = props;
-
+const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; label: string; state: "completed" | "current" | "pending" | "error"; icon: React.ReactNode; detail?: string }[]; compact?: boolean }) => {
   if (compact) {
     return (
       <div className="flex items-center gap-1 flex-wrap">
@@ -262,17 +338,12 @@ const ProcessStageStepper = (props: ProcessStageStepperProps) => {
             className="flex flex-col items-center relative z-10"
             style={{ width: `${100 / stages.length}%` }}
           >
-            {/* Connector line */}
             {i < stages.length - 1 && (
               <div
-                className={cn(
-                  "absolute top-4 h-0.5 rounded",
-                  stateStyles[stage.state].line
-                )}
-                style={{ left: "50%", right: `-50%`, width: "100%" }}
+                className={cn("absolute top-4 h-0.5 rounded", stateStyles[stage.state].line)}
+                style={{ left: "50%", right: "-50%", width: "100%" }}
               />
             )}
-            {/* Circle */}
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 relative z-10",
@@ -281,15 +352,14 @@ const ProcessStageStepper = (props: ProcessStageStepperProps) => {
             >
               {stateIcons[stage.state] || stage.icon}
             </div>
-            {/* Label */}
-            <span
-              className={cn(
-                "text-xs mt-2 text-center leading-tight",
-                stateStyles[stage.state].label
-              )}
-            >
+            <span className={cn("text-xs mt-2 text-center leading-tight", stateStyles[stage.state].label)}>
               {stage.label}
             </span>
+            {stage.detail && (
+              <span className="text-[10px] mt-1 text-center leading-tight text-muted-foreground max-w-[120px]">
+                {stage.detail}
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -297,6 +367,27 @@ const ProcessStageStepper = (props: ProcessStageStepperProps) => {
   );
 };
 
-export { getStages };
-export type { Stage };
+const ProcessStageStepper = (props: ProcessStageStepperProps) => {
+  const stages = getStages(props);
+  const { compact = false, solicitarDeferimento = false, deferimentoStatus } = props;
+
+  const deferimentoStages = solicitarDeferimento ? getDeferimentoStages(deferimentoStatus ?? null) : [];
+
+  return (
+    <div className="space-y-4">
+      <TimelineStepper stages={stages} compact={compact} />
+
+      {/* Deferimento sub-timeline */}
+      {solicitarDeferimento && deferimentoStages.length > 0 && (
+        <div className="ml-4 pl-4 border-l-2 border-yellow-300">
+          <p className="text-[10px] font-semibold text-yellow-700 mb-2 uppercase tracking-wide">Deferimento</p>
+          <TimelineStepper stages={deferimentoStages} compact={compact} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export { getStages, getDeferimentoStages };
+export type { Stage, ProcessStageStepperProps };
 export default ProcessStageStepper;

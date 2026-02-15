@@ -194,7 +194,8 @@ Deno.serve(async (req) => {
     for (const [key, value] of Object.entries(allFields)) {
       if (key === "id" || key === "status" || key === "created_at" || key === "updated_at" || 
           key === "comex_aprovado" || key === "armazem_aprovado" || key === "solicitar_deferimento" ||
-          key === "pendencias_selecionadas" || key === "status_vistoria" ||
+          key === "pendencias_selecionadas" || key === "status_vistoria" || key === "categoria" ||
+          key === "tipo_operacao" || key === "observacoes" ||
           visibleFixedFields.includes(key)) {
         sanitizedSolicitacao[key] = value;
       }

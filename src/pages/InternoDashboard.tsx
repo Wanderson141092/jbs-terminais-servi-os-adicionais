@@ -357,6 +357,9 @@ const InternoDashboard = () => {
   };
 
   const isLacreArmadorActive = (s: any) => {
+    // Activate if solicitar_lacre_armador is true on the process
+    if (s.solicitar_lacre_armador === true) return true;
+    // Or if service has status activation configured and current status matches
     const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
     if (!servico?.lacre_armador_status_ativacao?.length) return false;
     return servico.lacre_armador_status_ativacao.includes(s.status);

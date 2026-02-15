@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     }
 
     // Fetch deferimento documents, observations, status labels, field config, and dynamic fields in parallel
-    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes] = await Promise.all([
+    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes, etapasConfigRes] = await Promise.all([
       supabaseAdmin
         .from("deferimento_documents")
         .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
@@ -128,6 +128,11 @@ Deno.serve(async (req) => {
         .from("campos_analise_valores")
         .select("campo_id, valor, campos_analise(nome, visivel_externo)")
         .eq("solicitacao_id", solicitacao.id),
+      supabaseAdmin
+        .from("consulta_etapas_config")
+        .select("chave, titulo, tipo, grupo, ordem, etapa_equivalente, status_gatilho")
+        .eq("ativo", true)
+        .order("ordem"),
     ]);
 
     const deferimentoDocs = deferimentoRes.data;
@@ -201,6 +206,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    const etapasConfig = (etapasConfigRes.data || []).map((e: any) => ({
+      chave: e.chave,
+      titulo: e.titulo,
+      tipo: e.tipo,
+      grupo: e.grupo,
+      ordem: e.ordem,
+      etapa_equivalente: e.etapa_equivalente,
+      status_gatilho: e.status_gatilho || [],
+    }));
+
     return new Response(
       JSON.stringify({
         solicitacao: sanitizedSolicitacao,
@@ -209,6 +224,7 @@ Deno.serve(async (req) => {
         status_labels: statusLabels,
         campos_dinamicos_externos: dynamicFieldsForExternal,
         campos_visiveis: visibleFixedFields,
+        etapas_config: etapasConfig,
         servico_config: {
           tipo_agendamento: servicoData.tipo_agendamento,
           deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],

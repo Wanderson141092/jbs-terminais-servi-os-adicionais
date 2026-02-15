@@ -1,6 +1,16 @@
 import { Check, X, Clock, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface EtapaConfigItem {
+  chave: string;
+  titulo: string;
+  tipo: string;
+  grupo: string;
+  ordem: number;
+  etapa_equivalente: string | null;
+  status_gatilho: string[];
+}
+
 interface ProcessChecklistProps {
   solicitacao: {
     status: string;
@@ -23,6 +33,7 @@ interface ProcessChecklistProps {
   compact?: boolean;
   hideInternal?: boolean;
   serviceName?: string;
+  etapasConfig?: EtapaConfigItem[];
 }
 
 interface CheckItem {

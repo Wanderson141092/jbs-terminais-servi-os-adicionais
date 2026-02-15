@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Edit, Save, Eye, EyeOff, Globe, Monitor } from "lucide-react";
+import { Edit, Save, Eye, EyeOff, Globe, Monitor, Plus, Trash2 } from "lucide-react";
 
 interface CampoFixo {
   id: string;
@@ -37,13 +37,16 @@ const CamposFixosManager = () => {
   const [campos, setCampos] = useState<CampoFixo[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDialog, setShowDialog] = useState(false);
   const [editingCampo, setEditingCampo] = useState<CampoFixo | null>(null);
   const [formData, setFormData] = useState({
+    campo_chave: "",
     campo_label: "",
     visivel_externo: false,
     visivel_analise: true,
     obrigatorio_analise: false,
     servico_ids: [] as string[],
+    ordem: 0,
   });
 
   useEffect(() => {
@@ -60,33 +63,99 @@ const CamposFixosManager = () => {
     setLoading(false);
   };
 
-  const openEdit = (campo: CampoFixo) => {
-    setEditingCampo(campo);
-    setFormData({
-      campo_label: campo.campo_label,
-      visivel_externo: campo.visivel_externo,
-      visivel_analise: campo.visivel_analise,
-      obrigatorio_analise: campo.obrigatorio_analise,
-      servico_ids: campo.servico_ids || [],
-    });
+  const openDialog = (campo?: CampoFixo) => {
+    if (campo) {
+      setEditingCampo(campo);
+      setFormData({
+        campo_chave: campo.campo_chave,
+        campo_label: campo.campo_label,
+        visivel_externo: campo.visivel_externo,
+        visivel_analise: campo.visivel_analise,
+        obrigatorio_analise: campo.obrigatorio_analise,
+        servico_ids: campo.servico_ids || [],
+        ordem: campo.ordem,
+      });
+    } else {
+      setEditingCampo(null);
+      const maxOrdem = campos.length > 0 ? Math.max(...campos.map(c => c.ordem)) + 1 : 0;
+      setFormData({
+        campo_chave: "",
+        campo_label: "",
+        visivel_externo: false,
+        visivel_analise: true,
+        obrigatorio_analise: false,
+        servico_ids: [],
+        ordem: maxOrdem,
+      });
+    }
+    setShowDialog(true);
   };
 
   const handleSave = async () => {
-    if (!editingCampo) return;
-    const { error } = await supabase
-      .from("campos_fixos_config")
-      .update({
+    if (!formData.campo_chave.trim()) {
+      toast.error("Informe a chave do campo");
+      return;
+    }
+    if (!formData.campo_label.trim()) {
+      toast.error("Informe o rótulo do campo");
+      return;
+    }
+
+    // Normalize key: lowercase, underscores, no accents
+    const normalizedKey = formData.campo_chave
+      .toLowerCase()
+      .replace(/ /g, "_")
+      .replace(/-/g, "_")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9_]/g, "");
+
+    if (editingCampo) {
+      const { error } = await supabase
+        .from("campos_fixos_config")
+        .update({
+          campo_label: formData.campo_label,
+          visivel_externo: formData.visivel_externo,
+          visivel_analise: formData.visivel_analise,
+          obrigatorio_analise: formData.obrigatorio_analise,
+          servico_ids: formData.servico_ids,
+          ordem: formData.ordem,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingCampo.id);
+      if (error) { toast.error("Erro ao salvar"); return; }
+      toast.success("Campo atualizado!");
+    } else {
+      // Check duplicate key
+      if (campos.some(c => c.campo_chave === normalizedKey)) {
+        toast.error("Já existe um campo com esta chave");
+        return;
+      }
+      const { error } = await supabase.from("campos_fixos_config").insert({
+        campo_chave: normalizedKey,
         campo_label: formData.campo_label,
         visivel_externo: formData.visivel_externo,
         visivel_analise: formData.visivel_analise,
         obrigatorio_analise: formData.obrigatorio_analise,
         servico_ids: formData.servico_ids,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", editingCampo.id);
-    if (error) { toast.error("Erro ao salvar"); return; }
-    toast.success("Campo atualizado!");
-    setEditingCampo(null);
+        ordem: formData.ordem,
+      });
+      if (error) {
+        if (error.code === "23505") toast.error("Já existe um campo com esta chave");
+        else toast.error("Erro ao criar campo");
+        return;
+      }
+      toast.success("Campo criado!");
+    }
+    setShowDialog(false);
+    fetchData();
+  };
+
+  const handleDelete = async (campo: CampoFixo) => {
+    if (!confirm(`Tem certeza que deseja excluir o campo "${campo.campo_label}"?`)) return;
+    const { error } = await supabase.from("campos_fixos_config").delete().eq("id", campo.id);
+    if (error) { toast.error("Erro ao excluir"); return; }
+    toast.success("Campo excluído!");
     fetchData();
   };
 
@@ -115,12 +184,15 @@ const CamposFixosManager = () => {
     <div className="space-y-4">
       <div className="bg-muted/30 border rounded-lg p-4 text-sm text-muted-foreground">
         <p className="font-medium text-foreground mb-1">Campos Fixos da Análise</p>
-        <p>Configure quais campos fixos da solicitação devem aparecer na tela de análise interna e na consulta externa do cliente. Use os ícones para alternar a visibilidade rapidamente.</p>
+        <p>Configure quais campos fixos da solicitação devem aparecer na tela de análise interna e na consulta externa do cliente. Crie novos campos para serviços futuros ou personalizações específicas.</p>
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between py-3">
           <CardTitle className="text-base">Campos Configurados ({campos.length})</CardTitle>
+          <Button size="sm" onClick={() => openDialog()}>
+            <Plus className="h-4 w-4 mr-1" /> Novo Campo
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -139,73 +211,115 @@ const CamposFixosManager = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campos.map(campo => (
-                <TableRow key={campo.id} className={!campo.ativo ? "opacity-50" : ""}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-sm">{campo.campo_label}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{campo.campo_chave}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => toggleQuick(campo, "visivel_analise")}
-                    >
-                      {campo.visivel_analise ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
-                    </Button>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => toggleQuick(campo, "visivel_externo")}
-                    >
-                      {campo.visivel_externo ? <Globe className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
-                    </Button>
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {campo.servico_ids.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {campo.servico_ids.map(id => (
-                          <Badge key={id} variant="outline" className="text-[10px]">
-                            {servicos.find(s => s.id === id)?.nome || id.slice(0, 8)}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Todos</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Switch checked={campo.ativo} onCheckedChange={() => toggleAtivo(campo)} />
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(campo)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
+              {campos.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    Nenhum campo configurado.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                campos.map(campo => (
+                  <TableRow key={campo.id} className={!campo.ativo ? "opacity-50" : ""}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm">{campo.campo_label}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{campo.campo_chave}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => toggleQuick(campo, "visivel_analise")}
+                      >
+                        {campo.visivel_analise ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => toggleQuick(campo, "visivel_externo")}
+                      >
+                        {campo.visivel_externo ? <Globe className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {campo.servico_ids.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {campo.servico_ids.map(id => (
+                            <Badge key={id} variant="outline" className="text-[10px]">
+                              {servicos.find(s => s.id === id)?.nome || id.slice(0, 8)}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Todos</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Switch checked={campo.ativo} onCheckedChange={() => toggleAtivo(campo)} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openDialog(campo)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(campo)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingCampo} onOpenChange={() => setEditingCampo(null)}>
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar Campo: {editingCampo?.campo_chave}</DialogTitle>
-            <DialogDescription>Configure a visibilidade e comportamento deste campo</DialogDescription>
+            <DialogTitle>{editingCampo ? `Editar Campo: ${editingCampo.campo_chave}` : "Novo Campo Fixo"}</DialogTitle>
+            <DialogDescription>
+              {editingCampo 
+                ? "Configure a visibilidade e comportamento deste campo" 
+                : "Crie um novo campo fixo. A chave será o identificador interno usado no sistema."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
+              <Label>Chave do campo (identificador interno)</Label>
+              <Input
+                value={formData.campo_chave}
+                onChange={e => setFormData({ ...formData, campo_chave: e.target.value })}
+                placeholder="ex: numero_bl, peso_carga"
+                disabled={!!editingCampo}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {editingCampo 
+                  ? "A chave não pode ser alterada após a criação." 
+                  : "Use letras minúsculas e underscores. Será normalizado automaticamente."}
+              </p>
+            </div>
+            <div>
               <Label>Rótulo exibido</Label>
-              <Input value={formData.campo_label} onChange={e => setFormData({ ...formData, campo_label: e.target.value })} />
+              <Input
+                value={formData.campo_label}
+                onChange={e => setFormData({ ...formData, campo_label: e.target.value })}
+                placeholder="ex: Número do BL, Peso da Carga"
+              />
+            </div>
+            <div>
+              <Label>Ordem de exibição</Label>
+              <Input
+                type="number"
+                value={formData.ordem}
+                onChange={e => setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })}
+              />
             </div>
             <div className="flex items-center justify-between border rounded-md p-3">
               <Label>Visível na análise interna</Label>
@@ -236,7 +350,7 @@ const CamposFixosManager = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingCampo(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
             <Button onClick={handleSave}><Save className="h-4 w-4 mr-1" /> Salvar</Button>
           </DialogFooter>
         </DialogContent>

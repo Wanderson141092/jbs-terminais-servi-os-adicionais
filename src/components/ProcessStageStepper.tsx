@@ -109,18 +109,17 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   const stages: Stage[] = [];
   const currentOrder = STATUS_ORDER[status] ?? 0;
 
-  // For terminal states, all completed stages become "error" to paint the whole line red
-  // For em_pendencia states, completed stages revert to "pending" (gray with ✓) — the final stage gets "warning" (amber)
-  // For "recusado" in Posicionamento, prior stages stay gray (pending) with ✓, only the terminal is red
-  const isPosicRecusado = isPosic && isRecusado;
-  const completedState = isPosicRecusado ? "pending" as const : isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
+  // For terminal states at late stage (order>=2), all completed stages become "error" (red X)
+  // For terminal states at early stage (order<=1), terminal replaces aguardando_confirmacao
+  // For em_pendencia states, completed stages revert to "pending" (gray with ✓)
+  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
 
   // Determine icon override for special states (only for terminal/error)
-  const stateIcon = (isTerminal && !isPosicRecusado) ? <X className="h-4 w-4" /> : null;
+  const stateIcon = isTerminal ? <X className="h-4 w-4" /> : null;
 
   // Stage 1: Solicitação Recebida (always completed once exists)
   // For em_pendencia, prior stages get gray styling ("pending") but keep ✓ icon
-  const priorIcon = (isEmPendencia || isPosicRecusado) ? <Check className="h-4 w-4" /> : null;
+  const priorIcon = isEmPendencia ? <Check className="h-4 w-4" /> : null;
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),
@@ -136,16 +135,8 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   const isEarlyCancellation = isPosicCancelled && !isLateCancellation;
 
   // Stage 2: Aguardando Confirmação
-  // If terminal happened at this stage, show it as completed (red) then terminal replaces next
+  // If terminal happened at this stage, terminal REPLACES aguardando_confirmacao
   if (isTerminal && currentOrder <= 1 && !isLateCancellation) {
-    // Was at aguardando_confirmacao when cancelled/refused — show it as error
-    stages.push({
-      key: "aguardando_confirmacao",
-      label: getTitle("aguardando_confirmacao", "Aguardando Confirmação"),
-      icon: <X className="h-4 w-4" />,
-      state: "error",
-    });
-    // Terminal replaces the next stage
     stages.push({
       key: status,
       label: terminalLabel,

@@ -96,29 +96,49 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   const stages: Stage[] = [];
   const currentOrder = STATUS_ORDER[status] ?? 0;
 
+  // For terminal states, all completed stages become "error" to paint the whole line red
+  const completedState = isTerminal ? "error" as const : "completed" as const;
+
   // Stage 1: Solicitação Recebida (always completed once exists)
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),
-    icon: <FileCheck className="h-4 w-4" />,
-    state: "completed",
+    icon: isTerminal ? <X className="h-4 w-4" /> : <FileCheck className="h-4 w-4" />,
+    state: completedState,
   });
 
   // Stage 2: Aguardando Confirmação
+  // If terminal happened at this stage, show it as completed (red) then terminal replaces next
+  if (isTerminal && currentOrder <= 1) {
+    // Was at aguardando_confirmacao when cancelled/refused — show it as error
+    stages.push({
+      key: "aguardando_confirmacao",
+      label: getTitle("aguardando_confirmacao", "Aguardando Confirmação"),
+      icon: <X className="h-4 w-4" />,
+      state: "error",
+    });
+    // Terminal replaces the next stage
+    stages.push({
+      key: status,
+      label: isCancelled ? "Cancelado" : "Recusado",
+      icon: <X className="h-4 w-4" />,
+      state: "error",
+    });
+    return stages;
+  }
+
+  // Aguardando confirmação normal
   {
     let state: Stage["state"] = "pending";
-    if (isTerminal && currentOrder <= 1) {
-      // Terminal happened at or before this stage
-      state = "completed"; // They were at this stage
-    } else if (status === "aguardando_confirmacao") {
+    if (status === "aguardando_confirmacao") {
       state = "current";
     } else if (currentOrder > 1) {
-      state = "completed";
+      state = completedState;
     }
     stages.push({
       key: "aguardando_confirmacao",
       label: getTitle("aguardando_confirmacao", "Aguardando Confirmação"),
-      icon: <Clock className="h-4 w-4" />,
+      icon: isTerminal ? <X className="h-4 w-4" /> : <Clock className="h-4 w-4" />,
       state,
     });
   }
@@ -126,20 +146,38 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   if (isPosic) {
     if (isServico) {
       // Branch: Confirmado - Aguardando Serviço → Serviço Finalizado
+      if (isTerminal && currentOrder <= 2) {
+        // Terminal at confirmado_aguardando_vistoria stage — show stage as error, then terminal
+        if (currentOrder >= 2) {
+          stages.push({
+            key: "aguardando_servico",
+            label: getTitle("aguardando_servico", "Confirmado - Aguardando Serviço"),
+            icon: <X className="h-4 w-4" />,
+            state: "error",
+          });
+        }
+        stages.push({
+          key: status,
+          label: isCancelled ? "Cancelado" : "Recusado",
+          icon: <X className="h-4 w-4" />,
+          state: "error",
+        });
+        return stages;
+      }
+
       {
         let state: Stage["state"] = "pending";
         if (status === "confirmado_aguardando_vistoria") {
           state = "current";
-        } else if (currentOrder > 2 && !isTerminal) {
+        } else if (currentOrder > 2) {
           state = "completed";
         }
-        // Only show if we've passed aguardando_confirmacao
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
           stages.push({
             key: "aguardando_servico",
             label: getTitle("aguardando_servico", "Confirmado - Aguardando Serviço"),
             icon: <Clock className="h-4 w-4" />,
-            state: isTerminal ? "completed" : state,
+            state,
           });
         }
       }
@@ -147,27 +185,43 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       // Serviço Finalizado
       {
         let state: Stage["state"] = "pending";
-        if (status === "vistoria_finalizada") {
+        if (status === "vistoria_finalizada" || status === "vistoriado_com_pendencia" || status === "nao_vistoriado") {
           state = "completed";
-        } else if (status === "vistoriado_com_pendencia" || status === "nao_vistoriado") {
-          state = "completed"; // service motivos still finalize
         }
         if (currentOrder >= 2 || ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
           stages.push({
             key: "servico_finalizado",
             label: getTitle("servico_finalizado", "Serviço Finalizado"),
             icon: <Check className="h-4 w-4" />,
-            state: isTerminal ? "pending" : state,
+            state,
           });
         }
       }
     } else {
       // Branch: Confirmado - Aguardando Vistoria → Vistoria result
+      if (isTerminal && currentOrder <= 2) {
+        if (currentOrder >= 2) {
+          stages.push({
+            key: "aguardando_vistoria",
+            label: getTitle("aguardando_vistoria", "Confirmado - Aguardando Vistoria"),
+            icon: <X className="h-4 w-4" />,
+            state: "error",
+          });
+        }
+        stages.push({
+          key: status,
+          label: isCancelled ? "Cancelado" : "Recusado",
+          icon: <X className="h-4 w-4" />,
+          state: "error",
+        });
+        return stages;
+      }
+
       {
         let state: Stage["state"] = "pending";
         if (status === "confirmado_aguardando_vistoria") {
           state = "current";
-        } else if (currentOrder > 2 && !isTerminal) {
+        } else if (currentOrder > 2) {
           state = "completed";
         }
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
@@ -175,7 +229,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
             key: "aguardando_vistoria",
             label: getTitle("aguardando_vistoria", "Confirmado - Aguardando Vistoria"),
             icon: <Clock className="h-4 w-4" />,
-            state: isTerminal ? "completed" : state,
+            state,
           });
         }
       }
@@ -214,6 +268,17 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     }
   } else {
     // Non-Posicionamento services: → Serviço Concluído
+    if (isTerminal) {
+      // Terminal replaces Serviço Concluído
+      stages.push({
+        key: status,
+        label: isCancelled ? "Cancelado" : "Recusado",
+        icon: <X className="h-4 w-4" />,
+        state: "error",
+      });
+      return stages;
+    }
+
     {
       let state: Stage["state"] = "pending";
       const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado", "confirmado_aguardando_vistoria"];
@@ -225,20 +290,10 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           key: "servico_concluido",
           label: getTitle("servico_concluido", "Serviço Concluído"),
           icon: <Check className="h-4 w-4" />,
-          state: isTerminal ? "pending" : state,
+          state,
         });
       }
     }
-  }
-
-  // Terminal overlay: show Cancelado/Recusado as independent final state
-  if (isTerminal) {
-    stages.push({
-      key: status,
-      label: isCancelled ? "Cancelado" : "Recusado",
-      icon: <X className="h-4 w-4" />,
-      state: "error",
-    });
   }
 
   return stages;

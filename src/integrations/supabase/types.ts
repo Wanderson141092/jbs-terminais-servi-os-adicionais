@@ -1261,6 +1261,7 @@ export type Database = {
           deferimento_status_ativacao: string[] | null
           descricao: string | null
           id: string
+          lacre_armador_status_ativacao: string[] | null
           nome: string
           status_confirmacao_lancamento: string[] | null
           tipo_agendamento: string | null
@@ -1278,6 +1279,7 @@ export type Database = {
           deferimento_status_ativacao?: string[] | null
           descricao?: string | null
           id?: string
+          lacre_armador_status_ativacao?: string[] | null
           nome: string
           status_confirmacao_lancamento?: string[] | null
           tipo_agendamento?: string | null
@@ -1295,6 +1297,7 @@ export type Database = {
           deferimento_status_ativacao?: string[] | null
           descricao?: string | null
           id?: string
+          lacre_armador_status_ativacao?: string[] | null
           nome?: string
           status_confirmacao_lancamento?: string[] | null
           tipo_agendamento?: string | null
@@ -1388,6 +1391,8 @@ export type Database = {
           data_agendamento: string | null
           data_posicionamento: string | null
           id: string
+          lacre_armador_aceite_custo: boolean | null
+          lacre_armador_possui: boolean | null
           lancamento_confirmado: boolean | null
           lancamento_confirmado_data: string | null
           lancamento_confirmado_por: string | null
@@ -1397,6 +1402,7 @@ export type Database = {
           pendencias_selecionadas: string[] | null
           protocolo: string
           solicitar_deferimento: boolean | null
+          solicitar_lacre_armador: boolean | null
           status: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria: string | null
           tipo_carga: string | null
@@ -1422,6 +1428,8 @@ export type Database = {
           data_agendamento?: string | null
           data_posicionamento?: string | null
           id?: string
+          lacre_armador_aceite_custo?: boolean | null
+          lacre_armador_possui?: boolean | null
           lancamento_confirmado?: boolean | null
           lancamento_confirmado_data?: string | null
           lancamento_confirmado_por?: string | null
@@ -1431,6 +1439,7 @@ export type Database = {
           pendencias_selecionadas?: string[] | null
           protocolo: string
           solicitar_deferimento?: boolean | null
+          solicitar_lacre_armador?: boolean | null
           status?: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria?: string | null
           tipo_carga?: string | null
@@ -1456,6 +1465,8 @@ export type Database = {
           data_agendamento?: string | null
           data_posicionamento?: string | null
           id?: string
+          lacre_armador_aceite_custo?: boolean | null
+          lacre_armador_possui?: boolean | null
           lancamento_confirmado?: boolean | null
           lancamento_confirmado_data?: string | null
           lancamento_confirmado_por?: string | null
@@ -1465,6 +1476,7 @@ export type Database = {
           pendencias_selecionadas?: string[] | null
           protocolo?: string
           solicitar_deferimento?: boolean | null
+          solicitar_lacre_armador?: boolean | null
           status?: Database["public"]["Enums"]["status_solicitacao"]
           status_vistoria?: string | null
           tipo_carga?: string | null

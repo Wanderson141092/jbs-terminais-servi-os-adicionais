@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle, Download } from "lucide-react";
+import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle, Download, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +50,13 @@ interface ServicoConfig {
   aprovacao_administrativo?: boolean;
   aprovacao_operacional?: boolean;
   deferimento_status_ativacao?: string[];
+  lacre_armador_status_ativacao?: string[];
+}
+
+interface LacreArmadorConfig {
+  mensagem_custo?: string;
+  tipo_aceite?: string;
+  titulo_externo?: string;
 }
 
 interface ObservacaoItem {
@@ -81,10 +88,11 @@ interface ConsultaResultadoProps {
   observacoes?: ObservacaoItem[];
   statusLabels?: StatusLabel[];
   etapasConfig?: EtapaConfig[];
+  lacreArmadorConfig?: LacreArmadorConfig | null;
   onRefresh: () => void;
 }
 
-const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], onRefresh }: ConsultaResultadoProps) => {
+const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], lacreArmadorConfig = null, onRefresh }: ConsultaResultadoProps) => {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -93,6 +101,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   const aprovacaoOperacional = servicoConfig?.aprovacao_operacional ?? false;
 
   const allDocs = deferimentoDocs.filter(d => d.document_type === "deferimento" || !d.document_type);
+  const lacreDocs = deferimentoDocs.filter(d => d.document_type === "lacre_armador");
   const existingDoc = allDocs.length > 0 ? allDocs[0] : null;
 
   const getGeneralDeferimentoStatus = (): "recebido" | "recusado" | "aguardando" | null => {
@@ -110,6 +119,25 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   };
 
   const generalStatus = getGeneralDeferimentoStatus();
+
+  // Lacre Armador status
+  const getGeneralLacreStatus = (): "recebido" | "recusado" | "aguardando" | null => {
+    if (lacreDocs.length === 0) return null;
+    const hasPendente = lacreDocs.some(d => d.status === "pendente" || d.status === "aguardando");
+    if (hasPendente) return "aguardando";
+    const hasAceito = lacreDocs.some(d => d.status === "aceito");
+    if (hasAceito) return "recebido";
+    const hasRecusado = lacreDocs.some(d => d.status === "recusado");
+    if (hasRecusado) return "recusado";
+    return "aguardando";
+  };
+  const lacreStatus = getGeneralLacreStatus();
+
+  // Lacre armador visibility
+  const isServicePosicionamentoLacre = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
+  const statusInLacreActivation = servicoConfig?.lacre_armador_status_ativacao?.includes(solicitacao.status) ?? false;
+  const showLacreArmador = isServicePosicionamentoLacre && statusInLacreActivation && (solicitacao as any).solicitar_lacre_armador === true;
+  const canUploadLacre = showLacreArmador && (lacreDocs.length === 0 || lacreStatus === "recusado") && lacreStatus !== "aguardando";
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -392,6 +420,106 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                     </div>
                   ))}
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* Lacre Armador Section - before deferimento */}
+          {showLacreArmador && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-amber-600" />
+                  {lacreArmadorConfig?.titulo_externo || "Regularização de Lacre Armador"}
+                </p>
+
+                {/* Cost warning */}
+                {lacreArmadorConfig?.mensagem_custo && (
+                  <Alert className="border-amber-400 bg-amber-50">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="ml-2 text-sm text-amber-700">
+                      {lacreArmadorConfig.mensagem_custo}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {lacreStatus === "recebido" ? (
+                  <Alert className="border-green-500 bg-green-50">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="ml-2">
+                      <span className="font-semibold text-green-700">Lacre Armador Recebido</span>
+                      <p className="text-sm text-green-600 mt-1">Documento aprovado.</p>
+                    </AlertDescription>
+                  </Alert>
+                ) : lacreStatus === "recusado" ? (
+                  <div className="space-y-3">
+                    <Alert className="border-red-500 bg-red-50">
+                      <X className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="ml-2">
+                        <span className="font-semibold text-red-700">Reenviar documento de lacre armador</span>
+                        {lacreDocs.find(d => d.status === "recusado")?.motivo_recusa && (
+                          <p className="text-sm text-red-600 mt-1"><strong>Motivo:</strong> {lacreDocs.find(d => d.status === "recusado")?.motivo_recusa}</p>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                    <div className="bg-red-50 border border-red-300 rounded-lg p-4">
+                      <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        // Reuse the same upload flow with document_type lacre_armador
+                        const uploadLacre = async () => {
+                          setUploading(true);
+                          try {
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            formData.append("bucket", "deferimento");
+                            formData.append("solicitacao_id", solicitacao.id);
+                            formData.append("document_type", "lacre_armador");
+                            const { error } = await supabase.functions.invoke("upload-publico", { body: formData });
+                            if (error) throw error;
+                            toast.success("Documento de lacre enviado!");
+                            onRefresh();
+                          } catch { toast.error("Erro ao enviar documento."); }
+                          finally { setUploading(false); }
+                        };
+                        uploadLacre();
+                      }} disabled={uploading} className="text-sm border-red-300" />
+                    </div>
+                  </div>
+                ) : lacreStatus === "aguardando" ? (
+                  <Alert className="border-yellow-500 bg-yellow-50">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="ml-2">
+                      <span className="font-semibold text-yellow-700">Aguardando Atendimento</span>
+                      <p className="text-sm text-yellow-600 mt-1">Documento enviado. Aguardando análise.</p>
+                    </AlertDescription>
+                  </Alert>
+                ) : canUploadLacre ? (
+                  <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+                    <p className="text-xs text-amber-600 mb-3">Envie o documento de lacre armador (PDF, JPG ou PNG).</p>
+                    <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const uploadLacre = async () => {
+                        setUploading(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          formData.append("bucket", "deferimento");
+                          formData.append("solicitacao_id", solicitacao.id);
+                          formData.append("document_type", "lacre_armador");
+                          const { error } = await supabase.functions.invoke("upload-publico", { body: formData });
+                          if (error) throw error;
+                          toast.success("Documento de lacre enviado!");
+                          onRefresh();
+                        } catch { toast.error("Erro ao enviar documento."); }
+                        finally { setUploading(false); }
+                      };
+                      uploadLacre();
+                    }} disabled={uploading} className="text-sm border-amber-300" />
+                  </div>
+                ) : null}
               </div>
             </>
           )}

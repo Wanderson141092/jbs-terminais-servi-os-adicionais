@@ -49,6 +49,7 @@ const Index = () => {
   const [observacoes, setObservacoes] = useState<any[]>([]);
   const [statusLabels, setStatusLabels] = useState<any[]>([]);
   const [etapasConfig, setEtapasConfig] = useState<any[]>([]);
+  const [lacreArmadorConfig, setLacreArmadorConfig] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [buttons, setButtons] = useState<ExternalButton[]>([]);
@@ -113,6 +114,7 @@ const Index = () => {
       setObservacoes(response?.observacoes || []);
       setStatusLabels(response?.status_labels || []);
       setEtapasConfig(response?.etapas_config || []);
+      setLacreArmadorConfig(response?.lacre_armador_config || null);
 
       if (!response?.solicitacao) {
         toast.info("Nenhuma solicitação encontrada para este serviço com os dados informados.");
@@ -233,6 +235,7 @@ const Index = () => {
                   observacoes={observacoes}
                   statusLabels={statusLabels}
                   etapasConfig={etapasConfig}
+                  lacreArmadorConfig={lacreArmadorConfig}
                   onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor, lastSearchChave)}
                 />
               )}

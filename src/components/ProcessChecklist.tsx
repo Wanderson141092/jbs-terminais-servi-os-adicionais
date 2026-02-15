@@ -12,6 +12,9 @@ interface ProcessChecklistProps {
     solicitar_deferimento?: boolean;
     lancamento_confirmado?: boolean | null;
     pendencias_selecionadas?: string[] | null;
+    tipo_operacao?: string | null;
+    categoria?: string | null;
+    observacoes?: string | null;
   };
   aprovacaoAtivada?: boolean;
   aprovacaoAdministrativo?: boolean;
@@ -19,6 +22,7 @@ interface ProcessChecklistProps {
   deferimentoStatus?: "recebido" | "recusado" | "aguardando" | null;
   compact?: boolean;
   hideInternal?: boolean;
+  serviceName?: string;
 }
 
 interface CheckItem {
@@ -27,51 +31,76 @@ interface CheckItem {
   detail?: string;
 }
 
+const isPosicionamento = (tipoOperacao?: string | null): boolean => {
+  return (tipoOperacao || "").toLowerCase().includes("posicionamento");
+};
+
 const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
-  const { solicitacao: s, aprovacaoAtivada = false, aprovacaoAdministrativo = false, aprovacaoOperacional = false, deferimentoStatus, hideInternal = false } = props;
+  const { solicitacao: s, aprovacaoAdministrativo = false, aprovacaoOperacional = false, deferimentoStatus, hideInternal = false, serviceName } = props;
   const items: CheckItem[] = [];
+  const isPosic = isPosicionamento(s.tipo_operacao);
 
   // 1. Solicitação registrada
   items.push({ label: "Solicitação registrada", status: "done" });
 
-  // 2. Aprovações (individually)
-  if (aprovacaoAdministrativo) {
-    items.push({
-      label: "Aprovação Administrativo",
-      status: s.comex_aprovado === true ? "done" : s.comex_aprovado === false ? "error" : "waiting",
-      detail: s.comex_justificativa || undefined,
-    });
-  }
-  if (aprovacaoOperacional) {
-    items.push({
-      label: "Aprovação Operacional",
-      status: s.armazem_aprovado === true ? "done" : s.armazem_aprovado === false ? "error" : "waiting",
-      detail: s.armazem_justificativa || undefined,
-    });
+  // 2. Internal approvals as sub-items (only show internally)
+  if (!hideInternal) {
+    if (aprovacaoAdministrativo) {
+      items.push({
+        label: "Aprovação Administrativo",
+        status: s.comex_aprovado === true ? "done" : s.comex_aprovado === false ? "error" : "waiting",
+        detail: s.comex_justificativa || undefined,
+      });
+    }
+    if (aprovacaoOperacional) {
+      items.push({
+        label: "Aprovação Operacional",
+        status: s.armazem_aprovado === true ? "done" : s.armazem_aprovado === false ? "error" : "waiting",
+        detail: s.armazem_justificativa || undefined,
+      });
+    }
   }
 
-  // 3. Vistoria
-  const vistoriaStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
-  const vistoriaConcluida = vistoriaStatuses.includes(s.status);
-  items.push({
-    label: "Vistoria realizada",
-    status: s.status === "vistoria_finalizada"
-      ? "done"
-      : s.status === "vistoriado_com_pendencia"
-        ? "error"
-        : s.status === "nao_vistoriado"
-          ? "error"
-          : s.status === "confirmado_aguardando_vistoria"
-            ? "pending"
-            : "waiting",
-    detail: s.status === "vistoriado_com_pendencia" && s.pendencias_selecionadas?.length
-      ? `Pendências: ${s.pendencias_selecionadas.join(", ")}`
-      : s.status === "nao_vistoriado"
-        ? "Não vistoriado"
-        : undefined,
-  });
+  if (isPosic) {
+    // Posicionamento: vistoria-based items
+    const vistoriaStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
+    
+    if (s.status === "vistoria_finalizada") {
+      items.push({ label: "Vistoria finalizada sem pendência", status: "done" });
+    } else if (s.status === "vistoriado_com_pendencia") {
+      const pendDetail = s.pendencias_selecionadas?.length
+        ? s.pendencias_selecionadas.join(", ")
+        : undefined;
+      items.push({
+        label: "Vistoriado com pendência",
+        status: "error",
+        detail: pendDetail,
+      });
+      if (s.observacoes) {
+        items.push({
+          label: "Observação do processo",
+          status: "error",
+          detail: s.observacoes,
+        });
+      }
+    } else if (s.status === "nao_vistoriado") {
+      items.push({ label: "Não vistoriado", status: "error" });
+    } else if (s.status === "confirmado_aguardando_vistoria") {
+      items.push({ label: "Aguardando vistoria", status: "pending" });
+    }
+  } else {
+    // Non-Posicionamento: show service conclusion message
+    const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado", "confirmado_aguardando_vistoria"];
+    if (finishedStatuses.includes(s.status)) {
+      const name = serviceName || s.tipo_operacao || "Serviço";
+      items.push({
+        label: `Serviço "${name}" executado e finalizado.`,
+        status: "done",
+      });
+    }
+  }
 
-  // 4. Deferimento (only if showDeferimento is true - controlled by parent with 3 conditions)
+  // Deferimento (only if showDeferimento is true)
   if (s.solicitar_deferimento) {
     items.push({
       label: "Deferimento enviado",
@@ -86,7 +115,7 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
     });
   }
 
-  // 5. Confirmação de lançamento (internal only)
+  // Lançamento (internal only)
   if (!hideInternal) {
     const vistoriaStatuses2 = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
     const vistoriaConcluida2 = vistoriaStatuses2.includes(s.status);

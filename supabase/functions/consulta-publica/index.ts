@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const tipoOperacao = servicoData.nome;
     const valorUpper = valor.toUpperCase().trim();
 
-    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, pendencias_selecionadas, observacoes";
+    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, pendencias_selecionadas, observacoes, custo_posicionamento";
 
     let solicitacao = null;
 
@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
       if (key === "id" || key === "status" || key === "created_at" || key === "updated_at" || 
           key === "comex_aprovado" || key === "armazem_aprovado" || key === "solicitar_deferimento" ||
           key === "pendencias_selecionadas" || key === "status_vistoria" || key === "categoria" ||
-          key === "tipo_operacao" || key === "observacoes" ||
+          key === "tipo_operacao" || key === "observacoes" || key === "custo_posicionamento" ||
           visibleFixedFields.includes(key)) {
         sanitizedSolicitacao[key] = value;
       }

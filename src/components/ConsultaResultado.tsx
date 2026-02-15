@@ -344,6 +344,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               pendenciasSelecionadas={solicitacao.pendencias_selecionadas}
               observacoes={observacoes?.map(o => o.observacao)}
               etapasConfig={etapasConfig}
+              custoposicionamento={(solicitacao as any).custo_posicionamento ?? null}
             />
           </div>
 

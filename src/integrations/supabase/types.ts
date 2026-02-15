@@ -1353,6 +1353,7 @@ export type Database = {
           comex_justificativa: string | null
           comex_usuario_id: string | null
           created_at: string
+          custo_posicionamento: boolean | null
           data_agendamento: string | null
           data_posicionamento: string | null
           id: string
@@ -1385,6 +1386,7 @@ export type Database = {
           comex_justificativa?: string | null
           comex_usuario_id?: string | null
           created_at?: string
+          custo_posicionamento?: boolean | null
           data_agendamento?: string | null
           data_posicionamento?: string | null
           id?: string
@@ -1417,6 +1419,7 @@ export type Database = {
           comex_justificativa?: string | null
           comex_usuario_id?: string | null
           created_at?: string
+          custo_posicionamento?: boolean | null
           data_agendamento?: string | null
           data_posicionamento?: string | null
           id?: string

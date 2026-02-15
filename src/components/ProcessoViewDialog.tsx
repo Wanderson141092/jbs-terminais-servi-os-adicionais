@@ -174,6 +174,9 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                 aprovacaoOperacional={aprovacaoOperacional}
                 solicitarDeferimento={solicitacao.solicitar_deferimento}
                 deferimentoStatus={deferimentoStatus}
+                categoria={(solicitacao as any).categoria}
+                tipoOperacao={(solicitacao as any).tipo_operacao}
+                custoposicionamento={(solicitacao as any).custo_posicionamento ?? null}
               />
             </div>
 

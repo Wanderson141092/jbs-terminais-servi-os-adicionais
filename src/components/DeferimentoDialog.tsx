@@ -289,6 +289,18 @@ const DeferimentoDialog = ({ solicitacao, userId, onClose }: DeferimentoDialogPr
                               Alterar para Recusado
                             </Button>
                           )}
+                          {doc.status === "recusado" && !documents.some(d => d.id !== doc.id && new Date(d.created_at) > new Date(doc.created_at)) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-green-600 border-green-300 hover:bg-green-50"
+                              onClick={() => handleAceitar(doc.id)}
+                              disabled={loading}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Alterar para Recebido
+                            </Button>
+                          )}
                           {!showEmbeddedPreview && (
                             <Button variant="outline" size="sm" onClick={() => setPreviewUrl(doc.file_url)}>
                               <Eye className="h-4 w-4 mr-1" />

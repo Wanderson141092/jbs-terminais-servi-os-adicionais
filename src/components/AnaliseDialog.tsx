@@ -611,7 +611,33 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <FileText className="h-5 w-5" />
-              Análise — {solicitacao.protocolo}
+              <span>Análise — {solicitacao.protocolo}</span>
+              {solicitacao.chave_consulta && (
+                <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-md px-2.5 py-1 ml-1">
+                  <Key className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="text-sm font-mono font-bold text-blue-800 tracking-widest">{solicitacao.chave_consulta}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-blue-600 hover:bg-blue-100"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const { error } = await supabase.functions.invoke("notificar-status", {
+                          body: { action: "reenviar_chave", solicitacao_id: solicitacao.id },
+                        });
+                        if (error) throw error;
+                        toast.success("Chave reenviada para o e-mail do cliente!");
+                      } catch {
+                        toast.error("Erro ao reenviar chave.");
+                      }
+                    }}
+                    title="Reenviar chave por e-mail"
+                  >
+                    <Send className="h-3 w-3" />
+                  </Button>
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription>
               Análise e decisão sobre a solicitação
@@ -645,39 +671,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             </div>
 
-            {/* Chave de Consulta */}
-            {solicitacao.chave_consulta && (
-              <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <Key className="h-4 w-4 text-blue-600 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs text-blue-600 font-medium">Chave de Consulta</p>
-                  <p className="text-lg font-mono font-bold text-blue-800 tracking-widest">{solicitacao.chave_consulta}</p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-blue-600 border-blue-300 hover:bg-blue-100"
-                  onClick={async () => {
-                    try {
-                      const { error } = await supabase.functions.invoke("notificar-status", {
-                        body: { 
-                          action: "reenviar_chave",
-                          solicitacao_id: solicitacao.id 
-                        },
-                      });
-                      if (error) throw error;
-                      toast.success("Chave reenviada para o e-mail do cliente!");
-                    } catch {
-                      toast.error("Erro ao reenviar chave.");
-                    }
-                  }}
-                  title="Reenviar chave por e-mail"
-                >
-                  <Send className="h-3.5 w-3.5 mr-1" />
-                  Reenviar
-                </Button>
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <InfoItem icon={<Package className="h-4 w-4" />} label="Contêiner" value={solicitacao.numero_conteiner || "—"} />

@@ -48,6 +48,7 @@ const Index = () => {
   const [servicoConfig, setServicoConfig] = useState<any>(null);
   const [observacoes, setObservacoes] = useState<any[]>([]);
   const [statusLabels, setStatusLabels] = useState<any[]>([]);
+  const [etapasConfig, setEtapasConfig] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [buttons, setButtons] = useState<ExternalButton[]>([]);
@@ -109,6 +110,7 @@ const Index = () => {
       setServicoConfig(response?.servico_config || null);
       setObservacoes(response?.observacoes || []);
       setStatusLabels(response?.status_labels || []);
+      setEtapasConfig(response?.etapas_config || []);
 
       if (!response?.solicitacao) {
         toast.info("Nenhuma solicitação encontrada para este serviço com os dados informados.");
@@ -228,6 +230,7 @@ const Index = () => {
                   servicoConfig={servicoConfig}
                   observacoes={observacoes}
                   statusLabels={statusLabels}
+                  etapasConfig={etapasConfig}
                   onRefresh={() => handleSearch(lastSearchServicoId, lastSearchValor)}
                 />
               )}

@@ -13,11 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 import ParametrosCamposManager from "@/components/ParametrosCamposManager";
 import CamposFixosManager from "@/components/admin/CamposFixosManager";
+import ConsultaEtapasManager from "@/components/admin/ConsultaEtapasManager";
 
 interface RegraServico {
   id: string;
@@ -592,6 +593,10 @@ const AdminParametros = () => {
             <Settings className="h-4 w-4" />
             Campos Fixos
           </TabsTrigger>
+          <TabsTrigger value="consulta-etapas" className="flex items-center gap-2">
+            <GitBranch className="h-4 w-4" />
+            Consulta
+          </TabsTrigger>
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Regras
@@ -734,6 +739,11 @@ const AdminParametros = () => {
         {/* ============= CAMPOS FIXOS ============= */}
         <TabsContent value="campos-fixos">
           <CamposFixosManager />
+        </TabsContent>
+
+        {/* ============= CONSULTA ETAPAS ============= */}
+        <TabsContent value="consulta-etapas">
+          <ConsultaEtapasManager />
         </TabsContent>
 
         {/* ============= REGRAS DE SERVIÇO ============= */}

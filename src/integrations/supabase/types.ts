@@ -250,6 +250,54 @@ export type Database = {
         }
         Relationships: []
       }
+      consulta_etapas_config: {
+        Row: {
+          ativo: boolean
+          chave: string
+          created_at: string
+          descricao: string | null
+          etapa_equivalente: string | null
+          grupo: string
+          id: string
+          ordem: number
+          servico_ids: string[]
+          status_gatilho: string[] | null
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          created_at?: string
+          descricao?: string | null
+          etapa_equivalente?: string | null
+          grupo?: string
+          id?: string
+          ordem?: number
+          servico_ids?: string[]
+          status_gatilho?: string[] | null
+          tipo?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          created_at?: string
+          descricao?: string | null
+          etapa_equivalente?: string | null
+          grupo?: string
+          id?: string
+          ordem?: number
+          servico_ids?: string[]
+          status_gatilho?: string[] | null
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deferimento_documents: {
         Row: {
           created_at: string

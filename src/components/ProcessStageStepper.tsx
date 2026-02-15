@@ -1,6 +1,16 @@
 import { Check, Clock, X, CircleDot, FileCheck, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface EtapaConfigItem {
+  chave: string;
+  titulo: string;
+  tipo: string;
+  grupo: string;
+  ordem: number;
+  etapa_equivalente: string | null;
+  status_gatilho: string[];
+}
+
 interface ProcessStageStepperProps {
   status: string;
   comexAprovado?: boolean | null;
@@ -16,6 +26,7 @@ interface ProcessStageStepperProps {
   tipoOperacao?: string | null;
   pendenciasSelecionadas?: string[] | null;
   observacoes?: string[];
+  etapasConfig?: EtapaConfigItem[];
 }
 
 interface Stage {
@@ -67,7 +78,14 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     tipoOperacao,
     pendenciasSelecionadas,
     observacoes,
+    etapasConfig = [],
   } = props;
+
+  // Helper to get configured title, falling back to default
+  const getTitle = (chave: string, fallback: string): string => {
+    const cfg = etapasConfig.find(e => e.chave === chave);
+    return cfg?.titulo || fallback;
+  };
 
   const isCancelled = status === "cancelado";
   const isRecusado = status === "recusado";
@@ -81,7 +99,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // Stage 1: Solicitação Recebida (always completed once exists)
   stages.push({
     key: "recebida",
-    label: "Solicitação Recebida",
+    label: getTitle("recebida", "Solicitação Recebida"),
     icon: <FileCheck className="h-4 w-4" />,
     state: "completed",
   });
@@ -99,7 +117,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     }
     stages.push({
       key: "aguardando_confirmacao",
-      label: "Aguardando Confirmação",
+      label: getTitle("aguardando_confirmacao", "Aguardando Confirmação"),
       icon: <Clock className="h-4 w-4" />,
       state,
     });
@@ -119,7 +137,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
           stages.push({
             key: "aguardando_servico",
-            label: "Confirmado - Aguardando Serviço",
+            label: getTitle("aguardando_servico", "Confirmado - Aguardando Serviço"),
             icon: <Clock className="h-4 w-4" />,
             state: isTerminal ? "completed" : state,
           });
@@ -137,7 +155,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         if (currentOrder >= 2 || ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
           stages.push({
             key: "servico_finalizado",
-            label: "Serviço Finalizado",
+            label: getTitle("servico_finalizado", "Serviço Finalizado"),
             icon: <Check className="h-4 w-4" />,
             state: isTerminal ? "pending" : state,
           });
@@ -155,7 +173,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
           stages.push({
             key: "aguardando_vistoria",
-            label: "Confirmado - Aguardando Vistoria",
+            label: getTitle("aguardando_vistoria", "Confirmado - Aguardando Vistoria"),
             icon: <Clock className="h-4 w-4" />,
             state: isTerminal ? "completed" : state,
           });
@@ -167,7 +185,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         if (status === "vistoria_finalizada") {
           stages.push({
             key: "vistoria_finalizada",
-            label: "Vistoria Finalizada",
+            label: getTitle("vistoria_finalizada", "Vistoria Finalizada"),
             icon: <Check className="h-4 w-4" />,
             state: "completed",
           });
@@ -179,7 +197,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           const detail = [pendDetail, obsDetail].filter(Boolean).join(" — ");
           stages.push({
             key: "vistoriado_com_pendencia",
-            label: "Vistoriado com Pendência",
+            label: getTitle("vistoriado_com_pendencia", "Vistoriado com Pendência"),
             icon: <X className="h-4 w-4" />,
             state: "error",
             detail,
@@ -187,7 +205,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         } else if (status === "nao_vistoriado") {
           stages.push({
             key: "nao_vistoriado",
-            label: "Não Vistoriado",
+            label: getTitle("nao_vistoriado", "Não Vistoriado"),
             icon: <X className="h-4 w-4" />,
             state: "error",
           });
@@ -205,7 +223,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       if (currentOrder >= 2 || finishedStatuses.includes(status)) {
         stages.push({
           key: "servico_concluido",
-          label: "Serviço Concluído",
+          label: getTitle("servico_concluido", "Serviço Concluído"),
           icon: <Check className="h-4 w-4" />,
           state: isTerminal ? "pending" : state,
         });
@@ -234,40 +252,43 @@ interface DeferimentoStage {
   icon: React.ReactNode;
 }
 
-const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "aguardando" | null): DeferimentoStage[] => {
+const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "aguardando" | null, etapasConfig: EtapaConfigItem[] = []): DeferimentoStage[] => {
+  const getTitle = (chave: string, fallback: string): string => {
+    const cfg = etapasConfig.find(e => e.chave === chave);
+    return cfg?.titulo || fallback;
+  };
+
   const stages: DeferimentoStage[] = [];
 
-  // Always show "Aguardando envio do arquivo"
   let envioState: DeferimentoStage["state"] = "current";
   if (deferimentoStatus === "aguardando" || deferimentoStatus === "recebido" || deferimentoStatus === "recusado") {
     envioState = "completed";
   }
   stages.push({
     key: "aguardando_envio",
-    label: "Aguardando Envio do Arquivo",
+    label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
     icon: <Upload className="h-4 w-4" />,
     state: envioState,
   });
 
-  // Show result only when there is one
   if (deferimentoStatus === "recebido") {
     stages.push({
       key: "documento_recebido",
-      label: "Documento Recebido",
+      label: getTitle("documento_recebido", "Documento Recebido"),
       icon: <Check className="h-4 w-4" />,
       state: "completed",
     });
   } else if (deferimentoStatus === "recusado") {
     stages.push({
       key: "documento_recusado",
-      label: "Documento Recusado",
+      label: getTitle("documento_recusado", "Documento Recusado"),
       icon: <X className="h-4 w-4" />,
       state: "error",
     });
   } else if (deferimentoStatus === "aguardando") {
     stages.push({
       key: "aguardando_analise",
-      label: "Aguardando Análise",
+      label: getTitle("aguardando_analise", "Aguardando Análise"),
       icon: <Clock className="h-4 w-4" />,
       state: "current",
     });
@@ -371,7 +392,7 @@ const ProcessStageStepper = (props: ProcessStageStepperProps) => {
   const stages = getStages(props);
   const { compact = false, solicitarDeferimento = false, deferimentoStatus } = props;
 
-  const deferimentoStages = solicitarDeferimento ? getDeferimentoStages(deferimentoStatus ?? null) : [];
+  const deferimentoStages = solicitarDeferimento ? getDeferimentoStages(deferimentoStatus ?? null, props.etapasConfig) : [];
 
   return (
     <div className="space-y-4">

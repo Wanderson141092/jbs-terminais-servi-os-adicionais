@@ -64,16 +64,27 @@ interface StatusLabel {
   ordem: number;
 }
 
+interface EtapaConfig {
+  chave: string;
+  titulo: string;
+  tipo: string;
+  grupo: string;
+  ordem: number;
+  etapa_equivalente: string | null;
+  status_gatilho: string[];
+}
+
 interface ConsultaResultadoProps {
   solicitacao: Solicitacao;
   deferimentoDocs?: DeferimentoDocument[];
   servicoConfig?: ServicoConfig | null;
   observacoes?: ObservacaoItem[];
   statusLabels?: StatusLabel[];
+  etapasConfig?: EtapaConfig[];
   onRefresh: () => void;
 }
 
-const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], onRefresh }: ConsultaResultadoProps) => {
+const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], onRefresh }: ConsultaResultadoProps) => {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -332,6 +343,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               tipoOperacao={solicitacao.tipo_operacao}
               pendenciasSelecionadas={solicitacao.pendencias_selecionadas}
               observacoes={observacoes?.map(o => o.observacao)}
+              etapasConfig={etapasConfig}
             />
           </div>
 
@@ -345,6 +357,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             compact
             hideInternal
             serviceName={solicitacao.tipo_operacao || undefined}
+            etapasConfig={etapasConfig}
           />
 
           <Separator />

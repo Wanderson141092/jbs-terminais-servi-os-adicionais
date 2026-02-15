@@ -111,14 +111,16 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
 
   // For terminal states, all completed stages become "error" to paint the whole line red
   // For em_pendencia states, completed stages revert to "pending" (gray with ✓) — the final stage gets "warning" (amber)
-  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
+  // For "recusado" in Posicionamento, prior stages stay gray (pending) with ✓, only the terminal is red
+  const isPosicRecusado = isPosic && isRecusado;
+  const completedState = isPosicRecusado ? "pending" as const : isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
 
   // Determine icon override for special states (only for terminal/error)
-  const stateIcon = isTerminal ? <X className="h-4 w-4" /> : null;
+  const stateIcon = (isTerminal && !isPosicRecusado) ? <X className="h-4 w-4" /> : null;
 
   // Stage 1: Solicitação Recebida (always completed once exists)
   // For em_pendencia, prior stages get gray styling ("pending") but keep ✓ icon
-  const priorIcon = isEmPendencia ? <Check className="h-4 w-4" /> : null;
+  const priorIcon = (isEmPendencia || isPosicRecusado) ? <Check className="h-4 w-4" /> : null;
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),

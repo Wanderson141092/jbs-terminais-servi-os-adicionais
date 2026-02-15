@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ interface ParametroCampo {
   ordem: number;
   ativo: boolean;
   servico_ids: string[];
+  tipo_resultado?: string | null;
 }
 
 interface Servico {
@@ -29,11 +31,11 @@ interface Servico {
 }
 
 const GRUPOS = [
-  { key: "tipo_carga", label: "Tipo Carga", showSigla: true, showServicoIds: false },
-  { key: "categoria", label: "Categoria", showSigla: false, showServicoIds: false },
-  { key: "status_deferimento", label: "Status Deferimento", showSigla: false, showServicoIds: false },
-  { key: "status_processo", label: "Status do Processo", showSigla: false, showServicoIds: true },
-  { key: "pendencia_opcoes", label: "Opções de Pendência (Vistoria)", showSigla: false, showServicoIds: true },
+  { key: "tipo_carga", label: "Tipo Carga", showSigla: true, showServicoIds: false, showTipoResultado: false },
+  { key: "categoria", label: "Categoria", showSigla: false, showServicoIds: false, showTipoResultado: false },
+  { key: "status_deferimento", label: "Status Deferimento", showSigla: false, showServicoIds: false, showTipoResultado: false },
+  { key: "status_processo", label: "Status do Processo", showSigla: false, showServicoIds: true, showTipoResultado: true },
+  { key: "pendencia_opcoes", label: "Opções de Pendência (Vistoria)", showSigla: false, showServicoIds: true, showTipoResultado: false },
 ];
 
 const ParametrosCamposManager = () => {
@@ -42,7 +44,7 @@ const ParametrosCamposManager = () => {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<ParametroCampo | null>(null);
-  const [formData, setFormData] = useState({ grupo: "tipo_carga", valor: "", sigla: "", ordem: 0, servico_ids: [] as string[] });
+  const [formData, setFormData] = useState({ grupo: "tipo_carga", valor: "", sigla: "", ordem: 0, servico_ids: [] as string[], tipo_resultado: "" });
 
   useEffect(() => { fetchItems(); fetchServicos(); }, []);
 
@@ -68,11 +70,11 @@ const ParametrosCamposManager = () => {
   const openDialog = (grupo: string, item?: ParametroCampo) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ grupo: item.grupo, valor: item.valor, sigla: item.sigla || "", ordem: item.ordem, servico_ids: item.servico_ids || [] });
+      setFormData({ grupo: item.grupo, valor: item.valor, sigla: item.sigla || "", ordem: item.ordem, servico_ids: item.servico_ids || [], tipo_resultado: item.tipo_resultado || "" });
     } else {
       setEditingItem(null);
       const maxOrder = items.filter(i => i.grupo === grupo).reduce((max, i) => Math.max(max, i.ordem), 0);
-      setFormData({ grupo, valor: "", sigla: "", ordem: maxOrder + 1, servico_ids: [] });
+      setFormData({ grupo, valor: "", sigla: "", ordem: maxOrder + 1, servico_ids: [], tipo_resultado: "" });
     }
     setShowDialog(true);
   };
@@ -86,6 +88,7 @@ const ParametrosCamposManager = () => {
       sigla: formData.sigla.trim() || null,
       ordem: formData.ordem,
       servico_ids: formData.servico_ids,
+      tipo_resultado: formData.tipo_resultado || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -146,6 +149,7 @@ const ParametrosCamposManager = () => {
                 <TableHead>Valor</TableHead>
                 {grupo.showSigla && <TableHead>Sigla</TableHead>}
                 {grupo.showServicoIds && <TableHead>Serviços</TableHead>}
+                {grupo.showTipoResultado && <TableHead>Classificação</TableHead>}
                 <TableHead>Ordem</TableHead>
                 <TableHead>Ativo</TableHead>
                 <TableHead>Ações</TableHead>
@@ -154,7 +158,7 @@ const ParametrosCamposManager = () => {
             <TableBody>
               {grupoItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={grupo.showSigla || grupo.showServicoIds ? 6 : 4} className="text-center text-muted-foreground py-4">
+                  <TableCell colSpan={6 + (grupo.showSigla ? 1 : 0) + (grupo.showServicoIds ? 1 : 0) + (grupo.showTipoResultado ? 1 : 0)} className="text-center text-muted-foreground py-4">
                     Nenhum item cadastrado.
                   </TableCell>
                 </TableRow>
@@ -175,6 +179,17 @@ const ParametrosCamposManager = () => {
                           </div>
                         ) : (
                           <span className="text-muted-foreground">Todos</span>
+                        )}
+                      </TableCell>
+                    )}
+                    {grupo.showTipoResultado && (
+                      <TableCell>
+                        {item.tipo_resultado ? (
+                          <Badge variant={item.tipo_resultado === 'conforme' ? 'default' : item.tipo_resultado === 'nao_conforme' ? 'destructive' : 'secondary'} className="text-[10px]">
+                            {item.tipo_resultado === 'conforme' ? 'Conforme' : item.tipo_resultado === 'nao_conforme' ? 'Não Conforme' : 'Neutro'}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
                     )}
@@ -255,6 +270,22 @@ const ParametrosCamposManager = () => {
                   ))}
                   {servicos.length === 0 && <p className="text-xs text-muted-foreground">Nenhum serviço cadastrado</p>}
                 </div>
+              </div>
+            )}
+            {currentGrupo?.showTipoResultado && (
+              <div>
+                <Label>Classificação do Resultado</Label>
+                <p className="text-xs text-muted-foreground mb-2">Define se o status é conforme, não conforme ou neutro na timeline</p>
+                <Select value={formData.tipo_resultado || "neutro"} onValueChange={(v) => setFormData({ ...formData, tipo_resultado: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="neutro">Neutro</SelectItem>
+                    <SelectItem value="conforme">Conforme</SelectItem>
+                    <SelectItem value="nao_conforme">Não Conforme</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <div>

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface StatusOption {
   value: string;
   label: string;
+  tipo_resultado?: string | null;
 }
 
 let cachedOptions: StatusOption[] | null = null;
@@ -12,14 +13,15 @@ let cachePromise: Promise<StatusOption[]> | null = null;
 const fetchStatusOptions = async (): Promise<StatusOption[]> => {
   const { data } = await supabase
     .from("parametros_campos")
-    .select("valor, sigla")
+    .select("valor, sigla, tipo_resultado")
     .eq("grupo", "status_processo")
     .eq("ativo", true)
     .order("ordem");
 
   const options = (data || []).map((s: any) => ({
     value: s.sigla || s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-    label: s.valor
+    label: s.valor,
+    tipo_resultado: s.tipo_resultado || null,
   }));
 
   cachedOptions = options;

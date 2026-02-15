@@ -20,7 +20,7 @@ interface ProcessStageStepperProps {
   aprovacaoOperacional?: boolean;
   solicitarDeferimento?: boolean;
   deferimentoStatus?: "recebido" | "recusado" | "aguardando" | null;
-  statusLabels?: { sigla: string | null; valor: string; ordem: number }[];
+  statusLabels?: { sigla: string | null; valor: string; ordem: number; tipo_resultado?: string | null }[];
   compact?: boolean;
   categoria?: string | null;
   tipoOperacao?: string | null;
@@ -79,6 +79,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     pendenciasSelecionadas,
     observacoes,
     etapasConfig = [],
+    statusLabels = [],
   } = props;
 
   // Helper to get configured title, falling back to default
@@ -87,9 +88,18 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     return cfg?.titulo || fallback;
   };
 
+  // Determine if terminal based on tipo_resultado from statusLabels
+  const currentStatusLabel = statusLabels.find(sl => sl.sigla === status);
+  const isNaoConforme = currentStatusLabel?.tipo_resultado === "nao_conforme";
+  
+  // Fallback for hardcoded terminal states if no tipo_resultado available
   const isCancelled = status === "cancelado";
   const isRecusado = status === "recusado";
-  const isTerminal = isCancelled || isRecusado;
+  const isTerminal = isNaoConforme || isCancelled || isRecusado;
+  
+  // Get the display label for terminal status
+  const terminalLabel = isTerminal ? (currentStatusLabel?.valor || (isCancelled ? "Cancelado" : isRecusado ? "Recusado" : status)) : "";
+  
   const isPosic = isPosicionamento(tipoOperacao);
   const isServico = isPosic && isMotivosServico(categoria);
 
@@ -120,7 +130,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     // Terminal replaces the next stage
     stages.push({
       key: status,
-      label: isCancelled ? "Cancelado" : "Recusado",
+      label: terminalLabel,
       icon: <X className="h-4 w-4" />,
       state: "error",
     });
@@ -158,7 +168,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         }
         stages.push({
           key: status,
-          label: isCancelled ? "Cancelado" : "Recusado",
+          label: terminalLabel,
           icon: <X className="h-4 w-4" />,
           state: "error",
         });
@@ -210,7 +220,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         }
         stages.push({
           key: status,
-          label: isCancelled ? "Cancelado" : "Recusado",
+          label: terminalLabel,
           icon: <X className="h-4 w-4" />,
           state: "error",
         });
@@ -272,7 +282,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       // Terminal replaces Serviço Concluído
       stages.push({
         key: status,
-        label: isCancelled ? "Cancelado" : "Recusado",
+        label: terminalLabel,
         icon: <X className="h-4 w-4" />,
         state: "error",
       });

@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
         .limit(10),
       supabaseAdmin
         .from("parametros_campos")
-        .select("valor, sigla, ordem, servico_ids")
+        .select("valor, sigla, ordem, servico_ids, tipo_resultado")
         .eq("grupo", "status_processo")
         .eq("ativo", true)
         .order("ordem"),
@@ -145,6 +145,7 @@ Deno.serve(async (req) => {
         sigla: s.sigla,
         valor: s.valor,
         ordem: s.ordem,
+        tipo_resultado: s.tipo_resultado || null,
       }));
 
     // Generate signed URLs for each document (private buckets)

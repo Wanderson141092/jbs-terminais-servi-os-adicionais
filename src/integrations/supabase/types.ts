@@ -892,6 +892,7 @@ export type Database = {
           ordem: number
           servico_ids: string[]
           sigla: string | null
+          tipo_resultado: string | null
           updated_at: string
           valor: string
         }
@@ -903,6 +904,7 @@ export type Database = {
           ordem?: number
           servico_ids?: string[]
           sigla?: string | null
+          tipo_resultado?: string | null
           updated_at?: string
           valor: string
         }
@@ -914,6 +916,7 @@ export type Database = {
           ordem?: number
           servico_ids?: string[]
           sigla?: string | null
+          tipo_resultado?: string | null
           updated_at?: string
           valor?: string
         }

@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatContainerInput, isValidContainer } from "@/lib/containerValidation";
 
 interface ConsultaFormProps {
   onSearch: (tipo: string, valor: string, chave: string) => void;
@@ -49,45 +48,8 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         return;
       }
       
-      const containerRegex = /^[A-Z]{3}U\d{7}$/;
-      const protocoloRegex = /^JBS[A-Z]\d{6,}$/;
-      const lpcoRegex = /^[A-Z]\d{10}$/;
-      
-      // Se parece contêiner (começa com letras + dígitos), validar rigorosamente
-      if (/^[A-Z]{3,4}/.test(valorUpper) && !protocoloRegex.test(valorUpper) && !lpcoRegex.test(valorUpper)) {
-        if (!containerRegex.test(valorUpper)) {
-          if (valorUpper.length >= 4 && valorUpper[3] !== 'U') {
-            toast.error("A 4ª letra do contêiner deve ser obrigatoriamente 'U'");
-          } else {
-            toast.error("Formato de contêiner inválido. Use: 3 letras + U + 7 números (ex: ABCU1234567)");
-          }
-          return;
-        }
-      }
-      
       onSearch(servicoSelecionado, valorUpper, chaveUpper);
     }
-  };
-
-  // Verifica se o serviço selecionado é "Posicionamento"
-  const servicoNome = servicos.find(s => s.id === servicoSelecionado)?.nome || "";
-  const isPosicionamento = servicoNome.toLowerCase().includes("posicionamento");
-
-  const getDescricao = () => {
-    if (!servicoSelecionado) {
-      return "Selecione o serviço para continuar";
-    }
-    if (isPosicionamento) {
-      return "Informe o Contêiner, LPCO ou Protocolo";
-    }
-    return "Informe o Contêiner ou Protocolo";
-  };
-
-  const getPlaceholder = () => {
-    if (isPosicionamento) {
-      return "Ex: ABCU1234567, A1234567890, JBSP000001";
-    }
-    return "Ex: ABCU1234567, JBSP000001";
   };
 
   return (
@@ -115,7 +77,7 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
           Identificador
         </Label>
         <p className="text-xs text-muted-foreground mb-3">
-          {getDescricao()} + Chave de Validação
+          Informe o Contêiner, LPCO, Protocolo ou Chave de Consulta + Chave de Validação
         </p>
       </div>
 
@@ -123,15 +85,8 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         <div className="flex-1">
           <Input
             value={valor}
-            onChange={(e) => {
-              const raw = e.target.value.toUpperCase();
-              if (/^[A-Z]{0,4}/.test(raw) && !raw.startsWith("JBS") && !/^[A-Z]\d/.test(raw)) {
-                setValor(formatContainerInput(raw));
-              } else {
-                setValor(raw.slice(0, 15));
-              }
-            }}
-            placeholder={getPlaceholder()}
+            onChange={(e) => setValor(e.target.value.toUpperCase().slice(0, 15))}
+            placeholder="Ex: ABCU1234567, JBSP000001, A1234567890"
             disabled={!servicoSelecionado}
             maxLength={15}
           />
@@ -156,13 +111,8 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         </Button>
       </div>
 
-      {/* Legenda dinâmica baseada no serviço */}
       <div className="text-xs text-muted-foreground pt-2 border-t">
-        {isPosicionamento ? (
-          <p>Informe o contêiner, LPCO ou protocolo JBS + a chave de validação recebida na solicitação.</p>
-        ) : (
-          <p>Informe o contêiner ou protocolo JBS + a chave de validação recebida na solicitação.</p>
-        )}
+        <p>Informe o contêiner, LPCO, protocolo ou chave de consulta + a chave de validação recebida na solicitação.</p>
       </div>
     </form>
   );

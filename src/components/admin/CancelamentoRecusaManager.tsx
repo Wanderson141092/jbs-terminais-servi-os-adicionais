@@ -383,6 +383,9 @@ const CancelamentoRecusaManager = () => {
             </div>
           </div>
           <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowDialog(false)}>
+              Cancelar
+            </Button>
             <Button onClick={handleSave}>
               <Save className="h-4 w-4 mr-1" /> Salvar
             </Button>

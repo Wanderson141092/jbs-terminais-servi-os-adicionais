@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle, Download, Lock } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,9 @@ interface Solicitacao {
   created_at: string;
   categoria?: string | null;
   solicitar_deferimento?: boolean;
+  solicitar_lacre_armador?: boolean;
+  lacre_armador_possui?: boolean | null;
+  lacre_armador_aceite_custo?: boolean | null;
   pendencias_selecionadas?: string[];
   comex_aprovado?: boolean | null;
   armazem_aprovado?: boolean | null;
@@ -96,6 +100,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [lacreArmadorPossui, setLacreArmadorPossui] = useState<boolean | null>(solicitacao.lacre_armador_possui ?? null);
+  const [lacreDataPosicionamento, setLacreDataPosicionamento] = useState("");
+  const [savingLacre, setSavingLacre] = useState(false);
 
   const aprovacaoAdministrativo = servicoConfig?.aprovacao_administrativo ?? false;
   const aprovacaoOperacional = servicoConfig?.aprovacao_operacional ?? false;
@@ -434,8 +441,77 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                   {lacreArmadorConfig?.titulo_externo || "Regularização de Lacre Armador"}
                 </p>
 
-                {/* Cost warning */}
-                {lacreArmadorConfig?.mensagem_custo && (
+                {/* Form fields: possui lacre + data posicionamento */}
+                {lacreStatus !== "recebido" && lacreStatus !== "aguardando" && (
+                  <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Já possui Lacre Armador?</Label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="lacre_possui"
+                            checked={lacreArmadorPossui === true}
+                            onChange={() => setLacreArmadorPossui(true)}
+                            className="accent-amber-600"
+                          />
+                          <span className="text-sm">Sim</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="lacre_possui"
+                            checked={lacreArmadorPossui === false}
+                            onChange={() => setLacreArmadorPossui(false)}
+                            className="accent-amber-600"
+                          />
+                          <span className="text-sm">Não</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Data de Posicionamento para Inclusão do Lacre</Label>
+                      <Input
+                        type="date"
+                        value={lacreDataPosicionamento}
+                        onChange={(e) => setLacreDataPosicionamento(e.target.value)}
+                        className="max-w-xs"
+                      />
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={savingLacre || lacreArmadorPossui === null || !lacreDataPosicionamento}
+                      onClick={async () => {
+                        setSavingLacre(true);
+                        try {
+                          const { error } = await supabase.functions.invoke("upload-publico", {
+                            body: {
+                              action: "update_lacre_info",
+                              solicitacao_id: solicitacao.id,
+                              lacre_armador_possui: lacreArmadorPossui,
+                              data_posicionamento: lacreDataPosicionamento,
+                            },
+                          });
+                          if (error) throw error;
+                          toast.success("Informações do lacre salvas com sucesso!");
+                          onRefresh();
+                        } catch {
+                          toast.error("Erro ao salvar informações do lacre.");
+                        } finally {
+                          setSavingLacre(false);
+                        }
+                      }}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      {savingLacre ? "Salvando..." : "Confirmar Informações"}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Cost warning - only if internal marked cost as "Sim" */}
+                {(solicitacao as any).lacre_armador_aceite_custo === true && lacreArmadorConfig?.mensagem_custo && (
                   <Alert className="border-amber-400 bg-amber-50">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                     <AlertDescription className="ml-2 text-sm text-amber-700">
@@ -467,7 +543,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                       <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        // Reuse the same upload flow with document_type lacre_armador
                         const uploadLacre = async () => {
                           setUploading(true);
                           try {

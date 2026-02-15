@@ -1,0 +1,423 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Save, Edit, Trash2, Lock, FileText, Plus, AlertTriangle } from "lucide-react";
+
+interface SystemConfig {
+  id: string;
+  config_key: string;
+  config_value: string | null;
+  config_type: string;
+  description: string | null;
+  is_active: boolean;
+}
+
+interface DeferimentoTitulo {
+  id: string;
+  titulo: string;
+  servico_ids: string[];
+  ativo: boolean;
+}
+
+interface Servico {
+  id: string;
+  nome: string;
+}
+
+const LACRE_CONFIGS = [
+  { key: "lacre_armador_mensagem_custo", label: "Mensagem de Custo do Lacre", description: "Mensagem exibida na consulta externa quando há custo de serviço para o lacre armador" },
+  { key: "lacre_armador_titulo_externo", label: "Título Externo do Lacre", description: "Título exibido na seção de lacre armador na consulta externa" },
+  { key: "lacre_armador_tipo_aceite", label: "Tipo de Aceite do Lacre", description: "Tipo de aceite para custo: 'informativo' ou 'aceite'" },
+];
+
+const PaginaExternaConfigManager = () => {
+  const [lacreConfigs, setLacreConfigs] = useState<SystemConfig[]>([]);
+  const [deferimentoTitulos, setDeferimentoTitulos] = useState<DeferimentoTitulo[]>([]);
+  const [pendenciaOpcoes, setPendenciaOpcoes] = useState<any[]>([]);
+  const [servicos, setServicos] = useState<Servico[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Edit states
+  const [editingConfig, setEditingConfig] = useState<SystemConfig | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
+
+  // Deferimento titulo dialog
+  const [showTituloDialog, setShowTituloDialog] = useState(false);
+  const [editingTitulo, setEditingTitulo] = useState<DeferimentoTitulo | null>(null);
+  const [tituloForm, setTituloForm] = useState({ titulo: "", servico_ids: [] as string[] });
+
+  // Pendencia dialog
+  const [showPendDialog, setShowPendDialog] = useState(false);
+  const [editingPend, setEditingPend] = useState<any>(null);
+  const [pendForm, setPendForm] = useState({ valor: "", ordem: 0 });
+
+  useEffect(() => { fetchAll(); }, []);
+
+  const fetchAll = async () => {
+    const [lacreRes, titulosRes, pendRes, svcRes] = await Promise.all([
+      supabase.from("system_config").select("*").in("config_key", LACRE_CONFIGS.map(c => c.key)).order("config_key"),
+      supabase.from("deferimento_titulos").select("*").order("created_at"),
+      supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").order("ordem"),
+      supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
+    ]);
+    setLacreConfigs(lacreRes.data || []);
+    setDeferimentoTitulos(titulosRes.data || []);
+    setPendenciaOpcoes(pendRes.data || []);
+    setServicos(svcRes.data || []);
+    setLoading(false);
+  };
+
+  // ===== LACRE CONFIG =====
+  const openConfigEdit = (config: SystemConfig) => {
+    setEditingConfig(config);
+    setEditValue(config.config_value || "");
+    setShowConfigDialog(true);
+  };
+
+  const saveConfig = async () => {
+    if (!editingConfig) return;
+    const { error } = await supabase.from("system_config").update({
+      config_value: editValue,
+      updated_at: new Date().toISOString(),
+    }).eq("id", editingConfig.id);
+    if (error) { toast.error("Erro ao salvar"); return; }
+    toast.success("Configuração salva!");
+    setShowConfigDialog(false);
+    fetchAll();
+  };
+
+  const toggleConfigActive = async (config: SystemConfig) => {
+    await supabase.from("system_config").update({ is_active: !config.is_active }).eq("id", config.id);
+    fetchAll();
+  };
+
+  // ===== DEFERIMENTO TITULOS =====
+  const openTituloDialog = (titulo?: DeferimentoTitulo) => {
+    if (titulo) {
+      setEditingTitulo(titulo);
+      setTituloForm({ titulo: titulo.titulo, servico_ids: titulo.servico_ids || [] });
+    } else {
+      setEditingTitulo(null);
+      setTituloForm({ titulo: "", servico_ids: [] });
+    }
+    setShowTituloDialog(true);
+  };
+
+  const saveTitulo = async () => {
+    if (!tituloForm.titulo.trim()) { toast.error("Título obrigatório"); return; }
+    const data = { titulo: tituloForm.titulo.trim(), servico_ids: tituloForm.servico_ids, updated_at: new Date().toISOString() };
+    if (editingTitulo) {
+      const { error } = await supabase.from("deferimento_titulos").update(data).eq("id", editingTitulo.id);
+      if (error) { toast.error("Erro ao atualizar"); return; }
+      toast.success("Título atualizado!");
+    } else {
+      const { error } = await supabase.from("deferimento_titulos").insert(data);
+      if (error) { toast.error("Erro ao criar"); return; }
+      toast.success("Título criado!");
+    }
+    setShowTituloDialog(false);
+    fetchAll();
+  };
+
+  const deleteTitulo = async (id: string) => {
+    const { error } = await supabase.from("deferimento_titulos").delete().eq("id", id);
+    if (error) { toast.error("Erro ao excluir"); return; }
+    toast.success("Título excluído!");
+    fetchAll();
+  };
+
+  const toggleTituloAtivo = async (titulo: DeferimentoTitulo) => {
+    await supabase.from("deferimento_titulos").update({ ativo: !titulo.ativo }).eq("id", titulo.id);
+    fetchAll();
+  };
+
+  // ===== PENDENCIA OPCOES =====
+  const openPendDialog = (pend?: any) => {
+    if (pend) {
+      setEditingPend(pend);
+      setPendForm({ valor: pend.valor, ordem: pend.ordem });
+    } else {
+      setEditingPend(null);
+      const maxOrdem = pendenciaOpcoes.reduce((max, p) => Math.max(max, p.ordem), 0);
+      setPendForm({ valor: "", ordem: maxOrdem + 1 });
+    }
+    setShowPendDialog(true);
+  };
+
+  const savePend = async () => {
+    if (!pendForm.valor.trim()) { toast.error("Valor obrigatório"); return; }
+    const data: any = { grupo: "pendencia_opcoes", valor: pendForm.valor.trim(), ordem: pendForm.ordem, updated_at: new Date().toISOString() };
+    if (editingPend) {
+      const { error } = await supabase.from("parametros_campos").update(data).eq("id", editingPend.id);
+      if (error) { toast.error("Erro ao atualizar"); return; }
+      toast.success("Opção atualizada!");
+    } else {
+      const { error } = await supabase.from("parametros_campos").insert(data);
+      if (error) { toast.error("Erro ao criar"); return; }
+      toast.success("Opção criada!");
+    }
+    setShowPendDialog(false);
+    fetchAll();
+  };
+
+  const deletePend = async (id: string) => {
+    const { error } = await supabase.from("parametros_campos").delete().eq("id", id);
+    if (error) { toast.error("Erro ao excluir"); return; }
+    toast.success("Opção excluída!");
+    fetchAll();
+  };
+
+  const togglePendAtivo = async (pend: any) => {
+    await supabase.from("parametros_campos").update({ ativo: !pend.ativo }).eq("id", pend.id);
+    fetchAll();
+  };
+
+  const getServicoNome = (id: string) => servicos.find(s => s.id === id)?.nome || id.slice(0, 8);
+
+  if (loading) return <p className="text-muted-foreground text-center py-8">Carregando...</p>;
+
+  return (
+    <div className="space-y-6">
+      {/* Lacre Armador Config */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Lock className="h-5 w-5 text-amber-600" />
+            Configurações do Lacre Armador
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Configuração</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead>Ativo</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {LACRE_CONFIGS.map(cfg => {
+                const dbConfig = lacreConfigs.find(c => c.config_key === cfg.key);
+                if (!dbConfig) return (
+                  <TableRow key={cfg.key}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm">{cfg.label}</p>
+                        <p className="text-xs text-muted-foreground">{cfg.description}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm italic">Não configurado</TableCell>
+                    <TableCell>—</TableCell>
+                    <TableCell>—</TableCell>
+                  </TableRow>
+                );
+                return (
+                  <TableRow key={cfg.key} className={!dbConfig.is_active ? "opacity-50" : ""}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm">{cfg.label}</p>
+                        <p className="text-xs text-muted-foreground">{cfg.description}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm max-w-xs truncate">{dbConfig.config_value || "—"}</TableCell>
+                    <TableCell>
+                      <Switch checked={dbConfig.is_active} onCheckedChange={() => toggleConfigActive(dbConfig)} />
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => openConfigEdit(dbConfig)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Deferimento Títulos */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between py-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="h-5 w-5 text-blue-600" />
+            Títulos de Deferimento ({deferimentoTitulos.length})
+          </CardTitle>
+          <Button size="sm" onClick={() => openTituloDialog()}>
+            <Plus className="h-4 w-4 mr-1" /> Adicionar
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Título</TableHead>
+                <TableHead>Serviços</TableHead>
+                <TableHead>Ativo</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {deferimentoTitulos.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-4">Nenhum título cadastrado.</TableCell></TableRow>
+              ) : deferimentoTitulos.map(t => (
+                <TableRow key={t.id} className={!t.ativo ? "opacity-50" : ""}>
+                  <TableCell className="font-medium">{t.titulo}</TableCell>
+                  <TableCell className="text-xs">
+                    {t.servico_ids?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {t.servico_ids.map(id => <Badge key={id} variant="outline" className="text-[10px]">{getServicoNome(id)}</Badge>)}
+                      </div>
+                    ) : <span className="text-muted-foreground">Todos</span>}
+                  </TableCell>
+                  <TableCell><Switch checked={t.ativo} onCheckedChange={() => toggleTituloAtivo(t)} /></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openTituloDialog(t)}><Edit className="h-4 w-4" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="sm"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Excluir "{t.titulo}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteTitulo(t.id)} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Pendência Opções (Lacre) */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between py-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Opções de Pendência — Vistoria ({pendenciaOpcoes.length})
+          </CardTitle>
+          <Button size="sm" onClick={() => openPendDialog()}>
+            <Plus className="h-4 w-4 mr-1" /> Adicionar
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Valor</TableHead>
+                <TableHead>Ordem</TableHead>
+                <TableHead>Ativo</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pendenciaOpcoes.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-4">Nenhuma opção cadastrada.</TableCell></TableRow>
+              ) : pendenciaOpcoes.map(p => (
+                <TableRow key={p.id} className={!p.ativo ? "opacity-50" : ""}>
+                  <TableCell className="font-medium">{p.valor}</TableCell>
+                  <TableCell>{p.ordem}</TableCell>
+                  <TableCell><Switch checked={p.ativo} onCheckedChange={() => togglePendAtivo(p)} /></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openPendDialog(p)}><Edit className="h-4 w-4" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="sm"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Excluir "{p.valor}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deletePend(p.id)} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Config Edit Dialog */}
+      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar Configuração</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{editingConfig?.description}</p>
+            {editingConfig?.config_key === "lacre_armador_tipo_aceite" ? (
+              <Select value={editValue} onValueChange={setEditValue}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="informativo">Informativo</SelectItem>
+                  <SelectItem value="aceite">Aceite obrigatório</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} rows={3} />
+            )}
+          </div>
+          <DialogFooter><Button onClick={saveConfig}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Titulo Dialog */}
+      <Dialog open={showTituloDialog} onOpenChange={setShowTituloDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{editingTitulo ? "Editar" : "Adicionar"} Título de Deferimento</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Título</Label>
+              <Input value={tituloForm.titulo} onChange={(e) => setTituloForm(p => ({ ...p, titulo: e.target.value }))} placeholder="Ex: Deferimento de Liberação" />
+            </div>
+            <div>
+              <Label>Serviços (vazio = todos)</Label>
+              <div className="space-y-1 max-h-32 overflow-auto border rounded p-2 mt-1">
+                {servicos.map(s => (
+                  <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={tituloForm.servico_ids.includes(s.id)} onChange={() => setTituloForm(p => ({ ...p, servico_ids: p.servico_ids.includes(s.id) ? p.servico_ids.filter(x => x !== s.id) : [...p.servico_ids, s.id] }))} />
+                    {s.nome}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter><Button onClick={saveTitulo}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pendencia Dialog */}
+      <Dialog open={showPendDialog} onOpenChange={setShowPendDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{editingPend ? "Editar" : "Adicionar"} Opção de Pendência</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Valor</Label>
+              <Input value={pendForm.valor} onChange={(e) => setPendForm(p => ({ ...p, valor: e.target.value }))} placeholder="Ex: Lacre Armador Pendente" />
+            </div>
+            <div>
+              <Label>Ordem</Label>
+              <Input type="number" value={pendForm.ordem} onChange={(e) => setPendForm(p => ({ ...p, ordem: parseInt(e.target.value) || 0 }))} />
+            </div>
+          </div>
+          <DialogFooter><Button onClick={savePend}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default PaginaExternaConfigManager;

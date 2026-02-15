@@ -14,12 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch, Ban } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 import ParametrosCamposManager from "@/components/ParametrosCamposManager";
 import CamposFixosManager from "@/components/admin/CamposFixosManager";
 import ConsultaEtapasManager from "@/components/admin/ConsultaEtapasManager";
 import CancelamentoRecusaManager from "@/components/admin/CancelamentoRecusaManager";
+import PaginaExternaConfigManager from "@/components/admin/PaginaExternaConfigManager";
 
 interface RegraServico {
   id: string;
@@ -618,7 +620,11 @@ const AdminParametros = () => {
 
         {/* ============= PÁGINA EXTERNA ============= */}
         <TabsContent value="pagina-externa">
-          <ExternalButtonsManager />
+          <div className="space-y-6">
+            <ExternalButtonsManager />
+            <Separator />
+            <PaginaExternaConfigManager />
+          </div>
         </TabsContent>
 
         {/* ============= PÁGINA INTERNA ============= */}

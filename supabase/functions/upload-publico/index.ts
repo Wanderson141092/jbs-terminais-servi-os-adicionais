@@ -22,6 +22,51 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const contentType = req.headers.get("content-type") || "";
+
+    // Handle JSON requests (e.g., update_lacre_info)
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      if (body.action === "update_lacre_info") {
+        const { solicitacao_id, lacre_armador_possui, data_posicionamento } = body;
+        if (!solicitacao_id) {
+          return new Response(
+            JSON.stringify({ error: "Solicitação não informada." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const supabaseAdmin = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        );
+        const updateData: Record<string, any> = {
+          lacre_armador_possui: lacre_armador_possui ?? null,
+          updated_at: new Date().toISOString(),
+        };
+        if (data_posicionamento) {
+          updateData.data_posicionamento = data_posicionamento;
+        }
+        const { error } = await supabaseAdmin
+          .from("solicitacoes")
+          .update(updateData)
+          .eq("id", solicitacao_id);
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: "Erro ao atualizar informações do lacre." }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ success: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ error: "Ação não reconhecida." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const bucket = formData.get("bucket") as string | null;

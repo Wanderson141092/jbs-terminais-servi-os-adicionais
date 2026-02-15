@@ -903,20 +903,18 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     );
                   })()}
 
-                  {/* Lacre Armador Toggle - ativado quando pendência contém "Lacre Armador" */}
+                  {/* Lacre Armador Toggle - ativado automaticamente quando Regularização é marcada */}
                   {(() => {
                     const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
-                    const hasLacrePendencia = pendenciasSelecionadas.some(p => p.toLowerCase().includes("lacre armador"));
-                    const isActive = isPosicionamento && hasLacrePendencia;
                     return (
                       <>
-                        <div className={`flex items-center justify-between border rounded-md p-3 ${isActive ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                        <div className={`flex items-center justify-between border rounded-md p-3 ${isPosicionamento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
                           <div className="flex items-center gap-2">
                             <Lock className="h-4 w-4 text-amber-600" />
                             <div className="flex flex-col">
                               <Label className="cursor-pointer" htmlFor="solicitar-lacre">Regularização de Lacre Armador</Label>
                               <span className="text-[10px] text-muted-foreground">
-                                {isActive ? "Habilita envio de lacre na pág. externa" : "Requer pendência 'Lacre Armador' ativada"}
+                                {isPosicionamento ? "Habilita envio de lacre na pág. externa" : "Disponível apenas para Posicionamento"}
                               </span>
                             </div>
                           </div>
@@ -927,12 +925,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                               setSolicitarLacreArmador(checked);
                               if (!checked) setCustoLacreArmador(null);
                             }}
-                            disabled={!isActive}
+                            disabled={!isPosicionamento}
                           />
                         </div>
 
                         {/* Custo de Serviço para Lacre Armador */}
-                        {solicitarLacreArmador && isActive && (
+                        {solicitarLacreArmador && isPosicionamento && (
                           <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200 ml-6">
                             <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
                               <DollarSign className="h-4 w-4" />

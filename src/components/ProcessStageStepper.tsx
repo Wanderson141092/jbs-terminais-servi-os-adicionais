@@ -111,11 +111,14 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // For em_pendencia states, use "warning" state
   const completedState = isTerminal ? "error" as const : isEmPendencia ? "warning" as const : "completed" as const;
 
+  // Determine icon override for special states
+  const stateIcon = isTerminal ? <X className="h-4 w-4" /> : isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : null;
+
   // Stage 1: Solicitação Recebida (always completed once exists)
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),
-    icon: isTerminal ? <X className="h-4 w-4" /> : <FileCheck className="h-4 w-4" />,
+    icon: stateIcon || <FileCheck className="h-4 w-4" />,
     state: completedState,
   });
 
@@ -150,7 +153,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     stages.push({
       key: "aguardando_confirmacao",
       label: getTitle("aguardando_confirmacao", "Aguardando Confirmação"),
-      icon: isTerminal ? <X className="h-4 w-4" /> : <Clock className="h-4 w-4" />,
+      icon: stateIcon || <Clock className="h-4 w-4" />,
       state,
     });
   }
@@ -182,13 +185,13 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         if (status === "confirmado_aguardando_vistoria") {
           state = "current";
         } else if (currentOrder > 2) {
-          state = "completed";
+          state = completedState;
         }
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
           stages.push({
             key: "aguardando_servico",
             label: getTitle("aguardando_servico", "Confirmado - Aguardando Serviço"),
-            icon: <Clock className="h-4 w-4" />,
+            icon: stateIcon || <Clock className="h-4 w-4" />,
             state,
           });
         }
@@ -198,13 +201,13 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       {
         let state: Stage["state"] = "pending";
         if (status === "vistoria_finalizada" || status === "vistoriado_com_pendencia" || status === "nao_vistoriado") {
-          state = "completed";
+          state = completedState;
         }
         if (currentOrder >= 2 || ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
           stages.push({
             key: "servico_finalizado",
             label: getTitle("servico_finalizado", "Serviço Finalizado"),
-            icon: <Check className="h-4 w-4" />,
+            icon: stateIcon || <Check className="h-4 w-4" />,
             state,
           });
         }
@@ -234,13 +237,13 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         if (status === "confirmado_aguardando_vistoria") {
           state = "current";
         } else if (currentOrder > 2) {
-          state = "completed";
+          state = completedState;
         }
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
           stages.push({
             key: "aguardando_vistoria",
             label: getTitle("aguardando_vistoria", "Confirmado - Aguardando Vistoria"),
-            icon: <Clock className="h-4 w-4" />,
+            icon: stateIcon || <Clock className="h-4 w-4" />,
             state,
           });
         }
@@ -252,8 +255,8 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           stages.push({
             key: "vistoria_finalizada",
             label: getTitle("vistoria_finalizada", "Vistoria Finalizada"),
-            icon: <Check className="h-4 w-4" />,
-            state: "completed",
+            icon: stateIcon || <Check className="h-4 w-4" />,
+            state: completedState,
           });
         } else if (status === "vistoriado_com_pendencia") {
           const pendDetail = pendenciasSelecionadas?.length
@@ -264,16 +267,16 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           stages.push({
             key: "vistoriado_com_pendencia",
             label: getTitle("vistoriado_com_pendencia", "Vistoriado com Pendência"),
-            icon: <X className="h-4 w-4" />,
-            state: "error",
+            icon: isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : <X className="h-4 w-4" />,
+            state: isEmPendencia ? "warning" : "error",
             detail,
           });
         } else if (status === "nao_vistoriado") {
           stages.push({
             key: "nao_vistoriado",
             label: getTitle("nao_vistoriado", "Não Vistoriado"),
-            icon: <X className="h-4 w-4" />,
-            state: "error",
+            icon: isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : <X className="h-4 w-4" />,
+            state: isEmPendencia ? "warning" : "error",
           });
         }
       }
@@ -295,13 +298,13 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       let state: Stage["state"] = "pending";
       const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado", "confirmado_aguardando_vistoria"];
       if (finishedStatuses.includes(status)) {
-        state = "completed";
+        state = completedState;
       }
       if (currentOrder >= 2 || finishedStatuses.includes(status)) {
         stages.push({
           key: "servico_concluido",
           label: getTitle("servico_concluido", "Serviço Concluído"),
-          icon: <Check className="h-4 w-4" />,
+          icon: stateIcon || <Check className="h-4 w-4" />,
           state,
         });
       }

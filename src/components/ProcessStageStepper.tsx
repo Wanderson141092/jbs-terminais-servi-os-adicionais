@@ -27,6 +27,7 @@ interface ProcessStageStepperProps {
   pendenciasSelecionadas?: string[] | null;
   observacoes?: string[];
   etapasConfig?: EtapaConfigItem[];
+  custoposicionamento?: boolean | null;
 }
 
 interface Stage {
@@ -80,6 +81,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     observacoes,
     etapasConfig = [],
     statusLabels = [],
+    custoposicionamento,
   } = props;
 
   // Helper to get configured title, falling back to default
@@ -124,9 +126,16 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     state: completedState,
   });
 
+  // For Posicionamento cancellations, determine if it was early (before confirmation) or late (after confirmation)
+  const isPosicCancelled = isPosic && isCancelled;
+  // Late cancel: custo_posicionamento is not null (was answered), OR approvals exist
+  const isLateCancellation = isPosicCancelled && (custoposicionamento !== null && custoposicionamento !== undefined);
+  // Early cancel: cancelled but no custo_posicionamento answer
+  const isEarlyCancellation = isPosicCancelled && !isLateCancellation;
+
   // Stage 2: Aguardando Confirmação
   // If terminal happened at this stage, show it as completed (red) then terminal replaces next
-  if (isTerminal && currentOrder <= 1) {
+  if (isTerminal && currentOrder <= 1 && !isLateCancellation) {
     // Was at aguardando_confirmacao when cancelled/refused — show it as error
     stages.push({
       key: "aguardando_confirmacao",
@@ -163,9 +172,9 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   if (isPosic) {
     if (isServico) {
       // Branch: Confirmado - Aguardando Serviço → Serviço Finalizado
-      if (isTerminal && currentOrder <= 2) {
+      if (isTerminal && currentOrder <= 2 && !isEarlyCancellation) {
         // Terminal at confirmado_aguardando_vistoria stage — show stage as error, then terminal
-        if (currentOrder >= 2) {
+        if (currentOrder >= 2 || isLateCancellation) {
           stages.push({
             key: "aguardando_servico",
             label: getTitle("aguardando_servico", "Confirmado - Aguardando Serviço"),
@@ -216,8 +225,8 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       }
     } else {
       // Branch: Confirmado - Aguardando Vistoria → Vistoria result
-      if (isTerminal && currentOrder <= 2) {
-        if (currentOrder >= 2) {
+      if (isTerminal && currentOrder <= 2 && !isEarlyCancellation) {
+        if (currentOrder >= 2 || isLateCancellation) {
           stages.push({
             key: "aguardando_vistoria",
             label: getTitle("aguardando_vistoria", "Confirmado - Aguardando Vistoria"),

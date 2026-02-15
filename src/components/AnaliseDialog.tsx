@@ -63,6 +63,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
   const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
+  const [custoposicionamento, setCustoposicionamento] = useState<boolean | null>(solicitacao.custo_posicionamento ?? null);
 
 
   useEffect(() => {
@@ -232,12 +233,25 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     await executeApproval(true);
   };
 
+  // Check if this is a late cancellation requiring cost validation
+  const isLateCancel = (status: string): boolean => {
+    const isPosic = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
+    return isPosic === true && status === "cancelado" && 
+      (solicitacao.status === "confirmado_aguardando_vistoria");
+  };
+
   const handleUpdateStatus = async () => {
     if (!selectedStatus) return;
     if (selectedStatus === solicitacao.status && 
         solicitarDeferimento === solicitacao.solicitar_deferimento && 
         JSON.stringify(pendenciasSelecionadas) === JSON.stringify(solicitacao.pendencias_selecionadas)) {
       toast.info("Nenhuma alteração detectada.");
+      return;
+    }
+    
+    // Validação: cancelamento pós-confirmação requer resposta sobre custo
+    if (isLateCancel(selectedStatus) && custoposicionamento === null) {
+      toast.error("Informe se há custo de posicionamento antes de salvar.");
       return;
     }
     
@@ -257,18 +271,30 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (matchedLabel) {
       statusVistoria = matchedLabel;
     }
+
+    // Build update data
+    const updatePayload: any = {
+      status: selectedStatus,
+      status_vistoria: statusVistoria,
+      solicitar_deferimento: solicitarDeferimento,
+      pendencias_selecionadas: pendenciasSelecionadas,
+      cliente_nome: clienteNome.trim(),
+      cnpj: clienteCnpj.trim() || null,
+      updated_at: new Date().toISOString()
+    };
+
+    // If late cancellation, save custo_posicionamento and trigger lançamento if needed
+    if (isLateCancel(selectedStatus)) {
+      updatePayload.custo_posicionamento = custoposicionamento;
+      if (custoposicionamento === true) {
+        // Mark lancamento as pending (same as financial launch flow)
+        updatePayload.lancamento_confirmado = false;
+      }
+    }
     
     const { error } = await supabase
       .from("solicitacoes")
-      .update({
-        status: selectedStatus,
-        status_vistoria: statusVistoria,
-        solicitar_deferimento: solicitarDeferimento,
-        pendencias_selecionadas: pendenciasSelecionadas,
-        cliente_nome: clienteNome.trim(),
-        cnpj: clienteCnpj.trim() || null,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq("id", solicitacao.id);
 
     if (error) {
@@ -622,6 +648,51 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       ))}
                     </SelectContent>
                   </Select>
+
+                  {/* Custo de Posicionamento - cancelamento pós-confirmação */}
+                  {isLateCancel(selectedStatus) && (
+                    <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200">
+                      <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Há custo de posicionamento?
+                      </Label>
+                      <p className="text-xs text-amber-700">
+                        Cancelamento após confirmação requer validação de custo operacional.
+                      </p>
+                      <div className="flex gap-4 mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="custoposicionamento"
+                            checked={custoposicionamento === true}
+                            onChange={() => setCustoposicionamento(true)}
+                            className="accent-amber-600"
+                          />
+                          <span className="text-sm font-medium">Sim</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="custoposicionamento"
+                            checked={custoposicionamento === false}
+                            onChange={() => setCustoposicionamento(false)}
+                            className="accent-amber-600"
+                          />
+                          <span className="text-sm font-medium">Não</span>
+                        </label>
+                      </div>
+                      {custoposicionamento === true && (
+                        <p className="text-xs text-amber-700 mt-1 italic">
+                          O lançamento financeiro será ativado após salvar.
+                        </p>
+                      )}
+                      {custoposicionamento === null && (
+                        <p className="text-xs text-red-600 mt-1">
+                          Selecione uma opção para habilitar o salvamento.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Pendências Checkboxes */}
                   {selectedStatus === "vistoriado_com_pendencia" && (

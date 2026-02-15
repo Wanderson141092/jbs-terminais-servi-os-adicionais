@@ -359,37 +359,58 @@ const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "agua
 
   const stages: DeferimentoStage[] = [];
 
-  let envioState: DeferimentoStage["state"] = "current";
-  if (deferimentoStatus === "aguardando" || deferimentoStatus === "recebido" || deferimentoStatus === "recusado") {
-    envioState = "completed";
-  }
-  stages.push({
-    key: "aguardando_envio",
-    label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
-    icon: <Upload className="h-4 w-4" />,
-    state: envioState,
-  });
+  // Determine uniform theme based on overall deferimento status
+  // recusado → all gray except "Recusado" step which is red (error)
+  // aguardando → all blue (current)
+  // recebido → all green (completed)
+  // null (falta enviar) → all yellow (warning)
 
-  if (deferimentoStatus === "recebido") {
+  if (deferimentoStatus === "recusado") {
     stages.push({
-      key: "documento_recebido",
-      label: getTitle("documento_recebido", "Documento Recebido"),
-      icon: <Check className="h-4 w-4" />,
-      state: "completed",
+      key: "aguardando_envio",
+      label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
+      icon: <Upload className="h-4 w-4" />,
+      state: "pending", // gray
     });
-  } else if (deferimentoStatus === "recusado") {
     stages.push({
       key: "documento_recusado",
       label: getTitle("documento_recusado", "Documento Recusado"),
       icon: <X className="h-4 w-4" />,
-      state: "error",
+      state: "error", // red
+    });
+  } else if (deferimentoStatus === "recebido") {
+    stages.push({
+      key: "aguardando_envio",
+      label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
+      icon: <Upload className="h-4 w-4" />,
+      state: "completed", // green
+    });
+    stages.push({
+      key: "documento_recebido",
+      label: getTitle("documento_recebido", "Documento Recebido"),
+      icon: <Check className="h-4 w-4" />,
+      state: "completed", // green
     });
   } else if (deferimentoStatus === "aguardando") {
+    stages.push({
+      key: "aguardando_envio",
+      label: getTitle("aguardando_envio", "Aguardando Envio do Arquivo"),
+      icon: <Upload className="h-4 w-4" />,
+      state: "current", // blue
+    });
     stages.push({
       key: "aguardando_analise",
       label: getTitle("aguardando_analise", "Aguardando Análise"),
       icon: <Clock className="h-4 w-4" />,
-      state: "current",
+      state: "current", // blue
+    });
+  } else {
+    // null = falta enviar → yellow
+    stages.push({
+      key: "aguardando_envio",
+      label: getTitle("aguardando_envio", "Falta Enviar"),
+      icon: <Upload className="h-4 w-4" />,
+      state: "warning", // yellow
     });
   }
 
@@ -505,8 +526,20 @@ const ProcessStageStepper = (props: ProcessStageStepperProps) => {
 
       {/* Deferimento sub-timeline */}
       {solicitarDeferimento && deferimentoStages.length > 0 && (
-        <div className="ml-4 pl-4 border-l-2 border-yellow-300">
-          <p className="text-[10px] font-semibold text-yellow-700 mb-2 uppercase tracking-wide">Deferimento</p>
+        <div className={cn(
+          "ml-4 pl-4 border-l-2",
+          deferimentoStatus === "recusado" ? "border-red-300" :
+          deferimentoStatus === "recebido" ? "border-green-300" :
+          deferimentoStatus === "aguardando" ? "border-blue-300" :
+          "border-yellow-300"
+        )}>
+          <p className={cn(
+            "text-[10px] font-semibold mb-2 uppercase tracking-wide",
+            deferimentoStatus === "recusado" ? "text-red-700" :
+            deferimentoStatus === "recebido" ? "text-green-700" :
+            deferimentoStatus === "aguardando" ? "text-blue-700" :
+            "text-yellow-700"
+          )}>Deferimento</p>
           <TimelineStepper stages={deferimentoStages} compact={compact} />
         </div>
       )}

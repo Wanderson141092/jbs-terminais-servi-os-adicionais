@@ -250,6 +250,44 @@ export type Database = {
         }
         Relationships: []
       }
+      cancelamento_recusa_config: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          servico_id: string
+          status_habilitados: string[]
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          servico_id: string
+          status_habilitados?: string[]
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          servico_id?: string
+          status_habilitados?: string[]
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancelamento_recusa_config_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consulta_etapas_config: {
         Row: {
           ativo: boolean

@@ -763,6 +763,71 @@ export type Database = {
           },
         ]
       }
+      lacre_armador_dados: {
+        Row: {
+          confirmado_data: string | null
+          confirmado_por: string | null
+          created_at: string
+          data_posicionamento_lacre: string | null
+          foto_lacre_path: string | null
+          foto_lacre_url: string | null
+          id: string
+          lacre_coletado: boolean | null
+          lacre_status: string
+          motivo_recusa: string | null
+          periodo_lacre: string | null
+          responsavel_email: string | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+          solicitacao_id: string
+          updated_at: string
+        }
+        Insert: {
+          confirmado_data?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          data_posicionamento_lacre?: string | null
+          foto_lacre_path?: string | null
+          foto_lacre_url?: string | null
+          id?: string
+          lacre_coletado?: boolean | null
+          lacre_status?: string
+          motivo_recusa?: string | null
+          periodo_lacre?: string | null
+          responsavel_email?: string | null
+          responsavel_nome?: string | null
+          responsavel_telefone?: string | null
+          solicitacao_id: string
+          updated_at?: string
+        }
+        Update: {
+          confirmado_data?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          data_posicionamento_lacre?: string | null
+          foto_lacre_path?: string | null
+          foto_lacre_url?: string | null
+          id?: string
+          lacre_coletado?: boolean | null
+          lacre_status?: string
+          motivo_recusa?: string | null
+          periodo_lacre?: string | null
+          responsavel_email?: string | null
+          responsavel_nome?: string | null
+          responsavel_telefone?: string | null
+          solicitacao_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lacre_armador_dados_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_rules: {
         Row: {
           ativo: boolean

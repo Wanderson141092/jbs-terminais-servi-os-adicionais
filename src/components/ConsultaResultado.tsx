@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle, Download, Lock } from "lucide-react";
+import { Upload, FileText, Calendar, Package, User, Check, X, Clock, Eye, AlertTriangle, Download, Lock, Phone, Mail, Camera } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,20 @@ interface LacreArmadorConfig {
   titulo_externo?: string;
 }
 
+interface LacreArmadorDados {
+  id: string;
+  lacre_coletado: boolean | null;
+  foto_lacre_url: string | null;
+  foto_lacre_path: string | null;
+  data_posicionamento_lacre: string | null;
+  periodo_lacre: string | null;
+  responsavel_nome: string | null;
+  responsavel_telefone: string | null;
+  responsavel_email: string | null;
+  lacre_status: string;
+  motivo_recusa: string | null;
+}
+
 interface ObservacaoItem {
   observacao: string;
   status_no_momento: string;
@@ -93,15 +107,22 @@ interface ConsultaResultadoProps {
   statusLabels?: StatusLabel[];
   etapasConfig?: EtapaConfig[];
   lacreArmadorConfig?: LacreArmadorConfig | null;
+  lacreArmadorDados?: LacreArmadorDados | null;
   onRefresh: () => void;
 }
 
-const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], lacreArmadorConfig = null, onRefresh }: ConsultaResultadoProps) => {
+const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], lacreArmadorConfig = null, lacreArmadorDados = null, onRefresh }: ConsultaResultadoProps) => {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [lacreArmadorPossui, setLacreArmadorPossui] = useState<boolean | null>(solicitacao.lacre_armador_possui ?? null);
-  const [lacreDataPosicionamento, setLacreDataPosicionamento] = useState("");
+  // Lacre form state
+  const [lacreColetado, setLacreColetado] = useState<boolean | null>(null);
+  const [lacreFotoFile, setLacreFotoFile] = useState<File | null>(null);
+  const [lacreDataPos, setLacreDataPos] = useState("");
+  const [lacrePeriodo, setLacrePeriodo] = useState("");
+  const [lacreResponsavel, setLacreResponsavel] = useState("");
+  const [lacreTelefone, setLacreTelefone] = useState("");
+  const [lacreEmail, setLacreEmail] = useState("");
   const [savingLacre, setSavingLacre] = useState(false);
 
   const aprovacaoAdministrativo = servicoConfig?.aprovacao_administrativo ?? false;
@@ -127,23 +148,11 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
 
   const generalStatus = getGeneralDeferimentoStatus();
 
-  // Lacre Armador status
-  const getGeneralLacreStatus = (): "recebido" | "recusado" | "aguardando" | null => {
-    if (lacreDocs.length === 0) return null;
-    const hasPendente = lacreDocs.some(d => d.status === "pendente" || d.status === "aguardando");
-    if (hasPendente) return "aguardando";
-    const hasAceito = lacreDocs.some(d => d.status === "aceito");
-    if (hasAceito) return "recebido";
-    const hasRecusado = lacreDocs.some(d => d.status === "recusado");
-    if (hasRecusado) return "recusado";
-    return "aguardando";
-  };
-  const lacreStatus = getGeneralLacreStatus();
-
   // Lacre armador visibility - show when solicitar_lacre_armador is true (primary condition)
   const isServicePosicionamentoLacre = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
   const showLacreArmador = isServicePosicionamentoLacre && (solicitacao as any).solicitar_lacre_armador === true;
-  const canUploadLacre = showLacreArmador && (lacreDocs.length === 0 || lacreStatus === "recusado") && lacreStatus !== "aguardando";
+  const lacreCurrentStatus = lacreArmadorDados?.lacre_status || "aguardando_preenchimento";
+  const canFillLacreForm = showLacreArmador && (lacreCurrentStatus === "aguardando_preenchimento" || lacreCurrentStatus === "recusado");
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -430,87 +439,55 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             </>
           )}
 
-          {/* Lacre Armador Section - before deferimento */}
+          {/* Lacre Armador Section - Mini-form & Sub-timeline */}
           {showLacreArmador && (
             <>
               <Separator />
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <p className="text-sm font-semibold flex items-center gap-2">
                   <Lock className="h-4 w-4 text-amber-600" />
                   {lacreArmadorConfig?.titulo_externo || "Regularização de Lacre Armador"}
                 </p>
 
-                {/* Form fields: possui lacre + data posicionamento */}
-                {lacreStatus !== "recebido" && lacreStatus !== "aguardando" && (
-                  <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Já possui Lacre Armador?</Label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="lacre_possui"
-                            checked={lacreArmadorPossui === true}
-                            onChange={() => setLacreArmadorPossui(true)}
-                            className="accent-amber-600"
-                          />
-                          <span className="text-sm">Sim</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="lacre_possui"
-                            checked={lacreArmadorPossui === false}
-                            onChange={() => setLacreArmadorPossui(false)}
-                            className="accent-amber-600"
-                          />
-                          <span className="text-sm">Não</span>
-                        </label>
+                {/* Sub-timeline do lacre */}
+                <div className="flex items-center gap-1 text-xs overflow-x-auto pb-1">
+                  {[
+                    { key: "aguardando_preenchimento", label: "Preencher Dados" },
+                    { key: "aguardando_confirmacao", label: "Aguardando Confirmação" },
+                    { key: "posicionamento_confirmado", label: "Posicionamento Confirmado" },
+                    { key: "aguardando_lacre", label: "Aguardando Lacre" },
+                    { key: "servico_concluido", label: "Serviço Concluído" },
+                  ].map((step, i, arr) => {
+                    const statusOrder = ["aguardando_preenchimento", "aguardando_confirmacao", "posicionamento_confirmado", "aguardando_lacre", "servico_concluido"];
+                    const currentIdx = statusOrder.indexOf(lacreCurrentStatus);
+                    const stepIdx = statusOrder.indexOf(step.key);
+                    const isRecusado = lacreCurrentStatus === "recusado";
+                    
+                    let bgColor = "bg-muted text-muted-foreground";
+                    if (isRecusado && step.key === "aguardando_preenchimento") {
+                      bgColor = "bg-red-100 text-red-700 border border-red-300";
+                    } else if (stepIdx < currentIdx) {
+                      bgColor = "bg-green-100 text-green-700 border border-green-300";
+                    } else if (stepIdx === currentIdx) {
+                      if (step.key === "aguardando_confirmacao") bgColor = "bg-blue-100 text-blue-700 border border-blue-300";
+                      else if (step.key === "posicionamento_confirmado") bgColor = "bg-green-100 text-green-700 border border-green-300";
+                      else if (step.key === "servico_concluido") bgColor = "bg-green-100 text-green-700 border border-green-300";
+                      else bgColor = "bg-amber-100 text-amber-700 border border-amber-300";
+                    }
+                    
+                    return (
+                      <div key={step.key} className="flex items-center gap-1 shrink-0">
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap ${bgColor}`}>
+                          {step.label}
+                        </span>
+                        {i < arr.length - 1 && <span className="text-muted-foreground">→</span>}
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Data de Posicionamento para Inclusão do Lacre</Label>
-                      <Input
-                        type="date"
-                        value={lacreDataPosicionamento}
-                        onChange={(e) => setLacreDataPosicionamento(e.target.value)}
-                        className="max-w-xs"
-                      />
-                    </div>
-
-                    <Button
-                      size="sm"
-                      disabled={savingLacre || lacreArmadorPossui === null || !lacreDataPosicionamento}
-                      onClick={async () => {
-                        setSavingLacre(true);
-                        try {
-                          const { error } = await supabase.functions.invoke("upload-publico", {
-                            body: {
-                              action: "update_lacre_info",
-                              solicitacao_id: solicitacao.id,
-                              lacre_armador_possui: lacreArmadorPossui,
-                              data_posicionamento: lacreDataPosicionamento,
-                            },
-                          });
-                          if (error) throw error;
-                          toast.success("Informações do lacre salvas com sucesso!");
-                          onRefresh();
-                        } catch {
-                          toast.error("Erro ao salvar informações do lacre.");
-                        } finally {
-                          setSavingLacre(false);
-                        }
-                      }}
-                      className="bg-amber-600 hover:bg-amber-700 text-white"
-                    >
-                      {savingLacre ? "Salvando..." : "Confirmar Informações"}
-                    </Button>
-                  </div>
-                )}
-
-                {/* Cost warning - only if internal marked cost as "Sim" */}
-                {(solicitacao as any).lacre_armador_aceite_custo === true && lacreArmadorConfig?.mensagem_custo && (
+                {/* Cost warning */}
+                {(solicitacao as any).custo_posicionamento === true && lacreArmadorConfig?.mensagem_custo && (
                   <Alert className="border-amber-400 bg-amber-50">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                     <AlertDescription className="ml-2 text-sm text-amber-700">
@@ -519,81 +496,177 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                   </Alert>
                 )}
 
-                {lacreStatus === "recebido" ? (
+                {/* Recusa warning */}
+                {lacreCurrentStatus === "recusado" && lacreArmadorDados?.motivo_recusa && (
+                  <Alert className="border-red-500 bg-red-50">
+                    <X className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="ml-2">
+                      <span className="font-semibold text-red-700">Solicitação recusada</span>
+                      <p className="text-sm text-red-600 mt-1"><strong>Motivo:</strong> {lacreArmadorDados.motivo_recusa}</p>
+                      <p className="text-xs text-red-500 mt-1">Preencha novamente os dados para reenviar.</p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Mini-form - show when needs filling */}
+                {canFillLacreForm && (
+                  <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Lacre Armador coletado?</Label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="radio" name="lacre_coletado" checked={lacreColetado === true} onChange={() => setLacreColetado(true)} className="accent-amber-600" />
+                          <span className="text-sm">Sim</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="radio" name="lacre_coletado" checked={lacreColetado === false} onChange={() => setLacreColetado(false)} className="accent-amber-600" />
+                          <span className="text-sm">Não</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> Foto do Lacre</Label>
+                      <Input type="file" accept="image/jpeg,image/png" onChange={(e) => setLacreFotoFile(e.target.files?.[0] || null)} className="text-sm" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Data do Posicionamento</Label>
+                        <Input type="date" value={lacreDataPos} onChange={(e) => setLacreDataPos(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Período</Label>
+                        <select value={lacrePeriodo} onChange={(e) => setLacrePeriodo(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                          <option value="">Selecione...</option>
+                          <option value="manha">Manhã</option>
+                          <option value="tarde">Tarde</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-1"><User className="h-3.5 w-3.5" /> Nome do Responsável</Label>
+                      <Input value={lacreResponsavel} onChange={(e) => setLacreResponsavel(e.target.value)} placeholder="Nome completo" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Telefone</Label>
+                        <Input type="tel" value={lacreTelefone} onChange={(e) => setLacreTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> E-mail de Contato</Label>
+                        <Input type="email" value={lacreEmail} onChange={(e) => setLacreEmail(e.target.value)} placeholder="email@exemplo.com" />
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={savingLacre || lacreColetado === null || !lacreDataPos || !lacrePeriodo || !lacreResponsavel.trim()}
+                      onClick={async () => {
+                        setSavingLacre(true);
+                        try {
+                          // Upload photo first if exists
+                          if (lacreFotoFile) {
+                            const formData = new FormData();
+                            formData.append("file", lacreFotoFile);
+                            formData.append("bucket", "deferimento");
+                            formData.append("solicitacao_id", solicitacao.id);
+                            formData.append("document_type", "lacre_foto");
+                            const { error: uploadErr } = await supabase.functions.invoke("upload-publico", { body: formData });
+                            if (uploadErr) throw uploadErr;
+                          }
+
+                          // Submit form data
+                          const { error } = await supabase.functions.invoke("upload-publico", {
+                            body: {
+                              action: "submit_lacre_form",
+                              solicitacao_id: solicitacao.id,
+                              lacre_coletado: lacreColetado,
+                              data_posicionamento_lacre: lacreDataPos,
+                              periodo_lacre: lacrePeriodo,
+                              responsavel_nome: lacreResponsavel,
+                              responsavel_telefone: lacreTelefone,
+                              responsavel_email: lacreEmail,
+                            },
+                          });
+                          if (error) throw error;
+                          toast.success("Dados enviados! Aguardando confirmação.");
+                          onRefresh();
+                        } catch {
+                          toast.error("Erro ao enviar dados do lacre.");
+                        } finally {
+                          setSavingLacre(false);
+                        }
+                      }}
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      {savingLacre ? "Enviando..." : "Enviar Solicitação de Posicionamento"}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Status messages based on lacre_status */}
+                {lacreCurrentStatus === "aguardando_confirmacao" && (
+                  <Alert className="border-blue-400 bg-blue-50">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="ml-2">
+                      <span className="font-semibold text-blue-700">Aguardando Confirmação</span>
+                      <p className="text-sm text-blue-600 mt-1">Dados enviados. Aguardando confirmação do posicionamento pela equipe.</p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {lacreCurrentStatus === "posicionamento_confirmado" && (
                   <Alert className="border-green-500 bg-green-50">
                     <Check className="h-4 w-4 text-green-600" />
                     <AlertDescription className="ml-2">
-                      <span className="font-semibold text-green-700">Lacre Armador Recebido</span>
-                      <p className="text-sm text-green-600 mt-1">Documento aprovado.</p>
+                      <span className="font-semibold text-green-700">Posicionamento Confirmado</span>
+                      <p className="text-sm text-green-600 mt-1">O posicionamento para inclusão do lacre foi confirmado.</p>
                     </AlertDescription>
                   </Alert>
-                ) : lacreStatus === "recusado" ? (
-                  <div className="space-y-3">
-                    <Alert className="border-red-500 bg-red-50">
-                      <X className="h-4 w-4 text-red-600" />
-                      <AlertDescription className="ml-2">
-                        <span className="font-semibold text-red-700">Reenviar documento de lacre armador</span>
-                        {lacreDocs.find(d => d.status === "recusado")?.motivo_recusa && (
-                          <p className="text-sm text-red-600 mt-1"><strong>Motivo:</strong> {lacreDocs.find(d => d.status === "recusado")?.motivo_recusa}</p>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                    <div className="bg-red-50 border border-red-300 rounded-lg p-4">
-                      <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const uploadLacre = async () => {
-                          setUploading(true);
-                          try {
-                            const formData = new FormData();
-                            formData.append("file", file);
-                            formData.append("bucket", "deferimento");
-                            formData.append("solicitacao_id", solicitacao.id);
-                            formData.append("document_type", "lacre_armador");
-                            const { error } = await supabase.functions.invoke("upload-publico", { body: formData });
-                            if (error) throw error;
-                            toast.success("Documento de lacre enviado!");
-                            onRefresh();
-                          } catch { toast.error("Erro ao enviar documento."); }
-                          finally { setUploading(false); }
-                        };
-                        uploadLacre();
-                      }} disabled={uploading} className="text-sm border-red-300" />
-                    </div>
-                  </div>
-                ) : lacreStatus === "aguardando" ? (
-                  <Alert className="border-yellow-500 bg-yellow-50">
-                    <Clock className="h-4 w-4 text-yellow-600" />
+                )}
+
+                {lacreCurrentStatus === "aguardando_lacre" && (
+                  <Alert className="border-amber-400 bg-amber-50">
+                    <Lock className="h-4 w-4 text-amber-600" />
                     <AlertDescription className="ml-2">
-                      <span className="font-semibold text-yellow-700">Aguardando Atendimento</span>
-                      <p className="text-sm text-yellow-600 mt-1">Documento enviado. Aguardando análise.</p>
+                      <span className="font-semibold text-amber-700">Aguardando Lacre</span>
+                      <p className="text-sm text-amber-600 mt-1">Aguardando a inclusão do lacre armador no contêiner.</p>
                     </AlertDescription>
                   </Alert>
-                ) : canUploadLacre ? (
-                  <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
-                    <p className="text-xs text-amber-600 mb-3">Envie o documento de lacre armador (PDF, JPG ou PNG).</p>
-                    <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const uploadLacre = async () => {
-                        setUploading(true);
-                        try {
-                          const formData = new FormData();
-                          formData.append("file", file);
-                          formData.append("bucket", "deferimento");
-                          formData.append("solicitacao_id", solicitacao.id);
-                          formData.append("document_type", "lacre_armador");
-                          const { error } = await supabase.functions.invoke("upload-publico", { body: formData });
-                          if (error) throw error;
-                          toast.success("Documento de lacre enviado!");
-                          onRefresh();
-                        } catch { toast.error("Erro ao enviar documento."); }
-                        finally { setUploading(false); }
-                      };
-                      uploadLacre();
-                    }} disabled={uploading} className="text-sm border-amber-300" />
+                )}
+
+                {lacreCurrentStatus === "servico_concluido" && (
+                  <Alert className="border-green-500 bg-green-50">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="ml-2">
+                      <span className="font-semibold text-green-700">Serviço Concluído</span>
+                      <p className="text-sm text-green-600 mt-1">Lacre armador incluído com sucesso.</p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Show submitted data summary when not in fill mode */}
+                {!canFillLacreForm && lacreArmadorDados && lacreCurrentStatus !== "aguardando_preenchimento" && (
+                  <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-1 border">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">Dados Informados</p>
+                    <p><strong>Lacre coletado:</strong> {lacreArmadorDados.lacre_coletado ? "Sim" : "Não"}</p>
+                    {lacreArmadorDados.data_posicionamento_lacre && (
+                      <p><strong>Data:</strong> {new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} — {lacreArmadorDados.periodo_lacre === "manha" ? "Manhã" : "Tarde"}</p>
+                    )}
+                    {lacreArmadorDados.responsavel_nome && <p><strong>Responsável:</strong> {lacreArmadorDados.responsavel_nome}</p>}
+                    {lacreArmadorDados.responsavel_telefone && <p><strong>Telefone:</strong> {lacreArmadorDados.responsavel_telefone}</p>}
+                    {lacreArmadorDados.responsavel_email && <p><strong>E-mail:</strong> {lacreArmadorDados.responsavel_email}</p>}
+                    {lacreArmadorDados.foto_lacre_url && (
+                      <div className="mt-2">
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">Foto do Lacre</p>
+                        <img src={lacreArmadorDados.foto_lacre_url} alt="Foto do lacre" className="max-w-[200px] rounded border" />
+                      </div>
+                    )}
                   </div>
-                ) : null}
+                )}
               </div>
             </>
           )}

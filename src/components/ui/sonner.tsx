@@ -11,10 +11,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:text-white group-[.toaster]:border-none group-[.toaster]:shadow-2xl group-[.toaster]:text-base group-[.toaster]:font-semibold group-[.toaster]:py-5 group-[.toaster]:px-6 group-[.toaster]:min-w-[380px] group-[.toaster]:max-w-[520px] group-[.toaster]:rounded-xl",
+          description: "group-[.toast]:text-white/90 group-[.toast]:text-sm",
+          actionButton: "group-[.toast]:bg-white/20 group-[.toast]:text-white group-[.toast]:hover:bg-white/30",
+          cancelButton: "group-[.toast]:bg-white/20 group-[.toast]:text-white group-[.toast]:hover:bg-white/30",
+          success: "group-[.toaster]:!bg-green-600",
+          error: "group-[.toaster]:!bg-red-600",
+          warning: "group-[.toaster]:!bg-amber-500",
+          info: "group-[.toaster]:!bg-sky-400",
         },
       }}
       style={{ zIndex: 999999 }}

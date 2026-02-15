@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -644,6 +644,40 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 />
               </div>
             </div>
+
+            {/* Chave de Consulta */}
+            {solicitacao.chave_consulta && (
+              <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <Key className="h-4 w-4 text-blue-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs text-blue-600 font-medium">Chave de Consulta</p>
+                  <p className="text-lg font-mono font-bold text-blue-800 tracking-widest">{solicitacao.chave_consulta}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-600 border-blue-300 hover:bg-blue-100"
+                  onClick={async () => {
+                    try {
+                      const { error } = await supabase.functions.invoke("notificar-status", {
+                        body: { 
+                          action: "reenviar_chave",
+                          solicitacao_id: solicitacao.id 
+                        },
+                      });
+                      if (error) throw error;
+                      toast.success("Chave reenviada para o e-mail do cliente!");
+                    } catch {
+                      toast.error("Erro ao reenviar chave.");
+                    }
+                  }}
+                  title="Reenviar chave por e-mail"
+                >
+                  <Send className="h-3.5 w-3.5 mr-1" />
+                  Reenviar
+                </Button>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <InfoItem icon={<Package className="h-4 w-4" />} label="Contêiner" value={solicitacao.numero_conteiner || "—"} />

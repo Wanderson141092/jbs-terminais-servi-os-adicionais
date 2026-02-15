@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { formatContainerInput, isValidContainer } from "@/lib/containerValidation";
 
 interface ConsultaFormProps {
-  onSearch: (tipo: string, valor: string) => void;
+  onSearch: (tipo: string, valor: string, chave: string) => void;
   isLoading: boolean;
 }
 
@@ -21,6 +21,7 @@ interface Servico {
 
 const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
   const [valor, setValor] = useState("");
+  const [chave, setChave] = useState("");
   const [servicoSelecionado, setServicoSelecionado] = useState<string>("");
   const [servicos, setServicos] = useState<Servico[]>([]);
 
@@ -39,8 +40,14 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (valor.trim() && servicoSelecionado) {
+    if (valor.trim() && servicoSelecionado && chave.trim()) {
       const valorUpper = valor.trim().toUpperCase();
+      const chaveUpper = chave.trim().toUpperCase();
+      
+      if (chaveUpper.length !== 6) {
+        toast.error("A chave de validação deve ter exatamente 6 caracteres.");
+        return;
+      }
       
       const containerRegex = /^[A-Z]{3}U\d{7}$/;
       const protocoloRegex = /^JBS[A-Z]\d{6,}$/;
@@ -58,7 +65,7 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         }
       }
       
-      onSearch(servicoSelecionado, valorUpper);
+      onSearch(servicoSelecionado, valorUpper, chaveUpper);
     }
   };
 
@@ -108,7 +115,7 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
           Identificador
         </Label>
         <p className="text-xs text-muted-foreground mb-3">
-          {getDescricao()}
+          {getDescricao()} + Chave de Validação
         </p>
       </div>
 
@@ -129,9 +136,19 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
             maxLength={15}
           />
         </div>
+        <div className="w-full sm:w-32">
+          <Input
+            value={chave}
+            onChange={(e) => setChave(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+            placeholder="Chave"
+            disabled={!servicoSelecionado}
+            maxLength={6}
+            className="text-center tracking-widest font-mono"
+          />
+        </div>
         <Button 
           type="submit" 
-          disabled={isLoading || !valor.trim() || !servicoSelecionado} 
+          disabled={isLoading || !valor.trim() || !servicoSelecionado || chave.trim().length !== 6} 
           className="jbs-btn-primary px-6 w-full sm:w-auto"
         >
           <Search className="h-4 w-4 mr-2" />
@@ -142,9 +159,9 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
       {/* Legenda dinâmica baseada no serviço */}
       <div className="text-xs text-muted-foreground pt-2 border-t">
         {isPosicionamento ? (
-          <p>Informe o contêiner, o LPCO ou o protocolo JBS do serviço adicional que deseja consultar.</p>
+          <p>Informe o contêiner, LPCO ou protocolo JBS + a chave de validação recebida na solicitação.</p>
         ) : (
-          <p>Informe o contêiner ou protocolo JBS do serviço adicional que deseja consultar.</p>
+          <p>Informe o contêiner ou protocolo JBS + a chave de validação recebida na solicitação.</p>
         )}
       </div>
     </form>

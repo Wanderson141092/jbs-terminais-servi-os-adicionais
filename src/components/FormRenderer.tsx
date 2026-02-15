@@ -18,6 +18,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [protocolo, setProtocolo] = useState("");
+  const [chaveConsulta, setChaveConsulta] = useState("");
   const [emailParaNotificacao, setEmailParaNotificacao] = useState("");
   const [emailSalvo, setEmailSalvo] = useState(false);
   const [mapeamentos, setMapeamentos] = useState<{ pergunta_id: string; campo_solicitacao: string; campo_analise_id?: string | null }[]>([]);
@@ -168,8 +169,10 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
       }
 
       const generatedProtocolo = submitResponse.protocolo;
+      const generatedChave = submitResponse.chave_consulta;
 
       setProtocolo(generatedProtocolo);
+      setChaveConsulta(generatedChave || "");
       setSubmitted(true);
       toast.success("Solicitação enviada com sucesso!");
     } catch (err: any) {
@@ -263,6 +266,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     return (
       <FormRendererSuccess
         protocolo={protocolo}
+        chaveConsulta={chaveConsulta}
         emailParaNotificacao={emailParaNotificacao}
         emailSalvo={emailSalvo}
         onEmailChange={setEmailParaNotificacao}

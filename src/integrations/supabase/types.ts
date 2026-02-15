@@ -255,7 +255,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           id: string
-          servico_id: string
+          servico_ids: string[]
           status_habilitados: string[]
           tipo: string
           updated_at: string
@@ -264,7 +264,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           id?: string
-          servico_id: string
+          servico_ids?: string[]
           status_habilitados?: string[]
           tipo: string
           updated_at?: string
@@ -273,20 +273,12 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           id?: string
-          servico_id?: string
+          servico_ids?: string[]
           status_habilitados?: string[]
           tipo?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "cancelamento_recusa_config_servico_id_fkey"
-            columns: ["servico_id"]
-            isOneToOne: false
-            referencedRelation: "servicos"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       consulta_etapas_config: {
         Row: {

@@ -115,7 +115,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       // Store cancel/recusa config filtered by service
       const allCancelConfig = (cancelConfigRes.data || []) as any[];
       const serviceCancelConfig = currentServicoId 
-        ? allCancelConfig.filter((c: any) => c.servico_id === currentServicoId)
+        ? allCancelConfig.filter((c: any) => c.servico_ids.length === 0 || c.servico_ids.includes(currentServicoId))
         : [];
       setCancelRecusaConfig(serviceCancelConfig);
 

@@ -14,7 +14,7 @@ import { Plus, Edit, Save, Ban, XCircle, ShieldAlert } from "lucide-react";
 
 interface ConfigItem {
   id: string;
-  servico_id: string;
+  servico_ids: string[];
   tipo: string;
   status_habilitados: string[];
   ativo: boolean;
@@ -62,7 +62,7 @@ const CancelamentoRecusaManager = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<ConfigItem | null>(null);
   const [formData, setFormData] = useState({
-    servico_id: "",
+    servico_ids: [] as string[],
     tipo: "cancelamento_direto",
     status_habilitados: [] as string[],
   });
@@ -73,7 +73,7 @@ const CancelamentoRecusaManager = () => {
 
   const fetchAll = async () => {
     const [configRes, servicosRes, statusRes] = await Promise.all([
-      supabase.from("cancelamento_recusa_config").select("*").order("servico_id"),
+      supabase.from("cancelamento_recusa_config").select("*").order("created_at"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase
         .from("parametros_campos")
@@ -104,6 +104,9 @@ const CancelamentoRecusaManager = () => {
   const getServicoNome = (id: string) =>
     servicos.find((s) => s.id === id)?.nome || id.slice(0, 8);
 
+  const getServicosNomes = (ids: string[]) =>
+    ids.map((id) => getServicoNome(id));
+
   const getStatusLabel = (val: string) =>
     statusOptions.find((s) => s.value === val)?.label || val;
 
@@ -111,13 +114,13 @@ const CancelamentoRecusaManager = () => {
     if (item) {
       setEditingItem(item);
       setFormData({
-        servico_id: item.servico_id,
+        servico_ids: item.servico_ids || [],
         tipo: item.tipo,
         status_habilitados: item.status_habilitados || [],
       });
     } else {
       setEditingItem(null);
-      setFormData({ servico_id: "", tipo: "cancelamento_direto", status_habilitados: [] });
+      setFormData({ servico_ids: [], tipo: "cancelamento_direto", status_habilitados: [] });
     }
     setShowDialog(true);
   };
@@ -132,8 +135,8 @@ const CancelamentoRecusaManager = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.servico_id) {
-      toast.error("Selecione um serviço");
+    if (formData.servico_ids.length === 0) {
+      toast.error("Selecione pelo menos um serviço");
       return;
     }
     if (formData.status_habilitados.length === 0) {
@@ -142,7 +145,7 @@ const CancelamentoRecusaManager = () => {
     }
 
     const data: any = {
-      servico_id: formData.servico_id,
+      servico_ids: formData.servico_ids,
       tipo: formData.tipo,
       status_habilitados: formData.status_habilitados,
       updated_at: new Date().toISOString(),
@@ -225,7 +228,13 @@ const CancelamentoRecusaManager = () => {
                     const info = tipoInfo(item.tipo);
                     return (
                       <TableRow key={item.id} className={!item.ativo ? "opacity-50" : ""}>
-                        <TableCell className="font-medium">{getServicoNome(item.servico_id)}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-wrap gap-1">
+                            {getServicosNomes(item.servico_ids).map((nome, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px]">{nome}</Badge>
+                            ))}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className={`flex items-center gap-1 text-xs font-medium ${info?.color}`}>
                             {info?.icon}
@@ -266,23 +275,31 @@ const CancelamentoRecusaManager = () => {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <Label>Serviço</Label>
-              <Select
-                value={formData.servico_id}
-                onValueChange={(v) => setFormData({ ...formData, servico_id: v })}
-                disabled={!!editingItem}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o serviço" />
-                </SelectTrigger>
-                <SelectContent>
-                  {servicos.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
+              <Label>Serviços</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Selecione os serviços que esta regra se aplica. Deixe vazio = todos.
+              </p>
+              <div className="space-y-2 max-h-40 overflow-auto border rounded-md p-3">
+                {servicos.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`svc-${s.id}`}
+                      checked={formData.servico_ids.includes(s.id)}
+                      onCheckedChange={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          servico_ids: prev.servico_ids.includes(s.id)
+                            ? prev.servico_ids.filter((id) => id !== s.id)
+                            : [...prev.servico_ids, s.id],
+                        }));
+                      }}
+                    />
+                    <label htmlFor={`svc-${s.id}`} className="text-sm cursor-pointer">
                       {s.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
             <div>
               <Label>Tipo de Ação</Label>

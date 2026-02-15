@@ -394,9 +394,9 @@ const stateStyles = {
     label: "text-green-700 font-medium",
   },
   current: {
-    circle: "bg-yellow-500 text-white border-yellow-500 ring-4 ring-yellow-100",
+    circle: "bg-primary text-primary-foreground border-primary ring-4 ring-primary/20",
     line: "bg-muted",
-    label: "text-yellow-700 font-semibold",
+    label: "text-primary font-semibold",
   },
   pending: {
     circle: "bg-muted text-muted-foreground border-muted",

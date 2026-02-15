@@ -306,6 +306,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     const statusLabel = statusOptions.find(s => s.value === selectedStatus)?.label || selectedStatus;
     
     let details = `Status atualizado para: ${statusLabel}`;
+    if (isLateCancel(selectedStatus)) {
+      details += `. Cancelamento tardio (pós-confirmação). Custo de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
+      if (custoposicionamento === true) {
+        details += `. Lançamento financeiro ativado.`;
+      }
+    }
     if (solicitarDeferimento !== solicitacao.solicitar_deferimento) {
       details += `. Solicitar Deferimento: ${solicitarDeferimento ? "Ativado" : "Desativado"}`;
     }

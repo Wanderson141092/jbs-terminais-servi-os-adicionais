@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Edit, Trash2, Lock, FileText, Plus, AlertTriangle } from "lucide-react";
+import { Save, Edit, Trash2, Lock, FileText, Plus, AlertTriangle, ExternalLink } from "lucide-react";
 
 interface SystemConfig {
   id: string;
@@ -49,6 +49,12 @@ const PaginaExternaConfigManager = () => {
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Portal do Cliente
+  const [portalUrl, setPortalUrl] = useState("");
+  const [portalActive, setPortalActive] = useState(true);
+  const [portalConfigId, setPortalConfigId] = useState<string | null>(null);
+  const [savingPortal, setSavingPortal] = useState(false);
+
   // Edit states
   const [editingConfig, setEditingConfig] = useState<SystemConfig | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -67,17 +73,45 @@ const PaginaExternaConfigManager = () => {
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
-    const [lacreRes, titulosRes, pendRes, svcRes] = await Promise.all([
+    const [lacreRes, titulosRes, pendRes, svcRes, portalRes] = await Promise.all([
       supabase.from("system_config").select("*").in("config_key", LACRE_CONFIGS.map(c => c.key)).order("config_key"),
       supabase.from("deferimento_titulos").select("*").order("created_at"),
       supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").order("ordem"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
+      supabase.from("page_config").select("*").eq("config_key", "portal_cliente_url").maybeSingle(),
     ]);
     setLacreConfigs(lacreRes.data || []);
     setDeferimentoTitulos(titulosRes.data || []);
     setPendenciaOpcoes(pendRes.data || []);
     setServicos(svcRes.data || []);
+    if (portalRes.data) {
+      setPortalUrl(portalRes.data.config_value || "");
+      setPortalActive(portalRes.data.is_active ?? true);
+      setPortalConfigId(portalRes.data.id);
+    }
     setLoading(false);
+  };
+
+  const savePortalConfig = async () => {
+    setSavingPortal(true);
+    const payload = {
+      config_key: "portal_cliente_url",
+      config_value: portalUrl.trim(),
+      config_type: "url",
+      description: "Link do Portal do Cliente exibido na página externa",
+      is_active: portalActive,
+      updated_at: new Date().toISOString(),
+    };
+    if (portalConfigId) {
+      const { error } = await supabase.from("page_config").update(payload).eq("id", portalConfigId);
+      if (error) { toast.error("Erro ao salvar"); setSavingPortal(false); return; }
+    } else {
+      const { data, error } = await supabase.from("page_config").insert(payload).select("id").single();
+      if (error) { toast.error("Erro ao criar configuração"); setSavingPortal(false); return; }
+      setPortalConfigId(data.id);
+    }
+    toast.success("Link do Portal salvo!");
+    setSavingPortal(false);
   };
 
   // ===== LACRE CONFIG =====
@@ -191,6 +225,37 @@ const PaginaExternaConfigManager = () => {
 
   return (
     <div className="space-y-6">
+      {/* Portal do Cliente */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ExternalLink className="h-5 w-5 text-secondary" />
+            Portal do Cliente
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Switch checked={portalActive} onCheckedChange={setPortalActive} />
+            <Label className="text-sm">{portalActive ? "Botão visível na página externa" : "Botão oculto"}</Label>
+          </div>
+          <div>
+            <Label>Link do Portal</Label>
+            <Input
+              value={portalUrl}
+              onChange={(e) => setPortalUrl(e.target.value)}
+              placeholder="https://portal.exemplo.com.br"
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">URL que será aberta ao clicar no botão "Portal do Cliente" no cabeçalho.</p>
+          </div>
+          <Button onClick={savePortalConfig} disabled={savingPortal} size="sm">
+            <Save className="h-4 w-4 mr-1" /> {savingPortal ? "Salvando..." : "Salvar"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
       {/* Lacre Armador Config */}
       <Card>
         <CardHeader>

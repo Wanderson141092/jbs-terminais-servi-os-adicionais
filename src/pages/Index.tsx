@@ -119,7 +119,7 @@ const Index = () => {
       setLacreArmadorDados(response?.lacre_armador_dados || null);
 
       if (!response?.solicitacao) {
-        toast.info("Nenhuma solicitação encontrada para este serviço com os dados informados.");
+        toast.warning("Nenhuma solicitação encontrada para este serviço com os dados informados.");
       }
     } catch (err: any) {
       toast.error("Erro na consulta: " + err.message);
@@ -244,9 +244,9 @@ const Index = () => {
               )}
 
               {!isLoading && hasSearched && !resultado && (
-                <Card className="border-0 bg-muted/30">
+                <Card className="border-2 border-amber-400 bg-amber-50">
                   <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground">Nenhuma solicitação encontrada.</p>
+                    <p className="text-amber-700 font-semibold">Nenhuma solicitação encontrada.</p>
                   </CardContent>
                 </Card>
               )}

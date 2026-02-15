@@ -107,7 +107,16 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   const isServico = isPosic && isMotivosServico(categoria);
 
   const stages: Stage[] = [];
-  const currentOrder = STATUS_ORDER[status] ?? 0;
+  
+  // For terminal states, determine the effective order based on where in the flow it happened
+  // rather than using STATUS_ORDER (which assigns 99 to terminal states)
+  let currentOrder = STATUS_ORDER[status] ?? 0;
+  if (isTerminal && (isCancelled || isRecusado)) {
+    // Check if process was confirmed before terminal (approvals exist or custo_posicionamento was answered)
+    const wasConfirmed = (custoposicionamento !== null && custoposicionamento !== undefined) ||
+      (props.comexAprovado === true || props.armazemAprovado === true);
+    currentOrder = wasConfirmed ? 2 : 1;
+  }
 
   // For terminal states at late stage (order>=2), all completed stages become "error" (red X)
   // For terminal states at early stage (order<=1), terminal replaces aguardando_confirmacao

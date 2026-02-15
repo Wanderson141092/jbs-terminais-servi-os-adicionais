@@ -2,15 +2,33 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+// Play a notification sound
+const playNotificationSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+    oscillator.frequency.setValueAtTime(1100, audioCtx.currentTime + 0.1);
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.5);
+  } catch (e) {
+    console.warn("Could not play notification sound:", e);
+  }
+};
+
 export const useNotifications = (userId: string | null) => {
   const permissionRef = useRef<NotificationPermission>("default");
   const [permissionGranted, setPermissionGranted] = useState(false);
 
-  // Request notification permission immediately and show prompt
   const requestPermission = useCallback(async () => {
     if (!("Notification" in window)) {
       console.log("This browser does not support notifications");
-      toast.error("Seu navegador não suporta notificações nativas");
       return false;
     }
 
@@ -21,26 +39,19 @@ export const useNotifications = (userId: string | null) => {
     }
 
     if (Notification.permission === "denied") {
-      toast.error("Notificações bloqueadas. Habilite nas configurações do navegador.");
       return false;
     }
 
-    // Show request dialog
     try {
       const permission = await Notification.requestPermission();
       permissionRef.current = permission;
       setPermissionGranted(permission === "granted");
       
       if (permission === "granted") {
-        toast.success("Notificações ativadas! Você receberá alertas de novos pedidos.");
-        // Show test notification
         new Notification("JBS Terminais - Notificações Ativadas", {
           body: "Você receberá alertas sobre novos pedidos e atualizações.",
           icon: "/favicon.ico",
-          requireInteraction: false,
         });
-      } else {
-        toast.warning("Notificações não habilitadas. Você pode perder alertas importantes.");
       }
       
       return permission === "granted";
@@ -50,55 +61,67 @@ export const useNotifications = (userId: string | null) => {
     }
   }, []);
 
-  // Show native notification with sound
   const showNativeNotification = useCallback(
     (title: string, body: string, onClick?: () => void) => {
-      if (permissionRef.current !== "granted") {
-        // Fallback to toast if no permission
-        toast.info(body, { duration: 10000 });
-        return;
+      // Always play sound
+      playNotificationSound();
+
+      // Always show prominent in-app toast (works everywhere)
+      toast(body, {
+        duration: 15000,
+        position: "top-center",
+        style: {
+          background: "#DC2626",
+          color: "#FFFFFF",
+          border: "2px solid #B91C1C",
+          fontWeight: "600",
+          fontSize: "14px",
+          padding: "16px 20px",
+          boxShadow: "0 8px 32px rgba(220,38,38,0.4)",
+          zIndex: 999999,
+        },
+        action: onClick
+          ? {
+              label: "Ver",
+              onClick: () => onClick(),
+            }
+          : undefined,
+      });
+
+      // Try OS-level notification
+      if ("Notification" in window && Notification.permission === "granted") {
+        try {
+          const notification = new Notification(title, {
+            body,
+            icon: "/favicon.ico",
+            badge: "/favicon.ico",
+            tag: `jbs-${Date.now()}`,
+            requireInteraction: true,
+          });
+
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+            onClick?.();
+          };
+
+          setTimeout(() => notification.close(), 20000);
+        } catch (err) {
+          console.warn("Native notification failed:", err);
+        }
       }
 
-      try {
-        const notification = new Notification(title, {
-          body,
-          icon: "/favicon.ico",
-          badge: "/favicon.ico",
-          tag: `jbs-${Date.now()}`,
-          requireInteraction: true,
-          silent: false, // Allow sound
-        });
-
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-          onClick?.();
-        };
-
-        // Also show toast for visibility
-        toast.info(body, {
-          duration: 8000,
-          action: {
-            label: "Ver",
-            onClick: () => onClick?.(),
-          },
-        });
-
-        // Auto close after 15 seconds
-        setTimeout(() => notification.close(), 15000);
-      } catch (err) {
-        console.error("Error showing notification:", err);
-        toast.info(body, { duration: 10000 });
+      // Try vibration on mobile
+      if ("vibrate" in navigator) {
+        try { navigator.vibrate([200, 100, 200]); } catch {}
       }
     },
     []
   );
 
-  // Subscribe to realtime notifications
   useEffect(() => {
     if (!userId) return;
 
-    // Request permission on mount
     requestPermission();
 
     const channel = supabase
@@ -114,12 +137,10 @@ export const useNotifications = (userId: string | null) => {
         (payload) => {
           const notification = payload.new as any;
           
-          // Show native notification immediately
           showNativeNotification(
             "🔔 JBS Terminais - Nova Notificação",
             notification.mensagem,
             () => {
-              // Mark as read when clicked
               supabase
                 .from("notifications")
                 .update({ lida: true })

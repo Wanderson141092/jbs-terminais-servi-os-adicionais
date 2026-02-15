@@ -624,7 +624,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       e.stopPropagation();
                       try {
                         const { error } = await supabase.functions.invoke("notificar-status", {
-                          body: { action: "reenviar_chave", solicitacao_id: solicitacao.id },
+                          body: { action: "reenviar_chave", solicitacao_id: solicitacao.id, usuario_id: userId },
                         });
                         if (error) throw error;
                         toast.success("Chave reenviada para o e-mail do cliente!");

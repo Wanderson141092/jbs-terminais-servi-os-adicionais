@@ -313,7 +313,7 @@ const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; 
   return y;
 };
 
-// ─── Checklist items (rows with colored accent bar) ───
+// ─── Checklist items (rows with colored accent bar + colored circle icon) ───
 const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; detail?: string }[], y: number): number => {
   const pageW = doc.internal.pageSize.getWidth();
   const rowH = 14;
@@ -323,14 +323,16 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
   for (const item of items) {
     y = ensureSpace(doc, y, rowH + 4);
 
-    const color = getStateColor(
-      item.status === "done" ? "completed" :
-      item.status === "error" ? "error" :
-      item.status === "warning" ? "warning" :
-      item.status === "pending" ? "current" : "pending"
-    );
+    const color: RGB =
+      item.status === "done" ? JBS_GREEN :
+      item.status === "error" ? COLOR_RED :
+      item.status === "warning" ? [217, 140, 20] :
+      item.status === "pending" ? COLOR_BLUE_LIGHT : [160, 160, 160];
 
-    const marker = getStateMarker(item.status === "done" ? "completed" : item.status);
+    const iconChar =
+      item.status === "done" ? "\u2713" :
+      item.status === "error" ? "X" :
+      item.status === "warning" ? "!" : "\u23F3";
 
     // Light row background
     doc.setFillColor(248, 249, 250);
@@ -340,20 +342,24 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
     doc.setFillColor(...color);
     doc.rect(MARGIN, y + 1, 3, rowH - 2, "F");
 
-    // State marker mini-pill
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    const mw = doc.getTextWidth(marker) + 8;
+    // Colored circle icon
+    const circleX = MARGIN + 12;
+    const circleY = y + rowH / 2;
+    const circleR = 4.5;
     doc.setFillColor(...color);
-    doc.roundedRect(MARGIN + 8, y + 3, mw, rowH - 6, 2, 2, "F");
+    doc.circle(circleX, circleY, circleR, "F");
+
+    // Icon character inside circle
     doc.setTextColor(...JBS_WHITE);
-    doc.text(marker, MARGIN + 8 + 4, y + rowH / 2 + 2);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text(iconChar, circleX, circleY + 2.5, { align: "center" });
 
     // Label
     doc.setTextColor(...JBS_TEXT);
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
-    doc.text(item.label, MARGIN + 8 + mw + 6, y + rowH / 2 + 2.5);
+    doc.text(item.label, MARGIN + 22, y + rowH / 2 + 2.5);
 
     y += rowH + 3;
 
@@ -499,31 +505,7 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   y = drawSectionBorder(doc, y);
   y += 6;
 
-  // ─── Acompanhamento (Observacoes) ───
-  if (observacoes.length > 0) {
-    y = drawSectionTitle(doc, "Acompanhamento", y);
-
-    for (const obs of observacoes) {
-      y = ensureSpace(doc, y, 16);
-      doc.setFillColor(...JBS_FOOTER_BG);
-      const obsLines = doc.splitTextToSize(obs.observacao, pageW - MARGIN * 2 - 20);
-      const obsH = obsLines.length * 5 + 12;
-      doc.roundedRect(MARGIN + 4, y, pageW - MARGIN * 2 - 8, obsH, 2, 2, "F");
-
-      doc.setTextColor(...JBS_TEXT);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "normal");
-      doc.text(obsLines, MARGIN + 10, y + 8);
-
-      doc.setTextColor(...JBS_LABEL);
-      doc.setFontSize(6.5);
-      doc.text(new Date(obs.created_at).toLocaleString("pt-BR"), pageW - MARGIN - 6, y + 8, { align: "right" });
-
-      y += obsH + 4;
-    }
-    y = drawSectionBorder(doc, y);
-    y += 6;
-  }
+  // Acompanhamento removed from external PDF (internal only)
 
   // ─── Lacre Armador ───
   if (showLacreArmador && lacreArmadorDados) {

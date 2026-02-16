@@ -117,10 +117,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       dynamicOptions.forEach((opt: any) => { ordemMap[opt.value] = opt.ordem; });
       setStatusOrdemMap(ordemMap);
       
-      // Filter out cancelado and recusado from the dropdown - they are now managed by dedicated buttons
-      const filteredOptions = dynamicOptions.filter((opt: any) => 
-        opt.value !== 'cancelado' && opt.value !== 'recusado'
-      );
+      // Filter out cancelado and recusado, and dedup by value (same sigla = same status)
+      const seen = new Set<string>();
+      const filteredOptions = dynamicOptions.filter((opt: any) => {
+        if (opt.value === 'cancelado' || opt.value === 'recusado') return false;
+        if (seen.has(opt.value)) return false;
+        seen.add(opt.value);
+        return true;
+      });
       
       setStatusOptions(filteredOptions);
       setPendenciaOpcoes(pendenciaRes.data || []);

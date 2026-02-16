@@ -48,7 +48,6 @@ const LACRE_CONFIGS = [
 const PaginaExternaConfigManager = () => {
   const [lacreConfigs, setLacreConfigs] = useState<SystemConfig[]>([]);
   const [deferimentoTitulos, setDeferimentoTitulos] = useState<DeferimentoTitulo[]>([]);
-  const [pendenciaOpcoes, setPendenciaOpcoes] = useState<any[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,24 +67,19 @@ const PaginaExternaConfigManager = () => {
   const [editingTitulo, setEditingTitulo] = useState<DeferimentoTitulo | null>(null);
   const [tituloForm, setTituloForm] = useState({ titulo: "", servico_ids: [] as string[] });
 
-  // Pendencia dialog
-  const [showPendDialog, setShowPendDialog] = useState(false);
-  const [editingPend, setEditingPend] = useState<any>(null);
-  const [pendForm, setPendForm] = useState({ valor: "", ordem: 0 });
+  // (Pendência management removed - managed in Pág. Interna only)
 
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
-    const [lacreRes, titulosRes, pendRes, svcRes, portalRes] = await Promise.all([
+    const [lacreRes, titulosRes, svcRes, portalRes] = await Promise.all([
       supabase.from("system_config").select("*").in("config_key", LACRE_CONFIGS.map(c => c.key)).order("config_key"),
       supabase.from("deferimento_titulos").select("*").order("created_at"),
-      supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").order("ordem"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("page_config").select("*").eq("config_key", "portal_cliente_url").maybeSingle(),
     ]);
     setLacreConfigs(lacreRes.data || []);
     setDeferimentoTitulos(titulosRes.data || []);
-    setPendenciaOpcoes(pendRes.data || []);
     setServicos(svcRes.data || []);
     if (portalRes.data) {
       setPortalUrl(portalRes.data.config_value || "");
@@ -181,46 +175,7 @@ const PaginaExternaConfigManager = () => {
     fetchAll();
   };
 
-  // ===== PENDENCIA OPCOES =====
-  const openPendDialog = (pend?: any) => {
-    if (pend) {
-      setEditingPend(pend);
-      setPendForm({ valor: pend.valor, ordem: pend.ordem });
-    } else {
-      setEditingPend(null);
-      const maxOrdem = pendenciaOpcoes.reduce((max, p) => Math.max(max, p.ordem), 0);
-      setPendForm({ valor: "", ordem: maxOrdem + 1 });
-    }
-    setShowPendDialog(true);
-  };
-
-  const savePend = async () => {
-    if (!pendForm.valor.trim()) { toast.error("Valor obrigatório"); return; }
-    const data: any = { grupo: "pendencia_opcoes", valor: pendForm.valor.trim(), ordem: pendForm.ordem, updated_at: new Date().toISOString() };
-    if (editingPend) {
-      const { error } = await supabase.from("parametros_campos").update(data).eq("id", editingPend.id);
-      if (error) { toast.error("Erro ao atualizar"); return; }
-      toast.success("Opção atualizada!");
-    } else {
-      const { error } = await supabase.from("parametros_campos").insert(data);
-      if (error) { toast.error("Erro ao criar"); return; }
-      toast.success("Opção criada!");
-    }
-    setShowPendDialog(false);
-    fetchAll();
-  };
-
-  const deletePend = async (id: string) => {
-    const { error } = await supabase.from("parametros_campos").delete().eq("id", id);
-    if (error) { toast.error("Erro ao excluir"); return; }
-    toast.success("Opção excluída!");
-    fetchAll();
-  };
-
-  const togglePendAtivo = async (pend: any) => {
-    await supabase.from("parametros_campos").update({ ativo: !pend.ativo }).eq("id", pend.id);
-    fetchAll();
-  };
+  // Pendência management removed - managed exclusively in Pág. Interna
 
   const getServicoNome = (id: string) => servicos.find(s => s.id === id)?.nome || id.slice(0, 8);
 
@@ -372,53 +327,7 @@ const PaginaExternaConfigManager = () => {
         </CardContent>
       </Card>
 
-      {/* Pendência Opções (Lacre) */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Opções de Pendência — Vistoria ({pendenciaOpcoes.length})
-          </CardTitle>
-          <Button size="sm" onClick={() => openPendDialog()}>
-            <Plus className="h-4 w-4 mr-1" /> Adicionar
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Valor</TableHead>
-                <TableHead>Ordem</TableHead>
-                <TableHead>Ativo</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pendenciaOpcoes.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-4">Nenhuma opção cadastrada.</TableCell></TableRow>
-              ) : pendenciaOpcoes.map(p => (
-                <TableRow key={p.id} className={!p.ativo ? "opacity-50" : ""}>
-                  <TableCell className="font-medium">{p.valor}</TableCell>
-                  <TableCell>{p.ordem}</TableCell>
-                  <TableCell><Switch checked={p.ativo} onCheckedChange={() => togglePendAtivo(p)} /></TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openPendDialog(p)}><Edit className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="ghost" size="sm"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>Excluir "{p.valor}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deletePend(p.id)} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction></AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Pendência management moved to Pág. Interna */}
 
       {/* Config Edit Dialog */}
       <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
@@ -475,23 +384,7 @@ const PaginaExternaConfigManager = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Pendencia Dialog */}
-      <Dialog open={showPendDialog} onOpenChange={setShowPendDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>{editingPend ? "Editar" : "Adicionar"} Opção de Pendência</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Valor</Label>
-              <Input value={pendForm.valor} onChange={(e) => setPendForm(p => ({ ...p, valor: e.target.value }))} placeholder="Ex: Lacre Armador Pendente" />
-            </div>
-            <div>
-              <Label>Ordem</Label>
-              <Input type="number" value={pendForm.ordem} onChange={(e) => setPendForm(p => ({ ...p, ordem: parseInt(e.target.value) || 0 }))} />
-            </div>
-          </div>
-          <DialogFooter><Button onClick={savePend}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Pendência dialog removed - managed in Pág. Interna */}
     </div>
   );
 };

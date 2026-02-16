@@ -89,7 +89,7 @@ const StatusCorrectionDialog = ({ solicitacao, userId, onClose }: StatusCorrecti
     await supabase.from("observacao_historico").insert({
       solicitacao_id: solicitacao.id,
       autor_id: userId,
-      observacao: `[Correção de Status] De "${solicitacao.status}" para "${statusLabel}": ${justificativa.trim()}`,
+      observacao: `[Correção de Status] Status: ${statusLabel}.\nObservação: ${justificativa.trim()}.`,
       status_no_momento: selectedStatus,
     });
 

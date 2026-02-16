@@ -981,12 +981,15 @@ const AdminParametros = () => {
                       maxLength={5}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Exemplo: {protocolConfig.prefixo}A000001
+                      Texto inicial que compõe o número do protocolo gerado automaticamente. Exemplo: {protocolConfig.prefixo}A000001
                     </p>
                   </div>
                   <div>
                     <Label>Último Número Gerado</Label>
                     <Input value={protocolConfig.ultimo_numero} disabled className="bg-muted" />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Sequência numérica atual do protocolo. Esse valor é incrementado automaticamente a cada nova solicitação.
+                    </p>
                   </div>
                   <Button onClick={saveProtocolConfig} disabled={saving}>
                     <Save className="h-4 w-4 mr-2" />
@@ -1022,6 +1025,7 @@ const AdminParametros = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">Serviço adicional ao qual esta regra será aplicada. Cada serviço pode ter apenas uma regra.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1031,10 +1035,12 @@ const AdminParametros = () => {
                   value={regraFormData.hora_corte}
                   onChange={(e) => setRegraFormData(prev => ({ ...prev, hora_corte: e.target.value }))}
                 />
+                <p className="text-xs text-muted-foreground mt-1">Horário limite para recebimento de solicitações no dia. Após esse horário, o comportamento depende das configurações de corte.</p>
               </div>
             </div>
             <div>
               <Label>Dias de Operação</Label>
+              <p className="text-xs text-muted-foreground mb-2">Dias da semana em que o serviço aceita solicitações. Dias desmarcados bloquearão novos pedidos.</p>
               <div className="flex flex-wrap gap-2 mt-2">
                 {DIAS_SEMANA.map(dia => (
                   <div key={dia.key} className="flex items-center space-x-2">
@@ -1052,6 +1058,7 @@ const AdminParametros = () => {
             {/* Tipo de limite - Diário Fixo ou Por Dia da Semana */}
             <div className="border-t pt-4">
               <Label className="mb-2 block">Tipo de Limite de Quantidade</Label>
+              <p className="text-xs text-muted-foreground mb-2">Define como limitar a quantidade de solicitações por dia: sem restrição, valor fixo para todos os dias ou valores específicos por dia da semana.</p>
               <Select
                 value={regraFormData.tipo_limite}
                 onValueChange={(v: "nenhum" | "fixo" | "por_dia") => {
@@ -1148,7 +1155,10 @@ const AdminParametros = () => {
                 checked={regraFormData.aplica_dia_anterior}
                 onCheckedChange={(c) => setRegraFormData(prev => ({ ...prev, aplica_dia_anterior: !!c }))}
               />
-              <Label htmlFor="aplica_dia_anterior">Aplicar regra ao dia anterior</Label>
+              <div>
+                <Label htmlFor="aplica_dia_anterior">Aplicar regra ao dia anterior</Label>
+                <p className="text-xs text-muted-foreground">Quando ativado, solicitações enviadas após o corte contam como se fossem do dia anterior.</p>
+              </div>
             </div>
           </div>
           <DialogFooter className="mt-4">
@@ -1224,6 +1234,7 @@ const AdminParametros = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">Serviço ao qual esta regra de roteamento se aplica.</p>
             </div>
             <div>
               <Label>Campo Critério (do Mapeamento de Campos)</Label>
@@ -1242,6 +1253,7 @@ const AdminParametros = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">Campo da solicitação usado como critério para decidir qual setor é responsável. Baseado nos mapeamentos configurados em Integrações.</p>
             </div>
             <div>
               <Label>Valor do Critério (opcional)</Label>
@@ -1250,6 +1262,7 @@ const AdminParametros = () => {
                 onChange={(e) => setRoutingFormData(prev => ({ ...prev, valor_criterio: e.target.value }))}
                 placeholder="Deixe vazio para qualquer valor"
               />
+              <p className="text-xs text-muted-foreground mt-1">Valor específico do campo critério que ativa esta regra. Se vazio, qualquer valor aciona o roteamento.</p>
             </div>
             <div>
               <Label>Setores que devem ser notificados *</Label>
@@ -1301,6 +1314,7 @@ const AdminParametros = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">Serviço adicional vinculado a esta regra de notificação.</p>
             </div>
             <div>
               <Label>Status Gatilho</Label>
@@ -1317,6 +1331,7 @@ const AdminParametros = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">Status que, ao ser atingido pelo processo, dispara automaticamente a notificação configurada.</p>
             </div>
             
             <div>
@@ -1340,6 +1355,7 @@ const AdminParametros = () => {
 
             <div>
               <Label>Tipos de Notificação *</Label>
+              <p className="text-xs text-muted-foreground mb-2">Canais por onde a notificação será enviada quando o status gatilho for atingido.</p>
               <div className="space-y-2 border rounded-lg p-3">
                 {TIPOS_NOTIFICACAO.map(tipo => (
                   <div key={tipo.key} className="flex items-center gap-2">

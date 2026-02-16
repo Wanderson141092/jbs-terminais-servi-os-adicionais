@@ -32,6 +32,8 @@ interface ServicoConfig {
   anexos_embutidos: boolean | null;
   aprovacao_ativada?: boolean;
   status_confirmacao_lancamento?: string[];
+  deferimento_status_ativacao?: string[];
+  lacre_armador_status_ativacao?: string[];
 }
 
 interface ObservacaoHistorico {
@@ -1007,11 +1009,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     </div>
                   )}
 
-                  {/* Solicitar Deferimento Toggle - apenas para Posicionamento */}
+                  {/* Solicitar Deferimento Toggle - apenas para Posicionamento e status habilitado */}
                   {(() => {
                     const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
+                    const defStatusAtivacao = servicoConfig?.deferimento_status_ativacao || [];
+                    const showDeferimento = isPosicionamento && defStatusAtivacao.length > 0 && defStatusAtivacao.includes(solicitacao.status);
+                    if (!showDeferimento && !solicitarDeferimento) return null;
                     return (
-                      <div className={`flex items-center justify-between border rounded-md p-3 ${isPosicionamento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                      <div className={`flex items-center justify-between border rounded-md p-3 ${showDeferimento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-blue-600" />
                           <div className="flex flex-col">
@@ -1025,7 +1030,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           id="solicitar-def"
                           checked={solicitarDeferimento}
                           onCheckedChange={setSolicitarDeferimento}
-                          disabled={!isPosicionamento}
+                          disabled={!showDeferimento}
                         />
                       </div>
                     );
@@ -1034,11 +1039,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   {/* Lacre Armador Toggle + Confirmação de Lançamento lado a lado */}
                   {(() => {
                     const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
+                    const lacreStatusAtivacao = servicoConfig?.lacre_armador_status_ativacao || [];
+                    const showLacre = isPosicionamento && lacreStatusAtivacao.length > 0 && lacreStatusAtivacao.includes(solicitacao.status);
+                    if (!showLacre && !solicitarLacreArmador) return null;
                     const showLacreConfirmLancamento = solicitarLacreArmador && isPosicionamento && custoLacreArmador === true && solicitacao.lancamento_confirmado === false;
                     return (
                       <>
                         <div className="flex gap-2">
-                          <div className={`flex-1 flex items-center justify-between border rounded-md p-2.5 ${isPosicionamento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                          <div className={`flex-1 flex items-center justify-between border rounded-md p-2.5 ${showLacre ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
                             <div className="flex items-center gap-2">
                               <Lock className="h-4 w-4 text-amber-600 shrink-0" />
                               <div className="flex flex-col">
@@ -1055,7 +1063,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                                 setSolicitarLacreArmador(checked);
                                 if (!checked) setCustoLacreArmador(null);
                               }}
-                              disabled={!isPosicionamento}
+                              disabled={!showLacre}
                             />
                           </div>
 

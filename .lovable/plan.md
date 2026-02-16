@@ -1,63 +1,97 @@
 
 
-## Plano: Fluxo de Cancelamento em Posicionamento com Validação de Custo
+# Corrigir Timeline: Remover Duplicidade de "Recusado" e Mostrar Motivo da Recusa
 
-### Resumo
+## Problema Identificado
 
-Implementar dois cenários de cancelamento para o serviço "Posicionamento":
+Para o protocolo JBSS00040 (serviço nao-posicionamento, recusado apos confirmacao):
 
-1. **Cancelamento antes da confirmação** (status atual = `aguardando_confirmacao`): O cancelamento e salvo normalmente. Na timeline, "Cancelado" aparece logo apos "Aguardando Confirmacao".
+1. **Duplicidade**: O label "Recusado" aparece duas vezes na timeline:
+   - Na etapa "Aguardando Confirmacao", que troca o label para "Recusado" (linha 171)
+   - E novamente como etapa terminal separada no bloco nao-posicionamento (linhas 325-331)
 
-2. **Cancelamento apos confirmacao** (status atual = `confirmado_aguardando_vistoria`): Requer validacao operacional. Ao selecionar "Cancelado", aparece a pergunta "Ha custo de posicionamento?":
-   - **Sim**: Ativa a confirmacao de lancamento financeiro (mesmo fluxo existente do icone $) e salva o cancelamento.
-   - **Nao**: Permite salvar o cancelamento diretamente sem lancamento.
+2. **Motivo da recusa ausente**: A justificativa ("Indisponibilidade operacional") existe no audit_log mas nao e exibida na timeline. Os campos `armazem_justificativa` e `comex_justificativa` tambem nao sao buscados pela funcao de consulta publica.
 
-### Alteracoes Necessarias
+## Solucao
 
-#### 1. Migracao de Banco de Dados
-- Adicionar coluna `custo_posicionamento` (boolean, nullable, default null) na tabela `solicitacoes` para registrar a resposta sobre custo.
+### 1. Corrigir duplicidade no `ProcessStageStepper.tsx`
 
-#### 2. AnaliseDialog.tsx - Validacao ao Cancelar
-Quando o usuario selecionar status "cancelado" no serviço de Posicionamento e o status atual ja for `confirmado_aguardando_vistoria`:
-- Exibir uma secao condicional com a pergunta "Ha custo de posicionamento?" (Switch ou Radio com Sim/Nao).
-- Se **Sim**: ao salvar, gravar `custo_posicionamento = true` e disparar a logica de confirmacao de lancamento (marcando nos campos `status_confirmacao_lancamento` do servico para que o icone $ apareca).
-- Se **Nao**: ao salvar, gravar `custo_posicionamento = false` e permitir o cancelamento sem lancamento.
-- Se nenhuma opcao for selecionada, bloquear o botao "Salvar Alteracoes" com mensagem de validacao.
+No bloco "Aguardando Confirmacao normal" (linhas 161-184), quando `isTerminal` e `currentOrder > 1`, o label NAO deve ser substituido por "Recusado"/"Cancelado". Deve mostrar "Confirmado" (pois o processo foi confirmado antes de ser recusado). O status terminal so aparecera uma vez, na etapa dedicada.
 
-#### 3. ProcessStageStepper.tsx - Timeline Visual
-O stepper precisa saber em que etapa o cancelamento ocorreu. Para isso:
-- Quando `cancelado` e Posicionamento, verificar `custo_posicionamento`:
-  - Se o status anterior era `aguardando_confirmacao` (inferido pela ausencia de aprovacoes), mostrar "Cancelado" apos "Aguardando Confirmacao".
-  - Se o status anterior era `confirmado_aguardando_vistoria` (inferido pela presenca de aprovacoes ou pelo campo `custo_posicionamento` nao ser null), mostrar a etapa "Confirmado - Aguardando Vistoria/Servico" como completa (vermelha) e depois "Cancelado".
+### 2. Adicionar prop `motivoRecusa` ao componente
 
-### Detalhes Tecnicos
+Adicionar uma nova prop opcional `motivoRecusa?: string | null` na interface `ProcessStageStepperProps`. Quando o status for terminal (recusado/cancelado), o `detail` da etapa terminal exibira esse motivo.
 
-**Migracao SQL:**
-```sql
-ALTER TABLE public.solicitacoes 
-ADD COLUMN IF NOT EXISTS custo_posicionamento boolean DEFAULT NULL;
+### 3. Buscar justificativa na funcao `consulta-publica`
+
+Adicionar `armazem_justificativa, comex_justificativa` ao `selectFields` da edge function, e inclui-los no objeto sanitizado retornado.
+
+### 4. Passar a justificativa ao componente em `ConsultaResultado.tsx` e `ProcessoViewDialog.tsx`
+
+Determinar a justificativa mais relevante (priorizar `armazem_justificativa` se `armazem_aprovado === false`, senao `comex_justificativa`) e passar como prop `motivoRecusa`.
+
+---
+
+## Detalhes Tecnicos
+
+### Arquivo: `src/components/ProcessStageStepper.tsx`
+
+**Interface** -- adicionar prop:
+```typescript
+motivoRecusa?: string | null;
 ```
 
-**AnaliseDialog.tsx - Trecho condicional (pseudocodigo):**
-```text
-Se selectedStatus === "cancelado" 
-  E servicoConfig?.nome inclui "posicionamento"
-  E solicitacao.status === "confirmado_aguardando_vistoria":
-    Mostrar: "Ha custo de posicionamento?" [Sim] [Nao]
-    Se nenhuma opcao: bloquear salvar
-    Se Sim: gravar custo_posicionamento=true, lancamento pendente
-    Se Nao: gravar custo_posicionamento=false, salvar normalmente
+**getStages, linhas 169-171** -- corrigir bloco terminal em aguardando_confirmacao:
+```typescript
+// Antes (duplicava o label):
+if (isTerminal) {
+  label = terminalLabel;
+}
+
+// Depois (mostra "Confirmado" pois ja passou dessa etapa):
+if (isTerminal) {
+  label = isPosic ? "Posicionamento Confirmado" : "Confirmado";
+}
 ```
 
-**ProcessStageStepper.tsx - Logica de posicionamento do "Cancelado":**
-- Adicionar prop `custoposicionamento` (boolean | null).
-- Quando `isTerminal` e Posicionamento:
-  - Se `custo_posicionamento` nao for null (ou se ha aprovacoes confirmadas): cancelamento ocorreu apos confirmacao -- mostrar a etapa de aguardando vistoria/servico antes do "Cancelado".
-  - Caso contrario: cancelamento ocorreu antes da confirmacao -- mostrar "Cancelado" logo apos "Aguardando Confirmacao" (comportamento atual).
+**Bloco nao-posicionamento terminal, linhas 323-331** -- adicionar `detail` com motivo:
+```typescript
+if (isTerminal) {
+  stages.push({
+    key: status,
+    label: terminalLabel,
+    icon: <X className="h-4 w-4" />,
+    state: "error",
+    detail: props.motivoRecusa || undefined,
+  });
+  return stages;
+}
+```
 
-**Arquivos modificados:**
-- `supabase/migrations/` -- nova migracao
-- `src/components/AnaliseDialog.tsx` -- pergunta de custo + validacao
-- `src/components/ProcessStageStepper.tsx` -- nova prop e logica de posicionamento do cancelamento
-- `supabase/functions/consulta-publica/index.ts` -- incluir `custo_posicionamento` no retorno
+Aplicar a mesma logica nos blocos posicionamento (servico e vistoria) para exibir o motivo nos cenarios terminais.
+
+### Arquivo: `supabase/functions/consulta-publica/index.ts`
+
+Adicionar ao `selectFields`:
+```
+, armazem_justificativa, comex_justificativa
+```
+
+### Arquivo: `src/components/ConsultaResultado.tsx`
+
+Determinar o motivo e passar ao stepper:
+```tsx
+const motivoRecusa = solicitacao.armazem_aprovado === false
+  ? (solicitacao as any).armazem_justificativa
+  : (solicitacao as any).comex_justificativa;
+
+<ProcessStageStepper
+  ...
+  motivoRecusa={motivoRecusa}
+/>
+```
+
+### Arquivo: `src/components/ProcessoViewDialog.tsx`
+
+Mesma logica para passar `motivoRecusa` ao stepper no dialog interno.
 

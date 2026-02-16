@@ -177,9 +177,8 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
 
   const generalStatus = getGeneralDeferimentoStatus();
 
-  // Lacre armador visibility - show when solicitar_lacre_armador is true (primary condition)
-  const isServicePosicionamentoLacre = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
-  const showLacreArmador = isServicePosicionamentoLacre && (solicitacao as any).solicitar_lacre_armador === true;
+  // Lacre armador visibility - solicitar_lacre_armador is the source of truth (set during analysis)
+  const showLacreArmador = (solicitacao as any).solicitar_lacre_armador === true;
   const lacreCurrentStatus = lacreArmadorDados?.lacre_status || "aguardando_preenchimento";
   const canFillLacreForm = showLacreArmador && (lacreCurrentStatus === "aguardando_preenchimento" || lacreCurrentStatus === "recusado");
 
@@ -241,13 +240,11 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
     setShowConfirmDialog(false);
   };
 
-  // Show deferimento only when ALL 3 conditions are met:
-  // 1. Service = Posicionamento
-  // 2. Current status is in deferimento_status_ativacao list
-  // 3. solicitar_deferimento toggle is active on the process
-  const isServicePosicionamento = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
-  const statusInDeferimentoActivation = servicoConfig?.deferimento_status_ativacao?.includes(solicitacao.status) ?? false;
-  const showDeferimento = isServicePosicionamento && statusInDeferimentoActivation && solicitacao.solicitar_deferimento === true;
+  // Show deferimento when both conditions are met:
+  // 1. Current status is in deferimento_status_ativacao list (or no config available, fallback to true)
+  // 2. solicitar_deferimento toggle is active on the process
+  const statusInDeferimentoActivation = servicoConfig?.deferimento_status_ativacao?.includes(solicitacao.status) ?? true;
+  const showDeferimento = statusInDeferimentoActivation && solicitacao.solicitar_deferimento === true;
   const canUpload = showDeferimento && (allDocs.length === 0 || generalStatus === "recusado") && generalStatus !== "aguardando";
 
   const getDeferimentoStatusSection = () => {

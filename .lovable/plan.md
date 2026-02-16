@@ -1,67 +1,59 @@
 
-# Plano: Correções no Sistema de Cobranças
 
-## Problemas Identificados
+# Plano: Submenu "Modelos de Relatorios" com Dialogos Flutuantes
 
-1. **Badges de cobranca na analise estao com logica invertida/incorreta** -- o badge "Custo Posic. Lacre" deveria mostrar o status "Lanc. Posic. Lacre Pendente" como referencia, e "Lanc. Posicionamento" deveria usar "Aguardando confirmacao de lancamento do servico".
-2. **"Custo Posic. Lacre" deve ficar oculto** se a resposta a "Ha cobranca..." for "Nao".
-3. **Texto da pergunta** precisa mudar de "Ha cobranca de servico (lacre armador)?" para "Ha cobranca de novo servico (Posicionamento — Pendencia de Lacre armador)?".
-4. **Falta campo `status_ativacao`** na tabela `lancamento_cobranca_config` e no formulario de gestao (LancamentoCobrancaManager) para configurar quais status ativam a visibilidade de cada cobranca.
+## Resumo
+Transformar a pagina separada de Relatorios em dois dialogos flutuantes acessiveis diretamente do menu "Relatorios" no dashboard, eliminando a navegacao para outra pagina.
 
-## Alteracoes Planejadas
+## Alteracoes
 
-### 1. Migracao de Banco de Dados
-Adicionar coluna `status_ativacao text[] NOT NULL DEFAULT '{}'::text[]` a tabela `lancamento_cobranca_config` para armazenar os status que ativam a visibilidade de cada cobranca na tela de analise.
+### 1. Menu do Dashboard (InternoDashboard.tsx)
+Substituir o item "Modelos de Relatorio" (que navega para `/interno/relatorios`) por um submenu com duas opcoes:
 
-### 2. LancamentoCobrancaManager (Parametros > Pag. Interna)
-- Adicionar campo "Status de Ativacao" no formulario de Nova/Editar Cobranca -- lista de checkboxes com os status do sistema (vindos de `parametros_campos` grupo `status_processo`).
-- Adicionar coluna "Status Ativacao" na tabela de listagem.
-- Salvar/carregar o novo campo `status_ativacao`.
+```text
+Relatorios (dropdown)
+  |-- Modelos de Relatorios (submenu)
+  |     |-- Extrair Relatorio    (abre dialog flutuante)
+  |     |-- Modelos Excel        (abre dialog flutuante)
+  |-- Relatorio Personalizado
+  |-- Programacao - Navis N4
+```
 
-### 3. AnaliseDialog -- Badges de Cobranca (linhas ~818-856)
-Reescrever a logica dos badges dinamicos:
+Adicionar dois novos estados:
+- `showExtrairRelatorio` (boolean)
+- `showModelosExcel` (boolean)
 
-- **Tipo "servico" (ex: Lanc. Posicionamento):**
-  - Visibilidade controlada por `cfg.status_ativacao` (se configurado, so aparece quando `solicitacao.status` esta na lista).
-  - Campo de referencia: `solicitacao.lancamento_confirmado` -- exibe "Pendente" ou "Confirmado".
-  - Texto: `{cfg.rotulo_analise}: Aguardando confirmacao de lancamento do servico` quando pendente / `Confirmado` quando confirmado.
+### 2. Novo Componente: ExtrairRelatorioDialog
+Extrair o conteudo da aba "Exportar Dados" do `Relatorios.tsx` para um componente dialog independente (`src/components/ExtrairRelatorioDialog.tsx`).
+- Recebe `open` e `onClose` como props
+- Contem a logica de fetch dos modelos com mapeamento e os cards de download
+- Inclui o `ReportDownloadDialog` internamente
+- Renomear titulo para "Extrair Relatorio"
 
-- **Tipo "pendencia" (ex: Custo Posic. Lacre):**
-  - Visibilidade: so aparece se `solicitacao.lacre_armador_aceite_custo === true` (se "Nao", fica oculto).
-  - Visibilidade tambem controlada por `cfg.status_ativacao`.
-  - Texto: `{cfg.rotulo_analise}: Lanc. Posic. Lacre Pendente` quando lancamento pendente / `Confirmado` apos confirmar.
+### 3. Novo Componente: ModelosExcelDialog
+Extrair o conteudo da aba "Modelos Importados" para um componente dialog independente (`src/components/ModelosExcelDialog.tsx`).
+- Recebe `open` e `onClose` como props
+- Contem a tabela de modelos, upload, mapeamento de colunas
+- Inclui `ReportColumnMappingDialog` internamente
+- Renomear titulo para "Modelos Excel"
 
-### 4. AnaliseDialog -- Texto da Pergunta (linha ~1128)
-Alterar de:
-> "Ha cobranca de servico (lacre armador)?"
+### 4. Integrar Dialogos no Dashboard
+Em `InternoDashboard.tsx`:
+- Importar os dois novos componentes
+- Renderizar ambos os dialogos (controlados pelos novos estados)
+- Remover a navegacao para `/interno/relatorios`
 
-Para:
-> "Ha cobranca de novo servico (Posicionamento — Pendencia de Lacre armador)?"
-
-### 5. Secao "Aguardando confirmacao de lancamento" (linhas ~1190-1211)
-Conectar esta secao tambem as `cobrancaConfigs` de tipo "servico" para usar o rotulo correto e respeitar o `status_ativacao`.
+### 5. Pagina Relatorios.tsx
+Manter o arquivo por compatibilidade (a rota ainda existira), mas a interacao principal sera via dialogos no dashboard.
 
 ## Detalhes Tecnicos
 
-```text
-lancamento_cobranca_config
-+-------------------+----------+
-| Campo Novo        | Tipo     |
-+-------------------+----------+
-| status_ativacao   | text[]   |
-+-------------------+----------+
-```
+Arquivos criados:
+- `src/components/ExtrairRelatorioDialog.tsx` -- dialog com grid de modelos mapeados para download
+- `src/components/ModelosExcelDialog.tsx` -- dialog com tabela de modelos, upload e mapeamento
 
-Fluxo de visibilidade dos badges:
-```text
-Para cada cfg em cobrancaConfigs:
-  1. Se cfg.status_ativacao nao vazio -> so mostra se solicitacao.status esta na lista
-  2. Se cfg.tipo == "servico" -> mostra badge com lancamento_confirmado
-  3. Se cfg.tipo == "pendencia" -> so mostra se lacre_armador_aceite_custo === true
-     (oculto se "Nao" ou null)
-```
+Arquivos editados:
+- `src/pages/InternoDashboard.tsx` -- submenu + estados + renderizacao dos dialogos
 
-### Arquivos Modificados
-- **Migracao SQL**: Nova coluna `status_ativacao`
-- **`src/components/admin/LancamentoCobrancaManager.tsx`**: Campo de status de ativacao
-- **`src/components/AnaliseDialog.tsx`**: Logica de badges, texto da pergunta, secao de lancamento
+A logica de dados (fetch de `modelos_relatorio`, `modelo_relatorio_colunas`, upload, delete) sera movida do `Relatorios.tsx` para os respectivos dialogos, cada um sendo autonomo.
+

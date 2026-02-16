@@ -33,16 +33,16 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label className="text-sm font-semibold text-foreground mb-2 block">
-          Identificador
+          Consulta de Solicitação
         </Label>
         <p className="text-xs text-muted-foreground mb-3">
-          Informe o Contêiner, LPCO, Protocolo ou Chave de Consulta + Chave de Validação
+          Informe o Protocolo, Contêiner ou LPCO + Chave de Validação
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs text-muted-foreground mb-1 block">Identificador</Label>
+          <Label className="text-xs text-muted-foreground mb-1 block">Protocolo, Contêiner ou LPCO</Label>
           <Input
             value={valor}
             onChange={(e) => setValor(e.target.value.toUpperCase().slice(0, 15))}
@@ -71,7 +71,7 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
       </Button>
 
       <div className="text-xs text-muted-foreground pt-2 border-t">
-        <p>Informe o contêiner, LPCO, protocolo ou chave de consulta + a chave de validação recebida na solicitação.</p>
+        <p>Informe o Protocolo, Contêiner ou LPCO junto com a chave de validação recebida na solicitação.</p>
       </div>
     </form>
   );

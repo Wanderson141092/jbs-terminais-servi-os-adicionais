@@ -817,38 +817,44 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
               {/* Dynamic billing badges from lancamento_cobranca_config */}
               {cobrancaConfigs.map((cfg: any) => {
+                // Check status_ativacao visibility
+                const statusAtivacao = cfg.status_ativacao || [];
+                if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return null;
+
                 // "servico" type: shows based on lancamento_confirmado field
                 if (cfg.tipo === "servico") {
-                  if (solicitacao.lancamento_confirmado === null && solicitacao.lancamento_confirmado === undefined) return null;
-                  if (solicitacao.lancamento_confirmado === null) return null;
+                  const isPending = !solicitacao.lancamento_confirmado;
                   return (
                     <Badge
                       key={cfg.id}
                       variant="outline"
                       className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
-                        solicitacao.lancamento_confirmado
+                        !isPending
                           ? "border-green-500 text-green-700 bg-green-50"
                           : "border-red-500 text-red-700 bg-red-50"
                       }`}
                     >
                       <DollarSign className="h-3 w-3" />
-                      {cfg.rotulo_analise}: {solicitacao.lancamento_confirmado ? "Confirmado" : "Pendente"}
+                      {cfg.rotulo_analise}: {isPending ? "Aguardando confirmação de lançamento do serviço" : "Confirmado"}
                     </Badge>
                   );
                 }
-                // "pendencia" type: shows when related pendency is selected or lacre armador with cost
+                // "pendencia" type: only shows if lacre_armador_aceite_custo === true
                 if (cfg.tipo === "pendencia") {
-                  const pendenciaAtiva = cfg.campo_referencia && (solicitacao.pendencias_selecionadas || []).includes(cfg.campo_referencia);
-                  const lacreComCusto = solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo === true;
-                  if (!pendenciaAtiva && !lacreComCusto) return null;
+                  if (solicitacao.lacre_armador_aceite_custo !== true) return null;
+                  const isPending = !solicitacao.lancamento_confirmado;
                   return (
                     <Badge
                       key={cfg.id}
                       variant="outline"
-                      className="text-[10px] px-2 py-0.5 gap-1 font-semibold border-green-500 text-green-700 bg-green-50"
+                      className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
+                        !isPending
+                          ? "border-green-500 text-green-700 bg-green-50"
+                          : "border-red-500 text-red-700 bg-red-50"
+                      }`}
                     >
                       <DollarSign className="h-3 w-3" />
-                      {cfg.rotulo_analise}: Sim
+                      {cfg.rotulo_analise}: {isPending ? "Lanç. Posic. Lacre Pendente" : "Confirmado"}
                     </Badge>
                   );
                 }
@@ -1125,7 +1131,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200 ml-6">
                             <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
                               <DollarSign className="h-4 w-4" />
-                              Há cobrança de serviço (lacre armador)?
+                              Há cobrança de novo serviço (Posicionamento — Pendência de Lacre armador)?
                             </Label>
                             <p className="text-xs text-amber-700">
                               Confirme se houve cobrança operacional para o novo posicionamento de inserção do lacre armador. Se sim, o lançamento financeiro será exigido.
@@ -1188,27 +1194,43 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 
             {(() => {
+              // Find servico-type cobranca configs that match current status
+              const servicoCobrancas = cobrancaConfigs.filter((cfg: any) => {
+                if (cfg.tipo !== "servico") return false;
+                const statusAtivacao = cfg.status_ativacao || [];
+                if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
+                return true;
+              });
+              // Also check legacy config
               const svcConf = servicos.find(sv => sv.nome === (solicitacao.tipo_operacao || ""));
               const statusLanc = svcConf?.status_confirmacao_lancamento || [];
-              return statusLanc.includes(solicitacao.status) && !solicitacao.lancamento_confirmado;
-            })() && (
-              <>
-                <Separator />
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-red-600 mb-2">
-                    <DollarSign className="h-5 w-5" />
-                    <span className="font-semibold">Aguardando confirmação de lançamento do serviço</span>
+              const legacyMatch = statusLanc.includes(solicitacao.status);
+              
+              if ((servicoCobrancas.length === 0 && !legacyMatch) || solicitacao.lancamento_confirmado) return null;
+              
+              const label = servicoCobrancas.length > 0 
+                ? servicoCobrancas.map((c: any) => c.rotulo_analise).join(" / ")
+                : "Aguardando confirmação de lançamento do serviço";
+              
+              return (
+                <>
+                  <Separator />
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-red-600 mb-2">
+                      <DollarSign className="h-5 w-5" />
+                      <span className="font-semibold">{label}: Aguardando confirmação</span>
+                    </div>
+                    <Button 
+                      onClick={() => setShowLancamentoDialog(true)} 
+                      variant="outline" 
+                      className="border-red-300 text-red-600 hover:bg-red-50 w-full"
+                    >
+                      Confirmar Lançamento
+                    </Button>
                   </div>
-                  <Button 
-                    onClick={() => setShowLancamentoDialog(true)} 
-                    variant="outline" 
-                    className="border-red-300 text-red-600 hover:bg-red-50 w-full"
-                  >
-                    Confirmar Lançamento
-                  </Button>
-                </div>
-              </>
-            )}
+                </>
+              );
+            })()}
 
             {/* Anexos */}
             {attachments.length > 0 && (

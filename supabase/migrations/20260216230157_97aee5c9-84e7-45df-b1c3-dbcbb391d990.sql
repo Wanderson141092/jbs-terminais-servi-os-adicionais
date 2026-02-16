@@ -1,0 +1,1 @@
+ALTER TABLE public.lancamento_cobranca_config ADD COLUMN status_ativacao text[] NOT NULL DEFAULT '{}'::text[];

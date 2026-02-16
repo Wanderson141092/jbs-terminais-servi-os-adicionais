@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock, Ship, BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
+import NavisN4ExportDialog from "@/components/NavisN4ExportDialog";
 import { downloadInternalPdf, downloadBatchPdfs } from "@/components/ProcessoPdfGenerator";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,6 +82,7 @@ const InternoDashboard = () => {
   const [deferimentoSolicitacao, setDeferimentoSolicitacao] = useState<any>(null);
   const [lacreArmadorSolicitacao, setLacreArmadorSolicitacao] = useState<any>(null);
   const [showExcelExport, setShowExcelExport] = useState(false);
+  const [showNavisN4, setShowNavisN4] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   
@@ -442,6 +444,26 @@ const InternoDashboard = () => {
                 <Shield className="h-4 w-4" />
               </Button>
             )}
+            {/* Relatórios - accessible to all profiles */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/10">
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Relatórios</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 z-[100] bg-popover" sideOffset={8}>
+                <DropdownMenuItem onClick={() => setShowExcelExport(true)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Relatório Personalizado
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowNavisN4(true)}>
+                  <Ship className="h-4 w-4 mr-2" />
+                  Programação - Navis N4
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             <Button
               variant="ghost"
@@ -618,10 +640,6 @@ const InternoDashboard = () => {
               </Select>
               <Button variant="outline" size="sm" onClick={fetchSolicitacoes}>
                 Atualizar
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowExcelExport(true)}>
-                <FileSpreadsheet className="h-4 w-4 mr-1" />
-                Exportar
               </Button>
               {selectedIds.length > 0 && selectedIds.length <= 10 && (
                 <Button 
@@ -935,6 +953,9 @@ const InternoDashboard = () => {
 
       {/* Excel Export Dialog */}
       <ExcelExportDialog open={showExcelExport} onClose={() => setShowExcelExport(false)} />
+      
+      {/* Navis N4 Export Dialog */}
+      <NavisN4ExportDialog open={showNavisN4} onClose={() => setShowNavisN4(false)} />
     </div>
   );
 };

@@ -360,7 +360,21 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               <CardTitle className="text-lg font-bold text-foreground">
                 Protocolo: {solicitacao.protocolo}
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => downloadExternalPdf(solicitacao, { includeChecklist: true, aprovacaoAtivada: aprovacaoAdministrativo || aprovacaoOperacional, deferimentoStatus: generalStatus })} title="Baixar PDF">
+              <Button variant="outline" size="sm" onClick={() => downloadExternalPdf(solicitacao, {
+                includeChecklist: true,
+                aprovacaoAtivada: aprovacaoAdministrativo || aprovacaoOperacional,
+                aprovacaoAdministrativo,
+                aprovacaoOperacional,
+                deferimentoStatus: generalStatus,
+                observacoes,
+                statusLabels,
+                etapasConfig,
+                servicoConfig: servicoConfig || undefined,
+                lacreArmadorDados: lacreArmadorDados || undefined,
+                lacreArmadorConfig: lacreArmadorConfig || undefined,
+                showDeferimento,
+                showLacreArmador,
+              })} title="Baixar PDF">
                 <Download className="h-4 w-4" />
               </Button>
             </div>

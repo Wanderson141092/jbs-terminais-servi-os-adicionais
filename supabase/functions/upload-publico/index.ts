@@ -198,11 +198,50 @@ Deno.serve(async (req) => {
             );
           }
 
-          // Notify sectors about pending cancellation request
+          // Create internal notifications for all users linked to this service's sectors
           try {
-            await supabaseAdmin.functions.invoke("notificar-status", {
-              body: { solicitacao_id, novo_status: "cancelamento_pendente", origem: "cliente" },
-            });
+            const servicoNome = sol.tipo_operacao || "Serviço";
+            const { data: servicoData } = await supabaseAdmin
+              .from("servicos")
+              .select("id")
+              .eq("nome", servicoNome)
+              .eq("ativo", true)
+              .maybeSingle();
+
+            if (servicoData) {
+              // Get sectors linked to this service
+              const { data: setorServicos } = await supabaseAdmin
+                .from("setor_servicos")
+                .select("setor_email_id")
+                .eq("servico_id", servicoData.id);
+
+              if (setorServicos && setorServicos.length > 0) {
+                const setorIds = setorServicos.map((ss: any) => ss.setor_email_id);
+                const { data: setorEmails } = await supabaseAdmin
+                  .from("setor_emails")
+                  .select("email_setor")
+                  .in("id", setorIds);
+
+                if (setorEmails && setorEmails.length > 0) {
+                  const emails = setorEmails.map((se: any) => se.email_setor);
+                  const { data: profiles } = await supabaseAdmin
+                    .from("profiles")
+                    .select("id")
+                    .in("email_setor", emails);
+
+                  if (profiles && profiles.length > 0) {
+                    const notifications = profiles.map((p: any) => ({
+                      usuario_id: p.id,
+                      solicitacao_id,
+                      mensagem: `⚠️ Cancelamento solicitado pelo cliente para ${sol.protocolo} (${servicoNome}). Requer análise e confirmação.`,
+                      tipo: "cancelamento_pendente",
+                    }));
+
+                    await supabaseAdmin.from("notifications").insert(notifications);
+                  }
+                }
+              }
+            }
           } catch (_) { /* notification failure is non-blocking */ }
 
           return new Response(

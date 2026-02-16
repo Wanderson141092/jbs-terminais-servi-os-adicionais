@@ -738,9 +738,39 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="text-sm text-muted-foreground">Status:</span>
               <StatusBadge status={solicitacao.status} />
+
+              {/* Mini status: Lançamento Posicionamento */}
+              {solicitacao.lancamento_confirmado !== null && solicitacao.lancamento_confirmado !== undefined && (
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
+                    solicitacao.lancamento_confirmado
+                      ? "border-green-500 text-green-700 bg-green-50"
+                      : "border-red-500 text-red-700 bg-red-50"
+                  }`}
+                >
+                  <DollarSign className="h-3 w-3" />
+                  Lanç. Posicionamento: {solicitacao.lancamento_confirmado ? "Confirmado" : "Pendente"}
+                </Badge>
+              )}
+
+              {/* Mini status: Lançamento Lacre Armador */}
+              {solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo !== null && solicitacao.lacre_armador_aceite_custo !== undefined && (
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
+                    solicitacao.lacre_armador_aceite_custo
+                      ? "border-green-500 text-green-700 bg-green-50"
+                      : "border-amber-500 text-amber-700 bg-amber-50"
+                  }`}
+                >
+                  <Key className="h-3 w-3" />
+                  Lanç. Lacre Armador: {solicitacao.lacre_armador_aceite_custo ? "Confirmado" : "Pendente"}
+                </Badge>
+              )}
             </div>
 
             <Separator />

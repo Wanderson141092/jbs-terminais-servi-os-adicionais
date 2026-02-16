@@ -477,49 +477,6 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   y = drawSectionBorder(doc, y);
   y += 6;
 
-  // ─── Progresso do Processo ───
-  y = drawSectionTitle(doc, "Progresso do Processo", y);
-
-  const stages = getStages({
-    status: solicitacao.status,
-    comexAprovado: solicitacao.comex_aprovado,
-    armazemAprovado: solicitacao.armazem_aprovado,
-    aprovacaoAtivada: aprovacaoAdministrativo || aprovacaoOperacional,
-    aprovacaoAdministrativo,
-    aprovacaoOperacional,
-    solicitarDeferimento: showDeferimento,
-    deferimentoStatus: showDeferimento ? deferimentoStatus : undefined,
-    statusLabels,
-    categoria: solicitacao.categoria,
-    tipoOperacao: solicitacao.tipo_operacao,
-    pendenciasSelecionadas: solicitacao.pendencias_selecionadas,
-    observacoes: observacoes.map(o => o.observacao),
-    etapasConfig,
-    custoposicionamento: solicitacao.custo_posicionamento ?? null,
-  });
-
-  y = drawTimelineStages(doc, stages, y);
-
-  if (showDeferimento) {
-    const defStages = getDeferimentoStages(deferimentoStatus ?? null, etapasConfig);
-    if (defStages.length > 0) {
-      y = ensureSpace(doc, y, 20);
-      const defColor: RGB = deferimentoStatus === "recusado" ? COLOR_RED : deferimentoStatus === "recebido" ? JBS_GREEN : deferimentoStatus === "aguardando" ? COLOR_BLUE_LIGHT : COLOR_AMBER;
-      doc.setTextColor(...defColor);
-      doc.setFontSize(7.5);
-      doc.setFont("helvetica", "bold");
-      doc.text("DEFERIMENTO", MARGIN + 10, y + 4);
-      y += 8;
-      doc.setDrawColor(...defColor);
-      doc.setLineWidth(1.5);
-      doc.line(MARGIN + 6, y - 12, MARGIN + 6, y + 12);
-      y = drawTimelineStages(doc, defStages, y, 10);
-    }
-  }
-
-  y = drawSectionBorder(doc, y);
-  y += 6;
-
   // ─── Checklist ───
   y = drawSectionTitle(doc, "Checklist do Processo", y);
 
@@ -573,34 +530,6 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     y = drawSectionTitle(doc, lacreArmadorConfig?.titulo_externo || "Regularizacao de Lacre Armador", y);
 
     const lacreStatus = lacreArmadorDados.lacre_status || "aguardando_preenchimento";
-    const lacreStages = getLacreStagesForPdf(lacreStatus);
-    y = drawTimelineStages(doc, lacreStages, y);
-
-    const lacreMessages: Record<string, { label: string; color: RGB }> = {
-      aguardando_confirmacao: { label: "Aguardando confirmacao do posicionamento pela equipe.", color: COLOR_BLUE_LIGHT },
-      posicionamento_confirmado: { label: "O posicionamento para inclusao do lacre foi confirmado.", color: JBS_GREEN },
-      aguardando_lacre: { label: "Aguardando a inclusao do lacre armador no conteiner.", color: COLOR_AMBER },
-      servico_concluido: { label: "Lacre armador incluido com sucesso.", color: JBS_GREEN },
-    };
-
-    const msg = lacreMessages[lacreStatus];
-    if (msg) {
-      y = ensureSpace(doc, y, 12);
-      doc.setTextColor(...msg.color);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.text(msg.label, MARGIN + 4, y + 4);
-      y += 10;
-    }
-
-    if (lacreStatus === "recusado" && lacreArmadorDados.motivo_recusa) {
-      y = ensureSpace(doc, y, 12);
-      doc.setTextColor(...COLOR_RED);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.text("Solicitacao recusada - Motivo: " + lacreArmadorDados.motivo_recusa, MARGIN + 4, y + 4);
-      y += 10;
-    }
 
     if (lacreStatus !== "aguardando_preenchimento") {
       const lacreFields: [string, string][] = [
@@ -610,6 +539,20 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
         const periodo = lacreArmadorDados.periodo_lacre === "manha" ? "Manha" : "Tarde";
         lacreFields.push(["Data / Periodo", `${new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} - ${periodo}`]);
       }
+
+      // Status as plain text field (same style as other data fields)
+      const lacreStatusMessages: Record<string, string> = {
+        aguardando_confirmacao: "Aguardando confirmacao do posicionamento pela equipe.",
+        posicionamento_confirmado: "O posicionamento para inclusao do lacre foi confirmado.",
+        aguardando_lacre: "Aguardando a inclusao do lacre armador no conteiner.",
+        servico_concluido: "Lacre armador incluido com sucesso.",
+        recusado: lacreArmadorDados.motivo_recusa
+          ? `Solicitacao recusada - Motivo: ${lacreArmadorDados.motivo_recusa}`
+          : "Solicitacao recusada.",
+      };
+      const statusText = lacreStatusMessages[lacreStatus] || lacreStatus;
+      lacreFields.push(["Situacao", statusText]);
+
       if (lacreFields.length > 0) {
         y = drawFieldsGrid(doc, lacreFields, y, 2);
       }

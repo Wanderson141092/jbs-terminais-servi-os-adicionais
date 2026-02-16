@@ -101,18 +101,44 @@ Deno.serve(async (req) => {
         .eq("id", configData.id);
     }
 
-    // 5. Generate unique validation key (6 chars alphanumeric = 2.17B combinations)
-    const generateChaveConsulta = (): string => {
-      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-      let key = "";
-      const array = new Uint8Array(6);
-      crypto.getRandomValues(array);
-      for (let i = 0; i < 6; i++) {
-        key += chars[array[i] % chars.length];
+    // 4.5 Check cutoff time (hora_corte) - auto-reject if past cutoff
+    let autoRecusado = false;
+    const tipoOp = solicitacaoData.tipo_operacao || null;
+    if (tipoOp) {
+      // Find the service
+      const { data: servicoData } = await supabase
+        .from("servicos")
+        .select("id")
+        .eq("nome", tipoOp)
+        .eq("ativo", true)
+        .maybeSingle();
+
+      if (servicoData) {
+        // Find service rules
+        const { data: regraData } = await supabase
+          .from("regras_servico")
+          .select("hora_corte, dias_semana, aplica_dia_anterior")
+          .eq("servico_id", servicoData.id)
+          .eq("ativo", true)
+          .maybeSingle();
+
+        if (regraData?.hora_corte) {
+          // Get current time in Brazil timezone (UTC-3)
+          const now = new Date();
+          const brTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+          const currentHour = brTime.getHours();
+          const currentMinute = brTime.getMinutes();
+          
+          const [cutHour, cutMinute] = regraData.hora_corte.split(":").map(Number);
+          const currentMinutes = currentHour * 60 + currentMinute;
+          const cutoffMinutes = cutHour * 60 + cutMinute;
+
+          if (currentMinutes >= cutoffMinutes) {
+            autoRecusado = true;
+          }
+        }
       }
-      return key;
-    };
-    const chaveConsulta = generateChaveConsulta();
+    }
 
     // 6. Insert solicitacao
     const { error: solError } = await supabase.from("solicitacoes").insert({
@@ -124,11 +150,14 @@ Deno.serve(async (req) => {
       numero_conteiner: solicitacaoData.numero_conteiner || null,
       cnpj: solicitacaoData.cnpj || null,
       lpco: solicitacaoData.lpco || null,
-      observacoes: solicitacaoData.observacoes || null,
+      observacoes: autoRecusado
+        ? `${solicitacaoData.observacoes || ""}\n[RECUSADO AUTOMATICAMENTE - Pedido realizado após o horário de corte]`.trim()
+        : (solicitacaoData.observacoes || null),
       data_posicionamento: solicitacaoData.data_posicionamento || null,
       data_agendamento: solicitacaoData.data_agendamento || null,
       tipo_carga: solicitacaoData.tipo_carga || null,
       categoria: solicitacaoData.categoria || null,
+      status: autoRecusado ? "recusado" : "aguardando_confirmacao",
     });
 
     if (solError) throw solError;
@@ -163,14 +192,14 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           solicitacao_id: solData.id,
-          novo_status: "aguardando_confirmacao",
+          novo_status: autoRecusado ? "recusado" : "aguardando_confirmacao",
           usuario_id: "00000000-0000-0000-0000-000000000000", // system user
         }),
       }).catch((err) => console.error("Error triggering notification:", err));
     }
 
     return new Response(
-      JSON.stringify({ protocolo, chave_consulta: chaveConsulta }),
+      JSON.stringify({ protocolo, chave_consulta: chaveConsulta, auto_recusado: autoRecusado }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {

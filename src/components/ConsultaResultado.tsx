@@ -453,6 +453,11 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               observacoes={observacoes?.map(o => o.observacao)}
               etapasConfig={etapasConfig}
               custoposicionamento={(solicitacao as any).custo_posicionamento ?? null}
+              motivoRecusa={
+                solicitacao.armazem_aprovado === false
+                  ? (solicitacao as any).armazem_justificativa
+                  : (solicitacao as any).comex_justificativa
+              }
             />
           </div>
 

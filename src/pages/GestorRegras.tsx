@@ -29,6 +29,8 @@ interface RegraServico {
   limite_sex: number | null;
   limite_sab: number | null;
   aplica_dia_anterior: boolean;
+  recusar_apos_corte: boolean;
+  agendar_proximo_dia: boolean;
   ativo: boolean;
 }
 
@@ -68,6 +70,8 @@ const GestorRegras = () => {
     limite_sex: "",
     limite_sab: "",
     aplica_dia_anterior: false,
+    recusar_apos_corte: false,
+    agendar_proximo_dia: false,
   });
 
   const fetchData = useCallback(async () => {
@@ -150,6 +154,8 @@ const GestorRegras = () => {
         limite_sex: regra.limite_sex?.toString() || "",
         limite_sab: regra.limite_sab?.toString() || "",
         aplica_dia_anterior: regra.aplica_dia_anterior,
+        recusar_apos_corte: regra.recusar_apos_corte,
+        agendar_proximo_dia: regra.agendar_proximo_dia,
       });
     } else {
       setEditingRegra(null);
@@ -161,6 +167,8 @@ const GestorRegras = () => {
         dias_semana: ["seg", "ter", "qua", "qui", "sex"],
         limite_seg: "", limite_ter: "", limite_qua: "", limite_qui: "", limite_sex: "", limite_sab: "",
         aplica_dia_anterior: false,
+        recusar_apos_corte: false,
+        agendar_proximo_dia: false,
       });
     }
     setShowDialog(true);
@@ -189,6 +197,8 @@ const GestorRegras = () => {
       limite_sex: formData.tipo_limite === "por_dia" && formData.limite_sex ? parseInt(formData.limite_sex) : null,
       limite_sab: formData.tipo_limite === "por_dia" && formData.limite_sab ? parseInt(formData.limite_sab) : null,
       aplica_dia_anterior: formData.aplica_dia_anterior,
+      recusar_apos_corte: formData.recusar_apos_corte,
+      agendar_proximo_dia: formData.agendar_proximo_dia,
       updated_at: new Date().toISOString(),
     };
 
@@ -433,6 +443,24 @@ const GestorRegras = () => {
             <div className="flex items-center justify-between">
               <Label>Aplica dia anterior?</Label>
               <Switch checked={formData.aplica_dia_anterior} onCheckedChange={c => setFormData({ ...formData, aplica_dia_anterior: c })} />
+            </div>
+
+            <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Comportamento após o corte</p>
+              <div className="flex items-center justify-between">
+                <div className="flex-1 pr-2">
+                  <Label className="text-sm">Recusar automaticamente</Label>
+                  <p className="text-[11px] text-muted-foreground">Pedido após o corte é recusado. Reativação somente por usuário interno com justificativa.</p>
+                </div>
+                <Switch checked={formData.recusar_apos_corte} onCheckedChange={c => setFormData({ ...formData, recusar_apos_corte: c, agendar_proximo_dia: c ? false : formData.agendar_proximo_dia })} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex-1 pr-2">
+                  <Label className="text-sm">Agendar para próximo dia ativo</Label>
+                  <p className="text-[11px] text-muted-foreground">Pedido após o corte será atendido no próximo dia marcado como ativo na regra.</p>
+                </div>
+                <Switch checked={formData.agendar_proximo_dia} onCheckedChange={c => setFormData({ ...formData, agendar_proximo_dia: c, recusar_apos_corte: c ? false : formData.recusar_apos_corte })} />
+              </div>
             </div>
           </div>
           <DialogFooter>

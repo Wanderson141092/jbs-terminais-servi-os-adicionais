@@ -50,6 +50,7 @@ interface DeferimentoDocument {
 }
 
 interface ServicoConfig {
+  nome?: string;
   tipo_agendamento: string | null;
   aprovacao_administrativo?: boolean;
   aprovacao_operacional?: boolean;
@@ -479,7 +480,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             deferimentoStatus={showDeferimento ? generalStatus : null}
             compact
             hideInternal
-            serviceName={solicitacao.tipo_operacao || undefined}
+            serviceName={solicitacao.tipo_operacao || servicoConfig?.nome || undefined}
             etapasConfig={etapasConfig}
           />
 

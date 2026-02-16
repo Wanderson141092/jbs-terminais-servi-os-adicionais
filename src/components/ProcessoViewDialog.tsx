@@ -34,6 +34,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [aprovacaoAdministrativo, setAprovacaoAdministrativo] = useState(false);
   const [aprovacaoOperacional, setAprovacaoOperacional] = useState(false);
   const [deferimentoStatus, setDeferimentoStatus] = useState<"recebido" | "recusado" | "aguardando" | null>(null);
+  const [servicoNome, setServicoNome] = useState<string | undefined>(undefined);
 
   // Fetch attachments when dialog opens
   useEffect(() => {
@@ -68,9 +69,10 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     const tipoOperacao = solicitacao?.tipo_operacao || "Posicionamento";
     const { data } = await supabase
       .from("servicos")
-      .select("aprovacao_ativada, aprovacao_administrativo, aprovacao_operacional")
+      .select("nome, aprovacao_ativada, aprovacao_administrativo, aprovacao_operacional")
       .eq("nome", tipoOperacao)
       .maybeSingle();
+    setServicoNome(data?.nome || undefined);
     setAprovacaoAtivada(data?.aprovacao_ativada ?? false);
     setAprovacaoAdministrativo((data as any)?.aprovacao_administrativo ?? false);
     setAprovacaoOperacional((data as any)?.aprovacao_operacional ?? false);
@@ -192,6 +194,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
               aprovacaoAdministrativo={aprovacaoAdministrativo}
               aprovacaoOperacional={aprovacaoOperacional}
               deferimentoStatus={deferimentoStatus}
+              serviceName={solicitacao.tipo_operacao || servicoNome}
             />
 
             <Separator />

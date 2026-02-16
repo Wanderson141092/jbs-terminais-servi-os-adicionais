@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -69,6 +69,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [custoLacreArmador, setCustoLacreArmador] = useState<boolean | null>(null);
   const [showJustificativaNaoVistoriado, setShowJustificativaNaoVistoriado] = useState(false);
   const [justificativaNaoVistoriado, setJustificativaNaoVistoriado] = useState("");
+  const [showCorrigirStatus, setShowCorrigirStatus] = useState(false);
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
   const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
@@ -928,8 +929,64 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <>
                 <Separator />
                 <div className="space-y-3 bg-muted/20 p-4 rounded-lg border">
-                  <p className="text-sm font-semibold">Próxima Etapa:</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">Próxima Etapa:</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 gap-1"
+                      onClick={() => setShowCorrigirStatus(!showCorrigirStatus)}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      {showCorrigirStatus ? "Voltar" : "Corrigir Status"}
+                    </Button>
+                  </div>
                   {(() => {
+                    if (showCorrigirStatus) {
+                      // Show all statuses for correction
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">Selecione o status correto:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {statusOptions.filter((opt: any) => opt.value !== solicitacao.status).map((opt: any) => {
+                              const iconColorMap: Record<string, string> = {
+                                conforme: "text-emerald-600",
+                                nao_conforme: "text-red-600",
+                                em_pendencia: "text-amber-600",
+                                neutro: "text-blue-600",
+                              };
+                              const iconMap: Record<string, React.ReactNode> = {
+                                conforme: <CheckCircle2 className={`h-3.5 w-3.5 ${iconColorMap['conforme']}`} />,
+                                nao_conforme: <XCircle className={`h-3.5 w-3.5 ${iconColorMap['nao_conforme']}`} />,
+                                em_pendencia: <AlertTriangle className={`h-3.5 w-3.5 ${iconColorMap['em_pendencia']}`} />,
+                                neutro: <Clock className={`h-3.5 w-3.5 ${iconColorMap['neutro']}`} />,
+                              };
+                              const tipo = opt.tipo_resultado || 'neutro';
+                              const isSelected = selectedStatus === opt.value;
+                              return (
+                                <Button
+                                  key={opt.value}
+                                  variant={isSelected ? "secondary" : "outline"}
+                                  size="sm"
+                                  onClick={() => {
+                                    if (opt.value === 'nao_vistoriado') {
+                                      setShowJustificativaNaoVistoriado(true);
+                                    } else {
+                                      setSelectedStatus(opt.value);
+                                    }
+                                  }}
+                                  className={`flex items-center gap-1.5 [&_svg]:!text-current ${isSelected ? "ring-2 ring-ring font-semibold" : ""}`}
+                                >
+                                  <span className={iconColorMap[tipo]}>{iconMap[tipo]}</span>
+                                  <span>{opt.label}</span>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const currentOrdem = statusOrdemMap[solicitacao.status];
                     if (currentOrdem === undefined) {
                       return <p className="text-xs text-muted-foreground">Status atual sem ordem definida.</p>;
@@ -974,7 +1031,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                                     }
                                   }}
                                   className={`flex items-center gap-1.5 [&_svg]:!text-current ${isSelected ? "ring-2 ring-ring font-semibold" : ""}`}
-                                  style={{ color: undefined }}
                                 >
                                   <span className={iconColorMap[tipo]}>{iconMap[tipo]}</span>
                                   <span>{opt.label}</span>

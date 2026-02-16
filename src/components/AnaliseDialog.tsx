@@ -1136,7 +1136,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       "cancelado",
                       "servico_concluido",
                       "vistoria_finalizada",
-                      "vistoriado_com_pendencia",
                     ];
                     if (terminalStatuses.includes(solicitacao.status)) return null;
                     return (

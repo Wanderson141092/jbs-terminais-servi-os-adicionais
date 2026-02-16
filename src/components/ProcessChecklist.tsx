@@ -85,12 +85,15 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
     return items;
   }
 
+  // Final service conclusion label
+  const finalName = serviceName || s.tipo_operacao || "Serviço";
+  const finalLabel = `Serviço "${finalName}" concluído.`;
+
   if (isPosic) {
     // Posicionamento: vistoria-based items
-    const vistoriaStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
-    
     if (s.status === "vistoria_finalizada") {
       items.push({ label: "Vistoriado sem pendência", status: "done" });
+      items.push({ label: finalLabel, status: "done" });
     } else if (s.status === "vistoriado_com_pendencia") {
       const pendDetail = s.pendencias_selecionadas?.length
         ? s.pendencias_selecionadas.join(", ")
@@ -113,8 +116,7 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
         status: "error",
         detail: s.observacoes || undefined,
       });
-      const name = serviceName || s.tipo_operacao || "Serviço";
-      items.push({ label: `Serviço "${name}" concluído.`, status: "done" });
+      items.push({ label: finalLabel, status: "done" });
     } else if (s.status === "confirmado_aguardando_vistoria") {
       items.push({ label: "Aguardando conclusão do serviço", status: "pending" });
     }
@@ -128,16 +130,11 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
         status: "error",
         detail: s.observacoes || undefined,
       });
-      const name = serviceName || s.tipo_operacao || "Serviço";
-      items.push({ label: `Serviço "${name}" concluído.`, status: "done" });
+      items.push({ label: finalLabel, status: "done" });
     } else {
       const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia"];
       if (finishedStatuses.includes(s.status)) {
-        const name = serviceName || s.tipo_operacao || "Serviço";
-        items.push({
-          label: `Serviço "${name}" executado e finalizado.`,
-          status: "done",
-        });
+        items.push({ label: finalLabel, status: "done" });
       }
     }
   }

@@ -33,6 +33,7 @@ interface ServicoConfig {
   aprovacao_ativada?: boolean;
   status_confirmacao_lancamento?: string[];
   deferimento_status_ativacao?: string[];
+  deferimento_pendencias_ativacao?: string[];
   lacre_armador_status_ativacao?: string[];
   lacre_armador_pendencias_ativacao?: string[];
 }
@@ -1010,7 +1011,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   {(() => {
                     const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
                     const defStatusAtivacao = servicoConfig?.deferimento_status_ativacao || [];
-                    const showDeferimento = isPosicionamento && defStatusAtivacao.length > 0 && defStatusAtivacao.includes(solicitacao.status);
+                    const defPendenciasAtivacao = servicoConfig?.deferimento_pendencias_ativacao || [];
+                    const defStatusMatch = defStatusAtivacao.length > 0 && defStatusAtivacao.includes(solicitacao.status);
+                    const defPendenciasMatch = defPendenciasAtivacao.length === 0 || defPendenciasAtivacao.some((p: string) => (solicitacao.pendencias_selecionadas || []).includes(p));
+                    const showDeferimento = isPosicionamento && defStatusMatch && defPendenciasMatch;
                     if (!showDeferimento && !solicitarDeferimento) return null;
                     return (
                       <div className={`flex items-center justify-between border rounded-md p-3 ${showDeferimento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>

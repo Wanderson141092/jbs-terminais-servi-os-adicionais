@@ -89,8 +89,19 @@ Deno.serve(async (req) => {
 
     const servicoId = servicoData?.id || null;
 
-    // Fetch deferimento documents, observations, status labels, field config, dynamic fields, lacre data in parallel
-    const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes, etapasConfigRes, lacreConfigRes, lacreArmadorDadosRes] = await Promise.all([
+    // Fetch deferimento documents, observations, status labels, field config, dynamic fields, lacre data and external titles in parallel
+    const [
+      deferimentoRes,
+      observacoesRes,
+      statusLabelsRes,
+      camposFixosRes,
+      camposDinamicosRes,
+      camposValoresRes,
+      etapasConfigRes,
+      lacreConfigRes,
+      lacreArmadorDadosRes,
+      deferimentoTitulosRes,
+    ] = await Promise.all([
       supabaseAdmin
         .from("deferimento_documents")
         .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
@@ -132,12 +143,24 @@ Deno.serve(async (req) => {
       supabaseAdmin
         .from("system_config")
         .select("config_key, config_value, is_active")
-        .in("config_key", ["lacre_armador_mensagem_custo", "lacre_armador_tipo_aceite", "lacre_armador_titulo_externo", "lacre_armador_anexo_ativo", "lacre_armador_periodo_manha", "lacre_armador_periodo_tarde"]),
+        .in("config_key", [
+          "lacre_armador_mensagem_custo",
+          "lacre_armador_tipo_aceite",
+          "lacre_armador_titulo_externo",
+          "lacre_armador_anexo_ativo",
+          "lacre_armador_periodo_manha",
+          "lacre_armador_periodo_tarde",
+        ]),
       supabaseAdmin
         .from("lacre_armador_dados")
         .select("*")
         .eq("solicitacao_id", solicitacao.id)
         .maybeSingle(),
+      supabaseAdmin
+        .from("deferimento_titulos")
+        .select("titulo, servico_ids, created_at")
+        .eq("ativo", true)
+        .order("created_at", { ascending: false }),
     ]);
 
     const deferimentoDocs = deferimentoRes.data;
@@ -248,23 +271,31 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Resolve deferimento title for this service (fallback: first "global" title)
+    const deferimentoTitulos = (deferimentoTitulosRes.data || []) as any[];
+    const tituloForService = deferimentoTitulos.find((t) => !servicoId || !t.servico_ids?.length || t.servico_ids.includes(servicoId));
+    const deferimentoTitulo = tituloForService?.titulo || null;
+
     return new Response(
       JSON.stringify({
         solicitacao: sanitizedSolicitacao,
+        deferimento_titulo: deferimentoTitulo,
         deferimento_docs: docsWithSignedUrls,
         observacoes,
         status_labels: statusLabels,
         campos_dinamicos_externos: dynamicFieldsForExternal,
         campos_visiveis: visibleFixedFields,
         etapas_config: etapasConfig,
-        servico_config: servicoData ? {
-          nome: servicoData.nome,
-          tipo_agendamento: servicoData.tipo_agendamento,
-          deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],
-          lacre_armador_status_ativacao: (servicoData as any).lacre_armador_status_ativacao || [],
-          aprovacao_administrativo: servicoData.aprovacao_administrativo ?? false,
-          aprovacao_operacional: servicoData.aprovacao_operacional ?? false,
-        } : null,
+        servico_config: servicoData
+          ? {
+              nome: servicoData.nome,
+              tipo_agendamento: servicoData.tipo_agendamento,
+              deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],
+              lacre_armador_status_ativacao: (servicoData as any).lacre_armador_status_ativacao || [],
+              aprovacao_administrativo: servicoData.aprovacao_administrativo ?? false,
+              aprovacao_operacional: servicoData.aprovacao_operacional ?? false,
+            }
+          : null,
         lacre_armador_config: {
           mensagem_custo: lacreConfigMap["lacre_armador_mensagem_custo"] || "",
           tipo_aceite: lacreConfigMap["lacre_armador_tipo_aceite"] || "informativo",

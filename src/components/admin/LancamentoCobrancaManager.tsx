@@ -21,6 +21,7 @@ interface CobrancaConfig {
   tipo: string;
   servico_ids: string[];
   campo_referencia: string | null;
+  status_ativacao: string[];
   ativo: boolean;
 }
 
@@ -36,12 +37,14 @@ const LancamentoCobrancaManager = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<CobrancaConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusProcessoOpcoes, setStatusProcessoOpcoes] = useState<{value: string; label: string}[]>([]);
   const [formData, setFormData] = useState({
     nome: "",
     rotulo_analise: "",
     tipo: "servico",
     servico_ids: [] as string[],
     campo_referencia: "",
+    status_ativacao: [] as string[],
   });
 
   useEffect(() => {
@@ -49,14 +52,19 @@ const LancamentoCobrancaManager = () => {
   }, []);
 
   const fetchAll = async () => {
-    const [configRes, servicosRes, pendenciaRes] = await Promise.all([
+    const [configRes, servicosRes, pendenciaRes, statusRes] = await Promise.all([
       supabase.from("lancamento_cobranca_config").select("*").order("created_at"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("parametros_campos").select("valor").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
+      supabase.from("parametros_campos").select("valor, sigla").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
     ]);
     setConfigs((configRes.data || []) as CobrancaConfig[]);
     setServicos(servicosRes.data || []);
     setPendenciaOpcoes((pendenciaRes.data || []).map((p: any) => p.valor));
+    setStatusProcessoOpcoes((statusRes.data || []).map((s: any) => ({
+      value: s.sigla || s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+      label: s.valor,
+    })));
   };
 
   const openDialog = (config?: CobrancaConfig) => {
@@ -68,10 +76,11 @@ const LancamentoCobrancaManager = () => {
         tipo: config.tipo,
         servico_ids: config.servico_ids,
         campo_referencia: config.campo_referencia || "",
+        status_ativacao: config.status_ativacao || [],
       });
     } else {
       setEditing(null);
-      setFormData({ nome: "", rotulo_analise: "", tipo: "servico", servico_ids: [], campo_referencia: "" });
+      setFormData({ nome: "", rotulo_analise: "", tipo: "servico", servico_ids: [], campo_referencia: "", status_ativacao: [] });
     }
     setShowDialog(true);
   };
@@ -96,6 +105,7 @@ const LancamentoCobrancaManager = () => {
       tipo: formData.tipo,
       servico_ids: formData.servico_ids,
       campo_referencia: formData.tipo === "pendencia" ? formData.campo_referencia || null : null,
+      status_ativacao: formData.status_ativacao,
       updated_at: new Date().toISOString(),
     };
 
@@ -152,6 +162,7 @@ const LancamentoCobrancaManager = () => {
               <TableHead>Tipo</TableHead>
               <TableHead>Serviços Vinculados</TableHead>
               <TableHead>Campo Referência</TableHead>
+              <TableHead>Status Ativação</TableHead>
               <TableHead>Ativo</TableHead>
               <TableHead>Ações</TableHead>
             </TableRow>
@@ -178,6 +189,11 @@ const LancamentoCobrancaManager = () => {
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {config.campo_referencia || "—"}
+                </TableCell>
+                <TableCell className="text-xs max-w-[200px]">
+                  {config.status_ativacao && config.status_ativacao.length > 0
+                    ? config.status_ativacao.map(s => statusProcessoOpcoes.find(o => o.value === s)?.label || s).join(", ")
+                    : <span className="text-muted-foreground">Todos</span>}
                 </TableCell>
                 <TableCell>
                   <Switch checked={config.ativo} onCheckedChange={() => toggleAtivo(config)} />
@@ -208,7 +224,7 @@ const LancamentoCobrancaManager = () => {
             ))}
             {configs.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma configuração cadastrada.</TableCell>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma configuração cadastrada.</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -257,6 +273,28 @@ const LancamentoCobrancaManager = () => {
                 <p className="text-xs text-muted-foreground mt-1">Pendência que ativa essa cobrança quando selecionada no processo.</p>
               </div>
             )}
+
+            <div>
+              <Label>Status de Ativação</Label>
+              <p className="text-xs text-muted-foreground mb-2">Selecione em quais status do processo esta cobrança ficará visível. Deixe vazio para todos.</p>
+              <div className="flex flex-wrap gap-2 border rounded-md p-3 max-h-40 overflow-auto">
+                {statusProcessoOpcoes.map(s => (
+                  <div key={s.value} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`st-${s.value}`}
+                      checked={formData.status_ativacao.includes(s.value)}
+                      onCheckedChange={() => setFormData(prev => ({
+                        ...prev,
+                        status_ativacao: prev.status_ativacao.includes(s.value)
+                          ? prev.status_ativacao.filter(v => v !== s.value)
+                          : [...prev.status_ativacao, s.value],
+                      }))}
+                    />
+                    <Label htmlFor={`st-${s.value}`} className="text-sm cursor-pointer">{s.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div>
               <Label>Serviços Vinculados</Label>

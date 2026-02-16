@@ -837,6 +837,7 @@ export type Database = {
           nome: string
           rotulo_analise: string
           servico_ids: string[]
+          status_ativacao: string[]
           tipo: string
           updated_at: string
         }
@@ -848,6 +849,7 @@ export type Database = {
           nome: string
           rotulo_analise: string
           servico_ids?: string[]
+          status_ativacao?: string[]
           tipo?: string
           updated_at?: string
         }
@@ -859,6 +861,7 @@ export type Database = {
           nome?: string
           rotulo_analise?: string
           servico_ids?: string[]
+          status_ativacao?: string[]
           tipo?: string
           updated_at?: string
         }

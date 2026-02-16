@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock,
+  LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock, Check,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
   Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock, Ship, BarChart3
 } from "lucide-react";
@@ -804,7 +804,7 @@ const InternoDashboard = () => {
                       <TableCell>
                         {needsLaunchConfirmation(s) ? (
                           s.lancamento_confirmado ? (
-                            <CheckCircle2 className="h-4 w-4 text-muted-foreground/50 mx-auto" />
+                            <Check className="h-4 w-4 text-muted-foreground/50 mx-auto" />
                           ) : (
                             <Button
                               variant="ghost"

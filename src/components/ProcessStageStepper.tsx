@@ -169,7 +169,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       } else if (isEmPendencia) {
         label = currentStatusLabel?.valor || "Em Pendência";
       } else {
-        label = "Confirmado";
+        label = isPosic ? "Posicionamento Confirmado" : "Confirmado";
       }
     }
     stages.push({

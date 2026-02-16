@@ -240,16 +240,14 @@ Deno.serve(async (req) => {
     }));
 
     // Build lacre config map - respect is_active flag
+    const booleanConfigKeys = ["lacre_armador_anexo_ativo", "lacre_armador_periodo_manha", "lacre_armador_periodo_tarde"];
     const lacreConfigMap: Record<string, string> = {};
     (lacreConfigRes.data || []).forEach((c: any) => {
-      if (c.is_active === false) {
-        // For anexo_ativo, inactive means disabled
-        if (c.config_key === "lacre_armador_anexo_ativo") {
-          lacreConfigMap[c.config_key] = "false";
-        }
-        // Skip other inactive configs
+      if (c.is_active === false && booleanConfigKeys.includes(c.config_key)) {
+        lacreConfigMap[c.config_key] = "false";
         return;
       }
+      if (c.is_active === false) return;
       lacreConfigMap[c.config_key] = c.config_value;
     });
 

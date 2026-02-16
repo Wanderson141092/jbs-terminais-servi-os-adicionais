@@ -22,6 +22,7 @@ import CamposFixosManager from "@/components/admin/CamposFixosManager";
 import ConsultaEtapasManager from "@/components/admin/ConsultaEtapasManager";
 import CancelamentoRecusaManager from "@/components/admin/CancelamentoRecusaManager";
 import PaginaExternaConfigManager from "@/components/admin/PaginaExternaConfigManager";
+import ToggleActivationManager from "@/components/admin/ToggleActivationManager";
 
 interface RegraServico {
   id: string;
@@ -726,6 +727,8 @@ const AdminParametros = () => {
                 </Table>
               </CardContent>
             </Card>
+
+            <ToggleActivationManager />
           </div>
         </TabsContent>
 

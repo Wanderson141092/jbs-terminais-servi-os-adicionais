@@ -757,18 +757,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </Badge>
               )}
 
-              {/* Mini status: Lançamento Lacre Armador */}
-              {solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo !== null && solicitacao.lacre_armador_aceite_custo !== undefined && (
+              {/* Mini status: Custo Posicionamento Lacre Armador — só exibe se custo = Sim */}
+              {solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo === true && (
                 <Badge
                   variant="outline"
-                  className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
-                    solicitacao.lacre_armador_aceite_custo
-                      ? "border-green-500 text-green-700 bg-green-50"
-                      : "border-amber-500 text-amber-700 bg-amber-50"
-                  }`}
+                  className="text-[10px] px-2 py-0.5 gap-1 font-semibold border-green-500 text-green-700 bg-green-50"
                 >
                   <Key className="h-3 w-3" />
-                  Lanç. Lacre Armador: {solicitacao.lacre_armador_aceite_custo ? "Confirmado" : "Pendente"}
+                  Custo Posic. Lacre: Confirmado
                 </Badge>
               )}
             </div>
@@ -944,9 +940,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                             <div className="flex items-center gap-2">
                               <Lock className="h-4 w-4 text-amber-600 shrink-0" />
                               <div className="flex flex-col">
-                                <Label className="cursor-pointer text-sm" htmlFor="solicitar-lacre">Regularização de Lacre</Label>
+                              <Label className="cursor-pointer text-sm" htmlFor="solicitar-lacre">Posicionamento — Pendência de Lacre</Label>
                                 <span className="text-[10px] text-muted-foreground leading-tight">
-                                  {isPosicionamento ? "Lacre na pág. externa" : "Apenas Posicionamento"}
+                                  {isPosicionamento ? "Novo posicionamento para inserir lacre armador" : "Apenas Posicionamento"}
                                 </span>
                               </div>
                             </div>
@@ -965,8 +961,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           {showLacreConfirmLancamento && (
                             <div className="flex-1 border rounded-md p-2.5 bg-red-50 border-red-200 flex flex-col justify-center">
                               <div className="flex items-center gap-1.5 text-red-600 mb-1.5">
-                                <DollarSign className="h-3.5 w-3.5" />
-                                <span className="text-xs font-semibold">Lançamento Lacre Pendente</span>
+                              <DollarSign className="h-3.5 w-3.5" />
+                                <span className="text-xs font-semibold">Lanç. Posic. Lacre Pendente</span>
                               </div>
                               <Button 
                                 size="sm"
@@ -988,7 +984,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                               Há custo de serviço (lacre armador)?
                             </Label>
                             <p className="text-xs text-amber-700">
-                              Confirme se houve custo operacional para o lacre armador. Se sim, o lançamento financeiro será exigido.
+                              Confirme se houve custo operacional para o novo posicionamento de inserção do lacre armador. Se sim, o lançamento financeiro será exigido.
                             </p>
                             <div className="flex gap-4 mt-2">
                               <label className="flex items-center gap-2 cursor-pointer">

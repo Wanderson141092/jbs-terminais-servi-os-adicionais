@@ -129,15 +129,14 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // For terminal states at early stage (order<=1), terminal replaces aguardando_confirmacao
   // For em_pendencia states, completed stages revert to "pending" (gray with ✓)
   // For neutral states (e.g. aguardando_confirmacao), prior stages use "current" (blue) to match
-  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : isNeutro ? "current" as const : "completed" as const;
+  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
 
   // Determine icon override for special states (only for terminal/error)
   const stateIcon = isTerminal ? <X className="h-4 w-4" /> : null;
 
   // Stage 1: Solicitação Recebida (always completed once exists)
   // For em_pendencia, prior stages get gray styling ("pending") but keep ✓ icon
-  // For neutral status, prior stages use "current" styling with CircleDot icon
-  const priorIcon = (isEmPendencia || isNeutro) ? <Check className="h-4 w-4" /> : null;
+  const priorIcon = isEmPendencia ? <Check className="h-4 w-4" /> : null;
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),
@@ -173,12 +172,10 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     } else if (currentOrder > 1) {
       state = completedState;
       // Once past this stage, show resolved label
-      if (isTerminal) {
-        label = isPosic ? "Posicionamento Confirmado" : "Confirmado";
-      } else if (isEmPendencia) {
+      if (isEmPendencia) {
         label = currentStatusLabel?.valor || "Em Pendência";
       } else {
-        label = isPosic ? "Posicionamento Confirmado" : "Confirmado";
+        label = "Posicionamento Confirmado";
       }
     }
     stages.push({
@@ -327,7 +324,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       }
     }
   } else {
-    // Non-Posicionamento services: → Serviço Concluído
+    // Non-Posicionamento services: → Aguardando Vistoria → Serviço Concluído
     if (isTerminal) {
       // Terminal replaces Serviço Concluído
       stages.push({
@@ -340,14 +337,22 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       return stages;
     }
 
-    {
-      let state: Stage["state"] = "pending";
-      const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado", "confirmado_aguardando_vistoria"];
+    // Intermediate stage: Aguardando Vistoria (current when confirmado_aguardando_vistoria)
+    if (status === "confirmado_aguardando_vistoria") {
+      const isServicoMotivo = isMotivosServico(categoria);
+      stages.push({
+        key: isServicoMotivo ? "aguardando_servico" : "aguardando_vistoria",
+        label: isServicoMotivo
+          ? getTitle("aguardando_servico", "Aguardando Serviço")
+          : getTitle("aguardando_vistoria", "Aguardando Vistoria"),
+        icon: <Clock className="h-4 w-4" />,
+        state: "current",
+      });
+    } else {
+      // Final stage: Serviço Concluído (only when past confirmado_aguardando_vistoria)
+      const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
       if (finishedStatuses.includes(status)) {
-        state = isEmPendencia ? "warning" : completedState;
-      }
-      if (currentOrder >= 2 || finishedStatuses.includes(status)) {
-        // Show resolved label based on tipo_resultado
+        let state: Stage["state"] = isEmPendencia ? "warning" : completedState;
         let resolvedLabel = getTitle("servico_concluido", "Serviço Concluído");
         if (isEmPendencia) {
           resolvedLabel = currentStatusLabel?.valor || "Em Pendência";

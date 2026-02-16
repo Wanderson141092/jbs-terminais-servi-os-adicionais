@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Download, Trash2, FileSpreadsheet, BarChart3, Plus, File } from "lucide-react";
+import { ArrowLeft, Upload, Download, Trash2, BarChart3, File, FileSpreadsheet, Settings2, Database } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import jbsLogo from "@/assets/jbs-terminais-logo.png";
+import ReportColumnMappingDialog from "@/components/admin/ReportColumnMappingDialog";
+import ReportDownloadDialog from "@/components/admin/ReportDownloadDialog";
 
 interface ModeloRelatorio {
   id: string;
@@ -58,6 +61,10 @@ const Relatorios = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({ nome: "", descricao: "" });
+  const [mappingModeloId, setMappingModeloId] = useState<string | null>(null);
+  const [mappingModeloNome, setMappingModeloNome] = useState("");
+  const [downloadModelo, setDownloadModelo] = useState<ModeloRelatorio | null>(null);
+  const [modeloMappingCounts, setModeloMappingCounts] = useState<Record<string, number>>({});
 
   const { isAdmin } = useAdminCheck(user?.id || null);
 
@@ -78,7 +85,24 @@ const Relatorios = () => {
     if (error) {
       toast.error("Erro ao carregar modelos");
     } else {
-      setModelos((data || []) as ModeloRelatorio[]);
+      const models = (data || []) as ModeloRelatorio[];
+      setModelos(models);
+
+      // Fetch mapping counts
+      if (models.length > 0) {
+        const { data: mappings } = await supabase
+          .from("modelo_relatorio_colunas")
+          .select("modelo_id, campo_sistema")
+          .in("modelo_id", models.map(m => m.id));
+
+        const counts: Record<string, number> = {};
+        (mappings || []).forEach((m: any) => {
+          if (m.campo_sistema) {
+            counts[m.modelo_id] = (counts[m.modelo_id] || 0) + 1;
+          }
+        });
+        setModeloMappingCounts(counts);
+      }
     }
     setLoading(false);
   }, []);
@@ -108,7 +132,6 @@ const Relatorios = () => {
 
     setUploading(true);
     try {
-      const fileExt = uploadFile.name.split(".").pop();
       const filePath = `${Date.now()}_${uploadFile.name}`;
 
       const { error: storageError } = await supabase.storage
@@ -121,7 +144,7 @@ const Relatorios = () => {
         return;
       }
 
-      const { error: dbError } = await supabase.from("modelos_relatorio").insert({
+      const { data: inserted, error: dbError } = await supabase.from("modelos_relatorio").insert({
         nome: formData.nome.trim(),
         descricao: formData.descricao.trim() || null,
         file_name: uploadFile.name,
@@ -129,11 +152,10 @@ const Relatorios = () => {
         file_size: uploadFile.size,
         tipo: getFileType(uploadFile.name),
         criado_por: user?.id,
-      });
+      }).select().single();
 
       if (dbError) {
         toast.error("Erro ao salvar modelo");
-        // Cleanup uploaded file
         await supabase.storage.from("modelos-relatorio").remove([filePath]);
         setUploading(false);
         return;
@@ -144,13 +166,21 @@ const Relatorios = () => {
       setUploadFile(null);
       setFormData({ nome: "", descricao: "" });
       fetchModelos();
+
+      // Open column mapping dialog for spreadsheets
+      if (inserted && ["xlsx", "xls", "csv"].includes(uploadFile.name.split(".").pop()?.toLowerCase() || "")) {
+        setTimeout(() => {
+          setMappingModeloId(inserted.id);
+          setMappingModeloNome(inserted.nome);
+        }, 500);
+      }
     } catch {
       toast.error("Erro inesperado");
     }
     setUploading(false);
   };
 
-  const handleDownload = async (modelo: ModeloRelatorio) => {
+  const handleDownloadFile = async (modelo: ModeloRelatorio) => {
     const { data, error } = await supabase.storage
       .from("modelos-relatorio")
       .download(modelo.file_path);
@@ -193,7 +223,7 @@ const Relatorios = () => {
             </div>
             <div>
               <h1 className="text-xs sm:text-sm font-bold">Relatórios</h1>
-              <p className="text-[10px] sm:text-xs text-primary-foreground/70">Modelos de relatórios disponíveis</p>
+              <p className="text-[10px] sm:text-xs text-primary-foreground/70">Modelos e exportação de dados</p>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/interno/dashboard")} className="text-primary-foreground hover:bg-primary-foreground/10">
@@ -203,89 +233,158 @@ const Relatorios = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-bold">Modelos de Relatório</h2>
-            <Badge variant="secondary" className="text-xs">{modelos.length} modelo(s)</Badge>
-          </div>
-          {isAdmin && (
-            <Button onClick={() => { setShowUploadDialog(true); setUploadFile(null); setFormData({ nome: "", descricao: "" }); }}>
-              <Upload className="h-4 w-4 mr-2" /> Importar Modelo
-            </Button>
-          )}
-        </div>
+        <Tabs defaultValue="exportar" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="exportar" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Exportar Dados
+            </TabsTrigger>
+            <TabsTrigger value="modelos" className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Modelos Importados
+            </TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead className="hidden sm:table-cell">Descrição</TableHead>
-                  <TableHead>Arquivo</TableHead>
-                  <TableHead className="hidden sm:table-cell">Tamanho</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell>
-                  </TableRow>
-                ) : modelos.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      Nenhum modelo de relatório disponível.
-                      {isAdmin && " Clique em 'Importar Modelo' para adicionar."}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  modelos.map(modelo => (
-                    <TableRow key={modelo.id}>
-                      <TableCell className="text-lg">{FILE_TYPE_ICONS[modelo.tipo] || "📁"}</TableCell>
-                      <TableCell className="font-medium">{modelo.nome}</TableCell>
-                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground max-w-[200px] truncate">
-                        {modelo.descricao || "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{modelo.file_name}</TableCell>
-                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{formatFileSize(modelo.file_size)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleDownload(modelo)} title="Baixar">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          {isAdmin && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive" title="Remover">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Remover modelo?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    O modelo "{modelo.nome}" será removido da lista. O arquivo não será excluído permanentemente.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(modelo)}>Remover</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+          {/* EXPORTAR DADOS */}
+          <TabsContent value="exportar">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold">Exportar Dados</h2>
+              <p className="text-sm text-muted-foreground ml-2">Selecione um modelo para exportar os dados do sistema</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {modelos.filter(m => (modeloMappingCounts[m.id] || 0) > 0).map(modelo => (
+                <Card key={modelo.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setDownloadModelo(modelo)}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{FILE_TYPE_ICONS[modelo.tipo] || "📁"}</span>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{modelo.nome}</h3>
+                        <p className="text-xs text-muted-foreground truncate">{modelo.descricao || "Sem descrição"}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {modeloMappingCounts[modelo.id] || 0} colunas mapeadas
+                          </Badge>
                         </div>
-                      </TableCell>
+                      </div>
+                      <Download className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {modelos.filter(m => (modeloMappingCounts[m.id] || 0) > 0).length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-12">
+                  Nenhum modelo com colunas mapeadas. Importe um modelo e configure o mapeamento na aba "Modelos Importados".
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* MODELOS IMPORTADOS */}
+          <TabsContent value="modelos">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold">Modelos Importados</h2>
+                <Badge variant="secondary" className="text-xs">{modelos.length} modelo(s)</Badge>
+              </div>
+              {isAdmin && (
+                <Button onClick={() => { setShowUploadDialog(true); setUploadFile(null); setFormData({ nome: "", descricao: "" }); }}>
+                  <Upload className="h-4 w-4 mr-2" /> Importar Modelo
+                </Button>
+              )}
+            </div>
+
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead className="hidden sm:table-cell">Descrição</TableHead>
+                      <TableHead>Arquivo</TableHead>
+                      <TableHead>Mapeamento</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell>
+                      </TableRow>
+                    ) : modelos.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          Nenhum modelo de relatório disponível.
+                          {isAdmin && " Clique em 'Importar Modelo' para adicionar."}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      modelos.map(modelo => (
+                        <TableRow key={modelo.id}>
+                          <TableCell className="text-lg">{FILE_TYPE_ICONS[modelo.tipo] || "📁"}</TableCell>
+                          <TableCell className="font-medium">{modelo.nome}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground max-w-[200px] truncate">
+                            {modelo.descricao || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            <div>{modelo.file_name}</div>
+                            <div className="text-xs">{formatFileSize(modelo.file_size)}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={(modeloMappingCounts[modelo.id] || 0) > 0 ? "default" : "outline"}
+                              className="text-xs cursor-pointer"
+                              onClick={() => {
+                                setMappingModeloId(modelo.id);
+                                setMappingModeloNome(modelo.nome);
+                              }}
+                            >
+                              <Settings2 className="h-3 w-3 mr-1" />
+                              {(modeloMappingCounts[modelo.id] || 0) > 0
+                                ? `${modeloMappingCounts[modelo.id]} colunas`
+                                : "Configurar"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => handleDownloadFile(modelo)} title="Baixar arquivo original">
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              {isAdmin && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="text-destructive" title="Remover">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Remover modelo?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        O modelo "{modelo.nome}" será removido da lista.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete(modelo)}>Remover</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Dialog de Upload */}
@@ -321,7 +420,6 @@ const Relatorios = () => {
                 </label>
               </div>
             </div>
-
             <div>
               <Label>Nome do Modelo *</Label>
               <Input
@@ -330,7 +428,6 @@ const Relatorios = () => {
                 placeholder="Ex: Relatório Mensal de Posicionamento"
               />
             </div>
-
             <div>
               <Label>Descrição</Label>
               <Textarea
@@ -349,6 +446,28 @@ const Relatorios = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Column Mapping Dialog */}
+      {mappingModeloId && (
+        <ReportColumnMappingDialog
+          modeloId={mappingModeloId}
+          modeloNome={mappingModeloNome}
+          open={!!mappingModeloId}
+          onClose={() => setMappingModeloId(null)}
+          onSaved={() => fetchModelos()}
+        />
+      )}
+
+      {/* Download Dialog */}
+      {downloadModelo && (
+        <ReportDownloadDialog
+          modeloId={downloadModelo.id}
+          modeloNome={downloadModelo.nome}
+          modeloFileName={downloadModelo.file_name}
+          open={!!downloadModelo}
+          onClose={() => setDownloadModelo(null)}
+        />
+      )}
     </div>
   );
 };

@@ -828,6 +828,77 @@ export type Database = {
           },
         ]
       }
+      lancamento_cobranca_config: {
+        Row: {
+          ativo: boolean
+          campo_referencia: string | null
+          created_at: string
+          id: string
+          nome: string
+          rotulo_analise: string
+          servico_ids: string[]
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          campo_referencia?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          rotulo_analise: string
+          servico_ids?: string[]
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          campo_referencia?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          rotulo_analise?: string
+          servico_ids?: string[]
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      modelo_relatorio_colunas: {
+        Row: {
+          campo_sistema: string | null
+          coluna_modelo: string
+          created_at: string
+          id: string
+          modelo_id: string
+          ordem: number
+        }
+        Insert: {
+          campo_sistema?: string | null
+          coluna_modelo: string
+          created_at?: string
+          id?: string
+          modelo_id: string
+          ordem?: number
+        }
+        Update: {
+          campo_sistema?: string | null
+          coluna_modelo?: string
+          created_at?: string
+          id?: string
+          modelo_id?: string
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modelo_relatorio_colunas_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "modelos_relatorio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modelos_relatorio: {
         Row: {
           ativo: boolean

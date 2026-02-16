@@ -41,7 +41,7 @@ const TIPOS = [
   {
     key: "cancelamento_confirmacao",
     label: "Cancelamento com Confirmação Interna",
-    description: "Status em que o cancelamento requer validação operacional (análise de custo).",
+    description: "Status em que o cancelamento requer validação operacional (análise de cobrança).",
     icon: <ShieldAlert className="h-4 w-4" />,
     color: "text-amber-600",
   },
@@ -236,7 +236,7 @@ const CancelamentoRecusaManager = () => {
           <CardContent className="p-0">
             <div className="p-4 bg-muted/30 border-b text-sm text-muted-foreground space-y-1">
               <p><strong>Cancelamento Direto:</strong> O cancelamento é executado sem confirmação interna (feito pelo cliente antes do início do serviço).</p>
-              <p><strong>Cancelamento com Confirmação:</strong> Exige validação operacional (análise de custo de serviço) por um usuário interno.</p>
+              <p><strong>Cancelamento com Confirmação:</strong> Exige validação operacional (análise de cobrança de serviço) por um usuário interno.</p>
               <p><strong>Recusa:</strong> O botão "Recusar" fica ativo na análise nos status configurados.</p>
             </div>
             <Table>

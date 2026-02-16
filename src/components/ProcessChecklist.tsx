@@ -206,7 +206,7 @@ const ProcessChecklist = (props: ProcessChecklistProps) => {
               <p className={cn("text-sm font-medium", compact && "text-xs")}>
                 {item.label}
               </p>
-              {item.detail && !compact && (
+              {item.detail && (!compact || item.status === "error") && (
                 <p className="text-xs opacity-80 mt-0.5">{item.detail}</p>
               )}
             </div>

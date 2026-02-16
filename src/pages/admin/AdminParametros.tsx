@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch, Ban } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch, Ban, HelpCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
@@ -569,14 +569,20 @@ const AdminParametros = () => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/interno/dashboard")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <Settings className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Parâmetros do Sistema</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/interno/dashboard")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Settings className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Parâmetros do Sistema</h1>
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => navigate("/interno/admin/parametros/ajuda")}>
+          <HelpCircle className="h-4 w-4 mr-2" />
+          Manual
+        </Button>
       </div>
 
       <Tabs defaultValue="pagina-externa" className="space-y-6">

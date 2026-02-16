@@ -470,6 +470,11 @@ const InternoDashboard = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 z-[100] bg-popover" sideOffset={8}>
+                <DropdownMenuItem onClick={() => navigate("/interno/relatorios")}>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Modelos de Relatório
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowExcelExport(true)}>
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Relatório Personalizado

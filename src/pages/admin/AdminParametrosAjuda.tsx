@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Globe, Eye, List, Settings, GitBranch, Ban, Clock, Bell, FileText, Link2, Shield, HelpCircle, Timer } from "lucide-react";
+import { ArrowLeft, Globe, Eye, List, Settings, GitBranch, Ban, Clock, Bell, FileText, Link2, Shield, HelpCircle, Timer, BarChart3, Upload, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface CampoDoc {
@@ -307,6 +307,36 @@ const DOCUMENTACAO: AbaDoc[] = [
           { nome: "Prefixo do Protocolo", descricao: "Texto inicial do protocolo (ex: JBS). Máximo de 5 caracteres. Aparece antes do código do serviço.", obrigatorio: true },
           { nome: "Último Número Gerado", descricao: "Número sequencial atual do contador. Campo apenas informativo, não editável." },
         ],
+      },
+    ],
+  },
+  {
+    id: "relatorios",
+    titulo: "Relatórios",
+    icone: <BarChart3 className="h-5 w-5" />,
+    descricao: "Página de gerenciamento de modelos de relatório. Acessível por todos os perfis de usuário através do menu 'Relatórios' no dashboard. Administradores podem importar novos modelos; todos os usuários podem visualizar e baixar.",
+    secoes: [
+      {
+        titulo: "Modelos de Relatório",
+        descricao: "Lista todos os modelos de relatório disponíveis para download. Acessível em: Dashboard > Relatórios > Modelos de Relatório.",
+        campos: [
+          { nome: "Arquivo", descricao: "Arquivo do modelo a ser importado (Excel, PDF, Word). Tamanho máximo: 20MB.", obrigatorio: true },
+          { nome: "Nome do Modelo", descricao: "Nome identificador do modelo exibido na lista para todos os usuários.", obrigatorio: true },
+          { nome: "Descrição", descricao: "Texto explicativo sobre o conteúdo e uso do modelo." },
+        ],
+        acoes: [
+          { nome: "Importar Modelo", descricao: "Envia um novo arquivo de modelo (apenas administradores)." },
+          { nome: "Baixar (⬇️)", descricao: "Faz download do arquivo do modelo (todos os usuários)." },
+          { nome: "Remover (🗑️)", descricao: "Remove o modelo da lista (apenas administradores). O arquivo é desativado, não excluído permanentemente." },
+        ],
+      },
+      {
+        titulo: "Relatório Personalizado",
+        descricao: "Gera um relatório Excel customizado com filtros de data, serviço e status. Acessível via: Dashboard > Relatórios > Relatório Personalizado.",
+      },
+      {
+        titulo: "Programação - Navis N4",
+        descricao: "Exporta a programação de operações no formato compatível com o sistema Navis N4. Acessível via: Dashboard > Relatórios > Programação - Navis N4.",
       },
     ],
   },

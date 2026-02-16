@@ -133,23 +133,40 @@ Deno.serve(async (req) => {
 
     if (solError) throw solError;
 
-    // 6. Save dynamic field values
-    if (dynamicFieldValues.length > 0) {
-      // Get solicitacao id by protocolo
-      const { data: solData } = await supabase
-        .from("solicitacoes")
-        .select("id")
-        .eq("protocolo", protocolo)
-        .single();
+    // Get the created solicitation id for dynamic fields and notifications
+    const { data: solData } = await supabase
+      .from("solicitacoes")
+      .select("id")
+      .eq("protocolo", protocolo)
+      .single();
 
-      if (solData) {
-        const inserts = dynamicFieldValues.map((dv) => ({
+    // 6. Save dynamic field values
+    if (dynamicFieldValues.length > 0 && solData) {
+      const inserts = dynamicFieldValues.map((dv) => ({
+        solicitacao_id: solData.id,
+        campo_id: dv.campo_id,
+        valor: dv.valor,
+      }));
+      await supabase.from("campos_analise_valores").insert(inserts);
+    }
+
+    // 7. Trigger notifications for the new solicitation (aguardando_confirmacao)
+    if (solData) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      
+      fetch(`${supabaseUrl}/functions/v1/notificar-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
           solicitacao_id: solData.id,
-          campo_id: dv.campo_id,
-          valor: dv.valor,
-        }));
-        await supabase.from("campos_analise_valores").insert(inserts);
-      }
+          novo_status: "aguardando_confirmacao",
+          usuario_id: "00000000-0000-0000-0000-000000000000", // system user
+        }),
+      }).catch((err) => console.error("Error triggering notification:", err));
     }
 
     return new Response(

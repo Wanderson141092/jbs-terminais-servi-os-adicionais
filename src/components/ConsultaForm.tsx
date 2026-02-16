@@ -40,33 +40,35 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1 block">Identificador</Label>
           <Input
             value={valor}
             onChange={(e) => setValor(e.target.value.toUpperCase().slice(0, 15))}
-            placeholder="Ex: ABCU1234567, JBSP000001, A1234567890"
+            placeholder="Ex: ABCU1234567"
             maxLength={15}
           />
         </div>
-        <div className="w-full sm:w-32">
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1 block">Chave de Validação</Label>
           <Input
             value={chave}
             onChange={(e) => setChave(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
-            placeholder="Chave"
+            placeholder="6 caracteres"
             maxLength={6}
             className="text-center tracking-widest font-mono"
           />
         </div>
-        <Button 
-          type="submit" 
-          disabled={isLoading || !valor.trim() || chave.trim().length !== 6} 
-          className="jbs-btn-primary px-6 w-full sm:w-auto"
-        >
-          <Search className="h-4 w-4 mr-2" />
-          Consultar
-        </Button>
       </div>
+      <Button 
+        type="submit" 
+        disabled={isLoading || !valor.trim() || chave.trim().length !== 6} 
+        className="jbs-btn-primary w-full"
+      >
+        <Search className="h-4 w-4 mr-2" />
+        Consultar
+      </Button>
 
       <div className="text-xs text-muted-foreground pt-2 border-t">
         <p>Informe o contêiner, LPCO, protocolo ou chave de consulta + a chave de validação recebida na solicitação.</p>

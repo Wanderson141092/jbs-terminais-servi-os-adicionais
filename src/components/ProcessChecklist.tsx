@@ -72,6 +72,19 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
     }
   }
 
+  // Show rejection reason in checklist (even externally) when status is recusado
+  if (s.status === "recusado" || s.status === "cancelado") {
+    const motivoRecusa = s.armazem_aprovado === false
+      ? s.armazem_justificativa
+      : s.comex_justificativa;
+    items.push({
+      label: s.status === "recusado" ? "Recusado" : "Cancelado",
+      status: "error",
+      detail: motivoRecusa || undefined,
+    });
+    return items;
+  }
+
   if (isPosic) {
     // Posicionamento: vistoria-based items
     const vistoriaStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];

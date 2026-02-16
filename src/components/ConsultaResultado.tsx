@@ -463,7 +463,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
 
           {/* Checklist */}
           <ProcessChecklist
-            solicitacao={{...solicitacao, solicitar_deferimento: showDeferimento, observacoes: observacoes?.[0]?.observacao || null} as any}
+            solicitacao={{...solicitacao, solicitar_deferimento: showDeferimento, observacoes: observacoes?.[0]?.observacao || null, armazem_justificativa: (solicitacao as any).armazem_justificativa, comex_justificativa: (solicitacao as any).comex_justificativa} as any}
             aprovacaoAtivada={aprovacaoAdministrativo || aprovacaoOperacional}
             aprovacaoAdministrativo={aprovacaoAdministrativo}
             aprovacaoOperacional={aprovacaoOperacional}

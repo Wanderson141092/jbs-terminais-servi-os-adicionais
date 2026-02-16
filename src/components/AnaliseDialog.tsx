@@ -903,30 +903,51 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     );
                   })()}
 
-                  {/* Lacre Armador Toggle - ativado automaticamente quando Regularização é marcada */}
+                  {/* Lacre Armador Toggle + Confirmação de Lançamento lado a lado */}
                   {(() => {
                     const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
+                    const showLacreConfirmLancamento = solicitarLacreArmador && isPosicionamento && custoLacreArmador === true && solicitacao.lancamento_confirmado === false;
                     return (
                       <>
-                        <div className={`flex items-center justify-between border rounded-md p-3 ${isPosicionamento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
-                          <div className="flex items-center gap-2">
-                            <Lock className="h-4 w-4 text-amber-600" />
-                            <div className="flex flex-col">
-                              <Label className="cursor-pointer" htmlFor="solicitar-lacre">Regularização de Lacre Armador</Label>
-                              <span className="text-[10px] text-muted-foreground">
-                                {isPosicionamento ? "Habilita envio de lacre na pág. externa" : "Disponível apenas para Posicionamento"}
-                              </span>
+                        <div className="flex gap-2">
+                          <div className={`flex-1 flex items-center justify-between border rounded-md p-2.5 ${isPosicionamento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                            <div className="flex items-center gap-2">
+                              <Lock className="h-4 w-4 text-amber-600 shrink-0" />
+                              <div className="flex flex-col">
+                                <Label className="cursor-pointer text-sm" htmlFor="solicitar-lacre">Regularização de Lacre</Label>
+                                <span className="text-[10px] text-muted-foreground leading-tight">
+                                  {isPosicionamento ? "Lacre na pág. externa" : "Apenas Posicionamento"}
+                                </span>
+                              </div>
                             </div>
+                            <Switch
+                              id="solicitar-lacre"
+                              checked={solicitarLacreArmador}
+                              onCheckedChange={(checked) => {
+                                setSolicitarLacreArmador(checked);
+                                if (!checked) setCustoLacreArmador(null);
+                              }}
+                              disabled={!isPosicionamento}
+                            />
                           </div>
-                          <Switch
-                            id="solicitar-lacre"
-                            checked={solicitarLacreArmador}
-                            onCheckedChange={(checked) => {
-                              setSolicitarLacreArmador(checked);
-                              if (!checked) setCustoLacreArmador(null);
-                            }}
-                            disabled={!isPosicionamento}
-                          />
+
+                          {/* Confirmação de lançamento do lacre - ao lado */}
+                          {showLacreConfirmLancamento && (
+                            <div className="flex-1 border rounded-md p-2.5 bg-red-50 border-red-200 flex flex-col justify-center">
+                              <div className="flex items-center gap-1.5 text-red-600 mb-1.5">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                <span className="text-xs font-semibold">Lançamento Lacre Pendente</span>
+                              </div>
+                              <Button 
+                                size="sm"
+                                variant="outline"
+                                className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-7 w-full"
+                                onClick={() => setShowLancamentoDialog(true)}
+                              >
+                                Confirmar Lançamento
+                              </Button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Custo de Serviço para Lacre Armador */}

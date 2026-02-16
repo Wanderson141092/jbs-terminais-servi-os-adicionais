@@ -33,6 +33,19 @@ import {
   ExternalLink,
   FileText,
   Layout,
+  Ship,
+  Anchor,
+  Container,
+  Warehouse,
+  Package,
+  Box,
+  Truck,
+  Construction,
+  ArrowUpFromLine,
+  Layers,
+  Send,
+  Search,
+  Settings,
 } from "lucide-react";
 
 interface ExternalButton {
@@ -60,7 +73,23 @@ const ICON_OPTIONS = [
   { value: "Send", label: "Enviar" },
   { value: "Search", label: "Buscar" },
   { value: "Settings", label: "Configurações" },
+  { value: "Ship", label: "Navio" },
+  { value: "Anchor", label: "Área Portuária" },
+  { value: "Container", label: "Contêiner" },
+  { value: "Warehouse", label: "Armazém" },
+  { value: "Package", label: "Caixa / Pacote" },
+  { value: "Box", label: "Pallet / Volume" },
+  { value: "Truck", label: "Gate / Caminhão" },
+  { value: "Construction", label: "STS / Guindaste" },
+  { value: "ArrowUpFromLine", label: "Levantamento de Contêiner" },
+  { value: "Layers", label: "Pilha de Contêineres" },
 ];
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  FileText, Layout, ExternalLink, Send, Search, Settings,
+  Ship, Anchor, Container, Warehouse, Package, Box, Truck,
+  Construction, ArrowUpFromLine, Layers,
+};
 
 const ExternalButtonsManager = () => {
   const [buttons, setButtons] = useState<ExternalButton[]>([]);

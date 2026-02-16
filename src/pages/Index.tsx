@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
-import { FileText, ExternalLink, Layout, Send, Search, Settings } from "lucide-react";
+import {
+  FileText, ExternalLink, Layout, Send, Search, Settings,
+  Ship, Anchor, Container, Warehouse, Package, Box, Truck,
+  Construction, ArrowUpFromLine, Layers,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,12 +28,9 @@ interface ExternalButton {
 }
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  FileText,
-  ExternalLink,
-  Layout,
-  Send,
-  Search,
-  Settings,
+  FileText, ExternalLink, Layout, Send, Search, Settings,
+  Ship, Anchor, Container, Warehouse, Package, Box, Truck,
+  Construction, ArrowUpFromLine, Layers,
 };
 
 // URL validation - only allow http/https protocols

@@ -80,11 +80,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [showRecusarDialog, setShowRecusarDialog] = useState(false);
   const [cancelJustificativa, setCancelJustificativa] = useState("");
   const [showConclusaoLancamentoDialog, setShowConclusaoLancamentoDialog] = useState(false);
+  const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
 
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
@@ -93,6 +94,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
         supabase.from("campos_analise_valores").select("campo_id, valor, campos_analise(nome)").eq("solicitacao_id", solicitacao.id),
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
+        supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
       ]);
 
       setAttachments(attachRes.data || []);
@@ -143,6 +145,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         ? allCancelConfig.filter((c: any) => c.servico_ids.length === 0 || c.servico_ids.includes(currentServicoId))
         : [];
       setCancelRecusaConfig(serviceCancelConfig);
+
+      // Store billing configs filtered by service
+      const allCobrancaConfig = (cobrancaConfigRes.data || []) as any[];
+      const serviceCobrancaConfig = currentServicoId
+        ? allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0 || c.servico_ids.includes(currentServicoId))
+        : allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0);
+      setCobrancaConfigs(serviceCobrancaConfig);
 
       // Build dynamic fields display
       const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
@@ -805,31 +814,45 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <span className="text-sm text-muted-foreground">Status:</span>
               <StatusBadge status={solicitacao.status} />
 
-              {/* Mini status: Lançamento Posicionamento */}
-              {solicitacao.lancamento_confirmado !== null && solicitacao.lancamento_confirmado !== undefined && (
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
-                    solicitacao.lancamento_confirmado
-                      ? "border-green-500 text-green-700 bg-green-50"
-                      : "border-red-500 text-red-700 bg-red-50"
-                  }`}
-                >
-                  <DollarSign className="h-3 w-3" />
-                  Lanç. Posicionamento: {solicitacao.lancamento_confirmado ? "Confirmado" : "Pendente"}
-                </Badge>
-              )}
-
-              {/* Mini status: Custo Posic. Lacre — só exibe se aceite de cobrança = Sim */}
-              {solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo === true && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] px-2 py-0.5 gap-1 font-semibold border-green-500 text-green-700 bg-green-50"
-                >
-                  <DollarSign className="h-3 w-3" />
-                  Custo Posic. Lacre: Sim
-                </Badge>
-              )}
+              {/* Dynamic billing badges from lancamento_cobranca_config */}
+              {cobrancaConfigs.map((cfg: any) => {
+                // "servico" type: shows based on lancamento_confirmado field
+                if (cfg.tipo === "servico") {
+                  if (solicitacao.lancamento_confirmado === null && solicitacao.lancamento_confirmado === undefined) return null;
+                  if (solicitacao.lancamento_confirmado === null) return null;
+                  return (
+                    <Badge
+                      key={cfg.id}
+                      variant="outline"
+                      className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
+                        solicitacao.lancamento_confirmado
+                          ? "border-green-500 text-green-700 bg-green-50"
+                          : "border-red-500 text-red-700 bg-red-50"
+                      }`}
+                    >
+                      <DollarSign className="h-3 w-3" />
+                      {cfg.rotulo_analise}: {solicitacao.lancamento_confirmado ? "Confirmado" : "Pendente"}
+                    </Badge>
+                  );
+                }
+                // "pendencia" type: shows when related pendency is selected or lacre armador with cost
+                if (cfg.tipo === "pendencia") {
+                  const pendenciaAtiva = cfg.campo_referencia && (solicitacao.pendencias_selecionadas || []).includes(cfg.campo_referencia);
+                  const lacreComCusto = solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo === true;
+                  if (!pendenciaAtiva && !lacreComCusto) return null;
+                  return (
+                    <Badge
+                      key={cfg.id}
+                      variant="outline"
+                      className="text-[10px] px-2 py-0.5 gap-1 font-semibold border-green-500 text-green-700 bg-green-50"
+                    >
+                      <DollarSign className="h-3 w-3" />
+                      {cfg.rotulo_analise}: Sim
+                    </Badge>
+                  );
+                }
+                return null;
+              })}
             </div>
 
             <Separator />
@@ -1396,16 +1419,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Confirmar Lançamento do Serviço
+              Confirmar Lançamento — {cobrancaConfigs.find((c: any) => c.tipo === "servico")?.rotulo_analise || "Serviço"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Confirme que o serviço foi lançado no sistema financeiro.
+              Confirme que a cobrança foi lançada no sistema financeiro.
             </p>
             <div className="bg-muted/50 rounded-lg p-3">
               <p className="text-sm"><strong>Protocolo:</strong> {solicitacao.protocolo}</p>
               <p className="text-sm"><strong>Cliente:</strong> {solicitacao.cliente_nome}</p>
+              {cobrancaConfigs.filter((c: any) => c.tipo === "servico").map((cfg: any) => (
+                <p key={cfg.id} className="text-sm"><strong>Cobrança:</strong> {cfg.rotulo_analise}</p>
+              ))}
             </div>
           </div>
           <DialogFooter>
@@ -1424,7 +1450,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-amber-600" />
-              Confirmação de Lançamento Financeiro
+              Confirmação de Lançamento — {cobrancaConfigs.find((c: any) => c.tipo === "servico")?.rotulo_analise || "Financeiro"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
@@ -1434,6 +1460,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 <p><strong>Protocolo:</strong> {solicitacao.protocolo}</p>
                 <p><strong>Serviço:</strong> {solicitacao.tipo_operacao}</p>
                 <p><strong>Cliente:</strong> {solicitacao.cliente_nome}</p>
+                {cobrancaConfigs.filter((c: any) => c.tipo === "servico").map((cfg: any) => (
+                  <p key={cfg.id}><strong>Cobrança:</strong> {cfg.rotulo_analise}</p>
+                ))}
               </div>
               <p className="font-medium">A cobrança do serviço já foi lançada no sistema?</p>
             </AlertDialogDescription>

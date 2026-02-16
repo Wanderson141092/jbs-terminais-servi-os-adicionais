@@ -30,6 +30,7 @@ interface ServicoConfig {
   tipo_agendamento: string | null;
   anexos_embutidos: boolean | null;
   aprovacao_ativada?: boolean;
+  status_confirmacao_lancamento?: string[];
 }
 
 interface ObservacaoHistorico {
@@ -70,6 +71,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showRecusarDialog, setShowRecusarDialog] = useState(false);
   const [cancelJustificativa, setCancelJustificativa] = useState("");
+  const [showConclusaoLancamentoDialog, setShowConclusaoLancamentoDialog] = useState(false);
 
 
   useEffect(() => {
@@ -380,6 +382,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     onClose();
   };
 
+  // Check if the selected status requires financial launch confirmation
+  const isCompletionStatus = () => {
+    if (!servicoConfig?.status_confirmacao_lancamento?.length) return false;
+    return servicoConfig.status_confirmacao_lancamento.includes(selectedStatus);
+  };
+
   const handleUpdateStatus = async () => {
     if (!selectedStatus) return;
     if (selectedStatus === solicitacao.status && 
@@ -426,7 +434,18 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         return;
       }
     }
+
+    // If this is a completion status, show the financial launch confirmation dialog first
+    if (isCompletionStatus() && selectedStatus !== solicitacao.status) {
+      setShowConclusaoLancamentoDialog(true);
+      return;
+    }
     
+    await executeSaveStatus(false);
+  };
+
+  const executeSaveStatus = async (lancamentoConfirmado: boolean) => {
+    setShowConclusaoLancamentoDialog(false);
     setLoading(true);
     
     let statusVistoria: string | null = null;
@@ -460,6 +479,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     // If lacre armador with cost, trigger lançamento
     if (solicitarLacreArmador && custoLacreArmador === true) {
       updatePayload.lancamento_confirmado = false;
+    }
+
+    // If completion status, set lancamento based on user confirmation
+    if (isCompletionStatus() && selectedStatus !== solicitacao.status) {
+      updatePayload.lancamento_confirmado = lancamentoConfirmado;
+      if (lancamentoConfirmado) {
+        updatePayload.lancamento_confirmado_por = userId;
+        updatePayload.lancamento_confirmado_data = new Date().toISOString();
+      }
     }
     
     const { error } = await supabase
@@ -1257,7 +1285,44 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         </DialogContent>
       </Dialog>
 
-      {/* Confirmação de Recusa */}
+      {/* Dialog de confirmação de lançamento ao concluir serviço */}
+      <AlertDialog open={showConclusaoLancamentoDialog} onOpenChange={setShowConclusaoLancamentoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-amber-600" />
+              Confirmação de Lançamento Financeiro
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Ao marcar o serviço como <strong>concluído</strong>, é necessário informar se a cobrança já foi lançada no sistema financeiro.
+              </p>
+              <div className="bg-muted p-3 rounded text-sm">
+                <p><strong>Protocolo:</strong> {solicitacao.protocolo}</p>
+                <p><strong>Serviço:</strong> {solicitacao.tipo_operacao}</p>
+                <p><strong>Cliente:</strong> {solicitacao.cliente_nome}</p>
+              </div>
+              <p className="font-medium">A cobrança do serviço já foi lançada no sistema?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => executeSaveStatus(false)}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              Não, lançar depois
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => executeSaveStatus(true)}
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Sim, já foi lançada
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={showRecusaConfirm} onOpenChange={setShowRecusaConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -142,17 +142,49 @@ Deno.serve(async (req) => {
 
     const statusLabel = statusParam?.valor || novo_status;
 
-    // Fetch notification rules for this status
-    const { data: rules } = await supabaseAdmin
+    // Fetch the service for this solicitation
+    const servicoNome = solicitacao.tipo_operacao || "Serviço";
+    const { data: servicoData } = await supabaseAdmin
+      .from("servicos")
+      .select("id")
+      .eq("nome", servicoNome)
+      .eq("ativo", true)
+      .maybeSingle();
+
+    const servicoId = servicoData?.id;
+
+    // Fetch notification rules for this status, filtered by service
+    const { data: allRules } = await supabaseAdmin
       .from("notification_rules")
       .select("*")
       .eq("status_gatilho", novo_status)
       .eq("ativo", true);
 
+    // Filter rules that match this service
+    const rules = (allRules || []).filter((r: any) => 
+      !servicoId || r.servico_id === servicoId
+    );
+
     const results: { internal: number; email: boolean } = { internal: 0, email: false };
 
+    // Build notification message based on status
+    const buildNotificationMessage = () => {
+      if (novo_status === "aguardando_confirmacao") {
+        return `Uma nova solicitação de ${servicoNome} foi recebida. Protocolo: ${solicitacao.protocolo}`;
+      }
+      if (novo_status === "cancelado") {
+        return `A solicitação ${solicitacao.protocolo} (${servicoNome}) foi cancelada.`;
+      }
+      if (novo_status === "recusado") {
+        return `A solicitação ${solicitacao.protocolo} (${servicoNome}) foi recusada.`;
+      }
+      return `Solicitação ${solicitacao.protocolo} atualizada para: ${statusLabel}`;
+    };
+
+    const notificationMessage = buildNotificationMessage();
+
     // Check if the solicitação has a servico that matches the rules
-    for (const rule of (rules || [])) {
+    for (const rule of rules) {
       const tiposNotificacao = rule.tipos_notificacao || [];
       const setorIds = rule.setor_ids || [];
 
@@ -178,7 +210,7 @@ Deno.serve(async (req) => {
             const notifications = profiles.map((p: any) => ({
               usuario_id: p.id,
               solicitacao_id,
-              mensagem: `Solicitação ${solicitacao.protocolo} atualizada para: ${statusLabel}`,
+              mensagem: notificationMessage,
               tipo: "status_update",
             }));
 

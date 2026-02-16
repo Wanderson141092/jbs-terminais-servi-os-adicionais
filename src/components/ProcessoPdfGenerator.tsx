@@ -83,7 +83,7 @@ const getStateColor = (state: string): RGB => {
   }
 };
 
-// ─── Drawing helpers matching HTML layout ───
+// ─── Drawing helpers ───
 
 const MARGIN = 20;
 
@@ -91,18 +91,15 @@ const drawHeader = (doc: jsPDF, logoBase64: string | null, title: string, subtit
   const pageW = doc.internal.pageSize.getWidth();
   const headerH = 32;
 
-  // Blue background
   doc.setFillColor(...JBS_BLUE);
   doc.rect(0, 0, pageW, headerH, "F");
 
-  // Logo on white background
   if (logoBase64) {
     doc.setFillColor(...JBS_WHITE);
     doc.roundedRect(MARGIN, 6, 40, 20, 2, 2, "F");
     doc.addImage(logoBase64, "PNG", MARGIN + 2, 7, 36, 18);
   }
 
-  // Title + subtitle
   const textX = logoBase64 ? MARGIN + 48 : MARGIN;
   doc.setTextColor(...JBS_WHITE);
   doc.setFontSize(14);
@@ -142,9 +139,9 @@ const drawFooter = (doc: jsPDF) => {
   doc.setTextColor(...JBS_LABEL);
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  doc.text("JBS Terminais • Sistema de Gestão de Processos", MARGIN, footerY + 10);
+  doc.text("JBS Terminais - Sistema de Gestao de Processos", MARGIN, footerY + 10);
   doc.text(
-    `Emitido em ${new Date().toLocaleString("pt-BR")}  |  Pág. ${doc.getCurrentPageInfo().pageNumber}`,
+    `Emitido em ${new Date().toLocaleString("pt-BR")}  |  Pag. ${doc.getCurrentPageInfo().pageNumber}`,
     pageW - MARGIN, footerY + 10, { align: "right" }
   );
 };
@@ -167,7 +164,6 @@ const ensureSpace = (doc: jsPDF, y: number, needed: number): number => {
   return y;
 };
 
-// Draw a field (label on top, value below) at a given position
 const drawField = (doc: jsPDF, label: string, value: string, x: number, y: number, maxW: number) => {
   doc.setTextColor(...JBS_LABEL);
   doc.setFontSize(7.5);
@@ -177,12 +173,11 @@ const drawField = (doc: jsPDF, label: string, value: string, x: number, y: numbe
   doc.setTextColor(...JBS_TEXT);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  const lines = doc.splitTextToSize(value || "—", maxW);
+  const lines = doc.splitTextToSize(value || "---", maxW);
   doc.text(lines, x, y + 6);
   return lines.length * 5 + 10;
 };
 
-// Draw fields in a 3-column grid (matching .grid class in HTML)
 const drawFieldsGrid = (doc: jsPDF, fields: [string, string][], startY: number, cols = 3): number => {
   const pageW = doc.internal.pageSize.getWidth();
   const usable = pageW - MARGIN * 2;
@@ -202,7 +197,6 @@ const drawFieldsGrid = (doc: jsPDF, fields: [string, string][], startY: number, 
   return y;
 };
 
-// Section title (simple text, not a filled bar)
 const drawSectionTitle = (doc: jsPDF, label: string, y: number): number => {
   y = ensureSpace(doc, y, 16);
   doc.setTextColor(...JBS_TEXT);
@@ -212,7 +206,7 @@ const drawSectionTitle = (doc: jsPDF, label: string, y: number): number => {
   return y + 10;
 };
 
-// Status pill
+// Status pill (filled)
 const drawStatusPill = (doc: jsPDF, label: string, color: RGB, x: number, y: number): number => {
   doc.setFillColor(...color);
   doc.setFontSize(7.5);
@@ -224,53 +218,94 @@ const drawStatusPill = (doc: jsPDF, label: string, color: RGB, x: number, y: num
   return pw;
 };
 
-// ─── Timeline stages (horizontal pills with arrows) ───
+// ─── State marker text ───
+const getStateMarker = (state: string): string => {
+  switch (state) {
+    case "completed": return "OK";
+    case "done": return "OK";
+    case "error": return "X";
+    case "warning": return "!";
+    case "current": return "...";
+    default: return "-";
+  }
+};
+
+// ─── Timeline stages (colored pills with state marker + label) ───
 const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; detail?: string }[], y: number, indent = 0): number => {
   const pageW = doc.internal.pageSize.getWidth();
-  const startX = MARGIN + 4 + indent;
+  const startX = MARGIN + indent;
   let x = startX;
   const maxX = pageW - MARGIN;
+  const pillH = 14;
+  const pillR = 3;
+  const gap = 3;
 
   for (let i = 0; i < stages.length; i++) {
     const stage = stages[i];
     const color = getStateColor(stage.state);
-    const label = stage.label;
+    const marker = getStateMarker(stage.state);
 
-    doc.setFontSize(7);
+    doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    const tw = doc.getTextWidth(label) + 12;
-    const arrowW = i < stages.length - 1 ? 8 : 0;
+    const markerW = doc.getTextWidth(marker);
+    const labelW = doc.getTextWidth(stage.label);
+    const innerPad = 8;
+    const markerPad = 5;
+    const pillW = innerPad + markerW + markerPad + labelW + innerPad;
+    const arrowW = i < stages.length - 1 ? 10 : 0;
 
-    if (x + tw + arrowW > maxX) {
+    // Wrap to next line
+    if (x + pillW + arrowW > maxX && x > startX) {
       x = startX;
-      y += 14;
-      y = ensureSpace(doc, y, 14);
+      y += pillH + 4;
+      y = ensureSpace(doc, y, pillH + 4);
     }
 
+    // Filled pill
     doc.setFillColor(...color);
-    doc.roundedRect(x, y, tw, 10, 2, 2, "F");
-    doc.setTextColor(...JBS_WHITE);
-    doc.text(label, x + 6, y + 7);
-    x += tw;
+    doc.roundedRect(x, y, pillW, pillH, pillR, pillR, "F");
 
+    // Marker
+    doc.setTextColor(...JBS_WHITE);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(marker, x + innerPad, y + pillH / 2 + 2.5);
+
+    // Separator line inside pill
+    const sepX = x + innerPad + markerW + markerPad / 2;
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.3);
+    doc.line(sepX, y + 3, sepX, y + pillH - 3);
+
+    // Label
+    doc.setTextColor(...JBS_WHITE);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(stage.label, sepX + markerPad / 2 + 1, y + pillH / 2 + 2.5);
+
+    x += pillW + gap;
+
+    // Arrow connector
     if (i < stages.length - 1) {
       doc.setTextColor(...JBS_LABEL);
-      doc.setFontSize(8);
-      doc.text("→", x + 2, y + 7);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(">", x, y + pillH / 2 + 3);
       x += arrowW;
     }
   }
 
-  y += 14;
+  y += pillH + 4;
 
+  // Details below
   for (const stage of stages) {
     if (stage.detail) {
       y = ensureSpace(doc, y, 10);
       doc.setTextColor(...JBS_LABEL);
       doc.setFontSize(7);
       doc.setFont("helvetica", "italic");
-      const lines = doc.splitTextToSize(stage.detail, pageW - 40 - indent);
-      doc.text(lines, MARGIN + 4 + indent, y);
+      const lines = doc.splitTextToSize(stage.detail, pageW - MARGIN * 2 - indent - 8);
+      doc.text(lines, MARGIN + indent + 4, y);
       y += lines.length * 5 + 2;
     }
   }
@@ -278,12 +313,15 @@ const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; 
   return y;
 };
 
-// ─── Checklist items ───
+// ─── Checklist items (rows with colored accent bar) ───
 const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; detail?: string }[], y: number): number => {
   const pageW = doc.internal.pageSize.getWidth();
+  const rowH = 14;
+  const rowW = pageW - MARGIN * 2;
+  const pillR = 2.5;
 
   for (const item of items) {
-    y = ensureSpace(doc, y, 12);
+    y = ensureSpace(doc, y, rowH + 4);
 
     const color = getStateColor(
       item.status === "done" ? "completed" :
@@ -292,26 +330,39 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
       item.status === "pending" ? "current" : "pending"
     );
 
-    doc.setFillColor(...color);
-    doc.circle(MARGIN + 6, y + 4, 3, "F");
-    doc.setTextColor(...JBS_WHITE);
-    doc.setFontSize(6);
-    doc.setFont("helvetica", "bold");
-    const icon = item.status === "done" ? "✓" : item.status === "error" ? "✗" : item.status === "warning" ? "!" : "○";
-    doc.text(icon, MARGIN + 4.5, y + 5.5);
+    const marker = getStateMarker(item.status === "done" ? "completed" : item.status);
 
+    // Light row background
+    doc.setFillColor(248, 249, 250);
+    doc.roundedRect(MARGIN, y, rowW, rowH, pillR, pillR, "F");
+
+    // Left colored accent bar
+    doc.setFillColor(...color);
+    doc.rect(MARGIN, y + 1, 3, rowH - 2, "F");
+
+    // State marker mini-pill
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "bold");
+    const mw = doc.getTextWidth(marker) + 8;
+    doc.setFillColor(...color);
+    doc.roundedRect(MARGIN + 8, y + 3, mw, rowH - 6, 2, 2, "F");
+    doc.setTextColor(...JBS_WHITE);
+    doc.text(marker, MARGIN + 8 + 4, y + rowH / 2 + 2);
+
+    // Label
     doc.setTextColor(...JBS_TEXT);
     doc.setFontSize(8.5);
-    doc.setFont("helvetica", "normal");
-    doc.text(item.label, MARGIN + 14, y + 5.5);
-    y += 10;
+    doc.setFont("helvetica", "bold");
+    doc.text(item.label, MARGIN + 8 + mw + 6, y + rowH / 2 + 2.5);
+
+    y += rowH + 3;
 
     if (item.detail) {
       y = ensureSpace(doc, y, 8);
       doc.setTextColor(...JBS_LABEL);
       doc.setFontSize(7);
       doc.setFont("helvetica", "italic");
-      const lines = doc.splitTextToSize(item.detail, pageW - 50);
+      const lines = doc.splitTextToSize(item.detail, pageW - MARGIN * 2 - 20);
       doc.text(lines, MARGIN + 14, y);
       y += lines.length * 5 + 2;
     }
@@ -330,11 +381,11 @@ const getLacreStagesForPdf = (lacreStatus: string) => {
     { key: "aguardando_preenchimento", label: "Preencher Dados", logicalIdx: 0 },
     currentIdx >= statusOrder.indexOf("posicionamento_confirmado")
       ? { key: "posicionamento_confirmado", label: "Posicionamento Confirmado", logicalIdx: 2 }
-      : { key: "aguardando_confirmacao", label: "Aguardando Confirmação", logicalIdx: 1 },
+      : { key: "aguardando_confirmacao", label: "Aguardando Confirmacao", logicalIdx: 1 },
     currentIdx >= statusOrder.indexOf("servico_concluido")
       ? { key: "lacre_inserido", label: "Lacre Armador Inserido", logicalIdx: 4 }
       : { key: "aguardando_lacre", label: "Aguardando Lacre", logicalIdx: 3 },
-    { key: "servico_concluido", label: "Serviço Concluído", logicalIdx: 4 },
+    { key: "servico_concluido", label: "Servico Concluido", logicalIdx: 4 },
   ];
 
   return steps.map((step) => {
@@ -377,7 +428,7 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   let logoBase64: string | null = null;
   try { logoBase64 = await loadLogoBase64(); } catch { /* fallback */ }
 
-  let y = drawHeader(doc, logoBase64, "Comprovante de Solicitação", new Date().toLocaleString("pt-BR"));
+  let y = drawHeader(doc, logoBase64, "Comprovante de Solicitacao", new Date().toLocaleString("pt-BR"));
 
   // ─── Protocol + Status section ───
   y = ensureSpace(doc, y, 24);
@@ -388,22 +439,22 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   y = drawSectionBorder(doc, y);
   y += 6;
 
-  // ─── Pendências ───
+  // ─── Pendencias ───
   if (solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas?.length > 0) {
     doc.setFillColor(255, 250, 230);
     doc.roundedRect(MARGIN, y, pageW - MARGIN * 2, 12, 2, 2, "F");
     doc.setTextColor(180, 120, 0);
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.text("Pendências: " + solicitacao.pendencias_selecionadas.join(", "), MARGIN + 6, y + 8);
+    doc.text("Pendencias: " + solicitacao.pendencias_selecionadas.join(", "), MARGIN + 6, y + 8);
     y += 16;
   }
 
-  // ─── Informações da Solicitação (3-col grid) ───
+  // ─── Informacoes da Solicitacao (3-col grid) ───
   const isPosic = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
   const isAgendamento = servicoConfig?.tipo_agendamento === "data_horario";
-  const dateLabel = isPosic ? "Posicionar dia" : isAgendamento ? "Agendar para" : "Data do serviço";
-  let dateValue = "—";
+  const dateLabel = isPosic ? "Posicionar dia" : isAgendamento ? "Agendar para" : "Data do servico";
+  let dateValue = "---";
   if (isAgendamento && solicitacao.data_agendamento) {
     dateValue = new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   } else if (solicitacao.data_posicionamento) {
@@ -411,12 +462,12 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   }
 
   const infoFields: [string, string][] = [
-    solicitacao.tipo_operacao ? ["Serviço", solicitacao.tipo_operacao] : null,
+    solicitacao.tipo_operacao ? ["Servico", solicitacao.tipo_operacao] : null,
     solicitacao.categoria ? ["Categoria", solicitacao.categoria] : null,
     solicitacao.tipo_carga ? ["Tipo de Carga", formatTipoCarga(solicitacao.tipo_carga)] : null,
-    solicitacao.numero_conteiner ? ["Contêiner", solicitacao.numero_conteiner] : null,
+    solicitacao.numero_conteiner ? ["Conteiner", solicitacao.numero_conteiner] : null,
     solicitacao.lpco ? ["LPCO", solicitacao.lpco] : null,
-    dateValue !== "—" ? [dateLabel, dateValue] : null,
+    dateValue !== "---" ? [dateLabel, dateValue] : null,
     ...camposDinamicosExternos.map(c => [c.campo_nome, c.valor] as [string, string]),
   ].filter(Boolean) as [string, string][];
 
@@ -491,7 +542,7 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   y = drawSectionBorder(doc, y);
   y += 6;
 
-  // ─── Acompanhamento (Observações) ───
+  // ─── Acompanhamento (Observacoes) ───
   if (observacoes.length > 0) {
     y = drawSectionTitle(doc, "Acompanhamento", y);
 
@@ -519,17 +570,17 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
 
   // ─── Lacre Armador ───
   if (showLacreArmador && lacreArmadorDados) {
-    y = drawSectionTitle(doc, lacreArmadorConfig?.titulo_externo || "Regularização de Lacre Armador", y);
+    y = drawSectionTitle(doc, lacreArmadorConfig?.titulo_externo || "Regularizacao de Lacre Armador", y);
 
     const lacreStatus = lacreArmadorDados.lacre_status || "aguardando_preenchimento";
     const lacreStages = getLacreStagesForPdf(lacreStatus);
     y = drawTimelineStages(doc, lacreStages, y);
 
     const lacreMessages: Record<string, { label: string; color: RGB }> = {
-      aguardando_confirmacao: { label: "Aguardando confirmação do posicionamento pela equipe.", color: COLOR_BLUE_LIGHT },
-      posicionamento_confirmado: { label: "O posicionamento para inclusão do lacre foi confirmado.", color: JBS_GREEN },
-      aguardando_lacre: { label: "Aguardando a inclusão do lacre armador no contêiner.", color: COLOR_AMBER },
-      servico_concluido: { label: "Lacre armador incluído com sucesso.", color: JBS_GREEN },
+      aguardando_confirmacao: { label: "Aguardando confirmacao do posicionamento pela equipe.", color: COLOR_BLUE_LIGHT },
+      posicionamento_confirmado: { label: "O posicionamento para inclusao do lacre foi confirmado.", color: JBS_GREEN },
+      aguardando_lacre: { label: "Aguardando a inclusao do lacre armador no conteiner.", color: COLOR_AMBER },
+      servico_concluido: { label: "Lacre armador incluido com sucesso.", color: JBS_GREEN },
     };
 
     const msg = lacreMessages[lacreStatus];
@@ -547,17 +598,17 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
       doc.setTextColor(...COLOR_RED);
       doc.setFontSize(8.5);
       doc.setFont("helvetica", "bold");
-      doc.text("Solicitação recusada — Motivo: " + lacreArmadorDados.motivo_recusa, MARGIN + 4, y + 4);
+      doc.text("Solicitacao recusada - Motivo: " + lacreArmadorDados.motivo_recusa, MARGIN + 4, y + 4);
       y += 10;
     }
 
     if (lacreStatus !== "aguardando_preenchimento") {
       const lacreFields: [string, string][] = [
-        ["Lacre coletado", lacreArmadorDados.lacre_coletado ? "Sim" : "Não"],
+        ["Lacre coletado", lacreArmadorDados.lacre_coletado ? "Sim" : "Nao"],
       ];
       if (lacreArmadorDados.data_posicionamento_lacre) {
-        const periodo = lacreArmadorDados.periodo_lacre === "manha" ? "Manhã" : "Tarde";
-        lacreFields.push(["Data / Período", `${new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} — ${periodo}`]);
+        const periodo = lacreArmadorDados.periodo_lacre === "manha" ? "Manha" : "Tarde";
+        lacreFields.push(["Data / Periodo", `${new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} - ${periodo}`]);
       }
       if (lacreFields.length > 0) {
         y = drawFieldsGrid(doc, lacreFields, y, 2);
@@ -572,9 +623,9 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     y = drawSectionTitle(doc, "Status do Deferimento", y);
 
     const defMessages: Record<string, { text: string; color: RGB }> = {
-      recebido: { text: "Deferimento Recebido — Todos os documentos foram aprovados.", color: JBS_GREEN },
-      aguardando: { text: "Aguardando Atendimento — Documento(s) enviado(s), em análise.", color: COLOR_BLUE_LIGHT },
-      recusado: { text: "Documento Recusado — Reenvio necessário.", color: COLOR_RED },
+      recebido: { text: "Deferimento Recebido - Todos os documentos foram aprovados.", color: JBS_GREEN },
+      aguardando: { text: "Aguardando Atendimento - Documento(s) enviado(s), em analise.", color: COLOR_BLUE_LIGHT },
+      recusado: { text: "Documento Recusado - Reenvio necessario.", color: COLOR_RED },
     };
     const defMsg = defMessages[deferimentoStatus] || { text: "Aguardando envio do deferimento.", color: COLOR_AMBER };
     doc.setTextColor(...defMsg.color);
@@ -598,7 +649,7 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   let logoBase64: string | null = null;
   try { logoBase64 = await loadLogoBase64(); } catch { /* fallback */ }
 
-  let y = drawHeader(doc, logoBase64, "Relatório Interno de Processo", new Date().toLocaleString("pt-BR"), true);
+  let y = drawHeader(doc, logoBase64, "Relatorio Interno de Processo", new Date().toLocaleString("pt-BR"), true);
 
   // ─── Protocol + Status ───
   const halfW = (pageW - MARGIN * 2) / 2;
@@ -610,29 +661,29 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
 
   // ─── All fields in 3-col grid ───
   const allFields: [string, string][] = [
-    ["Cliente", solicitacao.cliente_nome || "—"],
-    ["E-mail", solicitacao.cliente_email || "—"],
-    ["CNPJ", solicitacao.cnpj || "—"],
-    ["Serviço", solicitacao.tipo_operacao || "—"],
-    ["Categoria", solicitacao.categoria || "—"],
-    ["Contêiner", solicitacao.numero_conteiner || "—"],
-    ["LPCO", solicitacao.lpco || "—"],
+    ["Cliente", solicitacao.cliente_nome || "---"],
+    ["E-mail", solicitacao.cliente_email || "---"],
+    ["CNPJ", solicitacao.cnpj || "---"],
+    ["Servico", solicitacao.tipo_operacao || "---"],
+    ["Categoria", solicitacao.categoria || "---"],
+    ["Conteiner", solicitacao.numero_conteiner || "---"],
+    ["LPCO", solicitacao.lpco || "---"],
     ["Tipo de Carga", formatTipoCarga(solicitacao.tipo_carga)],
     ["Data Posicionamento", solicitacao.data_posicionamento
-      ? new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR") : "—"],
-    ["Status Vistoria", solicitacao.status_vistoria || "—"],
-    ["Data Solicitação", new Date(solicitacao.created_at).toLocaleString("pt-BR")],
+      ? new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR") : "---"],
+    ["Status Vistoria", solicitacao.status_vistoria || "---"],
+    ["Data Solicitacao", new Date(solicitacao.created_at).toLocaleString("pt-BR")],
   ];
 
   y = drawFieldsGrid(doc, allFields, y, 3);
 
-  // Observações as full-width
+  // Observacoes as full-width
   if (solicitacao.observacoes) {
     y = ensureSpace(doc, y, 16);
     doc.setTextColor(...JBS_LABEL);
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "normal");
-    doc.text("OBSERVAÇÕES", MARGIN, y);
+    doc.text("OBSERVACOES", MARGIN, y);
     doc.setTextColor(...JBS_TEXT);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -644,9 +695,9 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   y = drawSectionBorder(doc, y);
   y += 6;
 
-  // ─── Aprovações ───
+  // ─── Aprovacoes ───
   if (aprovacaoAtivada) {
-    y = drawSectionTitle(doc, "Aprovações", y);
+    y = drawSectionTitle(doc, "Aprovacoes", y);
     const approvals = [
       { label: "Administrativo", approved: solicitacao.comex_aprovado, justificativa: solicitacao.comex_justificativa },
       { label: "Operacional", approved: solicitacao.armazem_aprovado, justificativa: solicitacao.armazem_justificativa },
@@ -683,9 +734,9 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     y += 6;
   }
 
-  // ─── Lançamento ───
+  // ─── Lancamento ───
   if (solicitacao.lancamento_confirmado !== undefined && solicitacao.lancamento_confirmado !== null) {
-    y = drawSectionTitle(doc, "Lançamento", y);
+    y = drawSectionTitle(doc, "Lancamento", y);
     const lancLabel = solicitacao.lancamento_confirmado ? "CONFIRMADO" : "PENDENTE";
     const lancColor: RGB = solicitacao.lancamento_confirmado ? JBS_GREEN : COLOR_AMBER;
     drawStatusPill(doc, lancLabel, lancColor, MARGIN + 4, y);

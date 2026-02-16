@@ -960,13 +960,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                               return (
                                 <Button
                                   key={opt.value}
-                                  variant={isSelected ? "default" : "outline"}
+                                  variant={isSelected ? "secondary" : "outline"}
                                   size="sm"
                                   onClick={() => setSelectedStatus(opt.value)}
-                                  className={`flex items-center gap-1.5 ${isSelected ? "ring-2 ring-primary" : ""}`}
+                                  className={`flex items-center gap-1.5 [&_svg]:!text-current ${isSelected ? "ring-2 ring-ring font-semibold" : ""}`}
+                                  style={{ color: undefined }}
                                 >
-                                  {iconMap[tipo]}
-                                  {opt.label}
+                                  <span className={iconColorMap[tipo]}>{iconMap[tipo]}</span>
+                                  <span>{opt.label}</span>
                                 </Button>
                               );
                             })}

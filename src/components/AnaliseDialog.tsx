@@ -419,18 +419,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const handleUpdateStatus = async () => {
     if (!selectedStatus) return;
+
+    // Validação PRIORITÁRIA: Vistoriado com Pendência requer ao menos uma pendência
+    if (selectedStatus === "vistoriado_com_pendencia" && pendenciasSelecionadas.length === 0) {
+      toast.error("Obrigatório selecionar uma das pendências.");
+      return;
+    }
+
     if (selectedStatus === solicitacao.status && 
         solicitarDeferimento === solicitacao.solicitar_deferimento && 
         solicitarLacreArmador === solicitacao.solicitar_lacre_armador &&
         custoLacreArmador === (solicitacao.lacre_armador_aceite_custo ?? null) &&
         JSON.stringify(pendenciasSelecionadas) === JSON.stringify(solicitacao.pendencias_selecionadas)) {
       toast.info("Nenhuma alteração detectada.");
-      return;
-    }
-    
-    // Validação: Vistoriado com Pendência requer ao menos uma pendência
-    if (selectedStatus === "vistoriado_com_pendencia" && pendenciasSelecionadas.length === 0) {
-      toast.error("Selecione ao menos uma pendência para o status 'Vistoriado com Pendência'.");
       return;
     }
 

@@ -28,6 +28,7 @@ interface ProcessStageStepperProps {
   observacoes?: string[];
   etapasConfig?: EtapaConfigItem[];
   custoposicionamento?: boolean | null;
+  motivoRecusa?: string | null;
 }
 
 interface Stage {
@@ -168,7 +169,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       state = completedState;
       // Once past this stage, show resolved label
       if (isTerminal) {
-        label = terminalLabel; // "Cancelado" or "Recusado"
+        label = isPosic ? "Posicionamento Confirmado" : "Confirmado";
       } else if (isEmPendencia) {
         label = currentStatusLabel?.valor || "Em Pendência";
       } else {
@@ -201,6 +202,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           label: terminalLabel,
           icon: <X className="h-4 w-4" />,
           state: "error",
+          detail: props.motivoRecusa || undefined,
         });
         return stages;
       }
@@ -249,6 +251,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           label: terminalLabel,
           icon: <X className="h-4 w-4" />,
           state: "error",
+          detail: props.motivoRecusa || undefined,
         });
         return stages;
       }
@@ -327,6 +330,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         label: terminalLabel,
         icon: <X className="h-4 w-4" />,
         state: "error",
+        detail: props.motivoRecusa || undefined,
       });
       return stages;
     }

@@ -177,6 +177,11 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                 categoria={(solicitacao as any).categoria}
                 tipoOperacao={(solicitacao as any).tipo_operacao}
                 custoposicionamento={(solicitacao as any).custo_posicionamento ?? null}
+                motivoRecusa={
+                  solicitacao.armazem_aprovado === false
+                    ? solicitacao.armazem_justificativa
+                    : solicitacao.comex_justificativa
+                }
               />
             </div>
 

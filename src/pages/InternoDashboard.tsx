@@ -43,6 +43,8 @@ import useNotifications from "@/hooks/useNotifications";
 import DeferimentoDialog from "@/components/DeferimentoDialog";
 import LacreArmadorDialog from "@/components/LacreArmadorDialog";
 import ReativacaoDialog from "@/components/ReativacaoDialog";
+import ExtrairRelatorioDialog from "@/components/ExtrairRelatorioDialog";
+import ModelosExcelDialog from "@/components/ModelosExcelDialog";
 
 interface Servico {
   id: string;
@@ -89,6 +91,8 @@ const InternoDashboard = () => {
   const [showNavisN4, setShowNavisN4] = useState(false);
   const [reativacaoSolicitacao, setReativacaoSolicitacao] = useState<any>(null);
   const [correcaoStatusSolicitacao, setCorrecaoStatusSolicitacao] = useState<any>(null);
+  const [showExtrairRelatorio, setShowExtrairRelatorio] = useState(false);
+  const [showModelosExcel, setShowModelosExcel] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
@@ -481,9 +485,16 @@ const InternoDashboard = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 z-[100] bg-popover" sideOffset={8}>
-                <DropdownMenuItem onClick={() => navigate("/interno/relatorios")}>
+                <DropdownMenuItem className="font-semibold text-xs text-muted-foreground pointer-events-none">
+                  Modelos de Relatórios
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowExtrairRelatorio(true)}>
                   <BarChart3 className="h-4 w-4 mr-2" />
-                  Modelos de Relatório
+                  Extrair Relatório
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowModelosExcel(true)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Modelos Excel
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowExcelExport(true)}>
@@ -1083,6 +1094,18 @@ const InternoDashboard = () => {
           }}
         />
       )}
+
+      {/* Extrair Relatório Dialog */}
+      <ExtrairRelatorioDialog
+        open={showExtrairRelatorio}
+        onClose={() => setShowExtrairRelatorio(false)}
+      />
+
+      {/* Modelos Excel Dialog */}
+      <ModelosExcelDialog
+        open={showModelosExcel}
+        onClose={() => setShowModelosExcel(false)}
+      />
     </div>
   );
 };

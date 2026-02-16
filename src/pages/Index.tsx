@@ -177,7 +177,7 @@ const Index = () => {
           {/* Left Panel - Action Buttons */}
           <div className="bg-card rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8">
             <h2 className="text-lg font-semibold text-primary mb-4 pb-3 border-b-4 border-secondary">
-              Cadastro / Serviços
+              Solicitação de Serviço
             </h2>
             <div className="grid gap-4">
               {buttons.map((button) => (

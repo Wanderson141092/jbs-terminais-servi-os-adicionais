@@ -943,33 +943,27 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                         {immediateNext.length > 0 ? (
                           <div className="flex flex-wrap gap-2">
                             {immediateNext.map((opt: any) => {
-                              const colorMap: Record<string, string> = {
-                                conforme: "border-emerald-500 text-emerald-700 bg-emerald-50 hover:bg-emerald-100",
-                                nao_conforme: "border-red-500 text-red-700 bg-red-50 hover:bg-red-100",
-                                em_pendencia: "border-amber-500 text-amber-700 bg-amber-50 hover:bg-amber-100",
-                                neutro: "border-blue-500 text-blue-700 bg-blue-50 hover:bg-blue-100",
-                              };
-                              const selectedColorMap: Record<string, string> = {
-                                conforme: "bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400",
-                                nao_conforme: "bg-red-600 text-white hover:bg-red-700 ring-2 ring-red-400",
-                                em_pendencia: "bg-amber-600 text-white hover:bg-amber-700 ring-2 ring-amber-400",
-                                neutro: "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-400",
+                              const iconColorMap: Record<string, string> = {
+                                conforme: "text-emerald-600",
+                                nao_conforme: "text-red-600",
+                                em_pendencia: "text-amber-600",
+                                neutro: "text-blue-600",
                               };
                               const iconMap: Record<string, React.ReactNode> = {
-                                conforme: <CheckCircle2 className="h-3.5 w-3.5" />,
-                                nao_conforme: <XCircle className="h-3.5 w-3.5" />,
-                                em_pendencia: <AlertTriangle className="h-3.5 w-3.5" />,
-                                neutro: <Clock className="h-3.5 w-3.5" />,
+                                conforme: <CheckCircle2 className={`h-3.5 w-3.5 ${iconColorMap['conforme']}`} />,
+                                nao_conforme: <XCircle className={`h-3.5 w-3.5 ${iconColorMap['nao_conforme']}`} />,
+                                em_pendencia: <AlertTriangle className={`h-3.5 w-3.5 ${iconColorMap['em_pendencia']}`} />,
+                                neutro: <Clock className={`h-3.5 w-3.5 ${iconColorMap['neutro']}`} />,
                               };
                               const tipo = opt.tipo_resultado || 'neutro';
                               const isSelected = selectedStatus === opt.value;
                               return (
                                 <Button
                                   key={opt.value}
-                                  variant="outline"
+                                  variant={isSelected ? "default" : "outline"}
                                   size="sm"
                                   onClick={() => setSelectedStatus(opt.value)}
-                                  className={`flex items-center gap-1.5 ${isSelected ? selectedColorMap[tipo] : colorMap[tipo]}`}
+                                  className={`flex items-center gap-1.5 ${isSelected ? "ring-2 ring-primary" : ""}`}
                                 >
                                   {iconMap[tipo]}
                                   {opt.label}

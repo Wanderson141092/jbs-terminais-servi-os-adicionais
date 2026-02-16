@@ -419,6 +419,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
     
+    // Validação: Vistoriado com Pendência requer ao menos uma pendência
+    if (selectedStatus === "vistoriado_com_pendencia" && pendenciasSelecionadas.length === 0) {
+      toast.error("Selecione ao menos uma pendência para o status 'Vistoriado com Pendência'.");
+      return;
+    }
+
     // Validação: se lacre armador ativado, exigir resposta sobre cobrança
     if (solicitarLacreArmador && custoLacreArmador === null) {
       toast.error("Informe se há cobrança de serviço para o lacre armador antes de salvar.");
@@ -1275,7 +1281,36 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                             {new Date(obs.created_at).toLocaleString("pt-BR")}
                           </span>
                         </div>
-                        <p className="text-foreground">{obs.observacao}</p>
+                        {obs.observacao.startsWith("[Correção de Status]") ? (
+                          <div className="text-foreground">
+                            {(() => {
+                              const text = obs.observacao.replace("[Correção de Status] ", "");
+                              // New format: "Status: X.\nObservação: Y."
+                              const newMatch = text.match(/^Status:\s*(.+?)\.\s*\n?Observação:\s*(.+?)\.?$/s);
+                              if (newMatch) {
+                                return (
+                                  <>
+                                    <p><strong>Status:</strong> {newMatch[1].trim()}.</p>
+                                    <p><strong>Observação:</strong> {newMatch[2].trim()}.</p>
+                                  </>
+                                );
+                              }
+                              // Old format: De "X" para "Y": justificativa
+                              const oldMatch = text.match(/^De\s+"([^"]+)"\s+para\s+"([^"]+)":\s*(.+)$/s);
+                              if (oldMatch) {
+                                return (
+                                  <>
+                                    <p><strong>Status:</strong> {oldMatch[2].trim()}.</p>
+                                    <p><strong>Observação:</strong> {oldMatch[3].trim()}.</p>
+                                  </>
+                                );
+                              }
+                              return <p>{text}</p>;
+                            })()}
+                          </div>
+                        ) : (
+                          <p className="text-foreground">{obs.observacao}</p>
+                        )}
                         <StatusBadge status={obs.status_no_momento} />
                       </div>
                     ))}

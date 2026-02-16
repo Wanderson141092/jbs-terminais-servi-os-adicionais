@@ -65,6 +65,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [solicitarDeferimento, setSolicitarDeferimento] = useState(false);
   const [solicitarLacreArmador, setSolicitarLacreArmador] = useState(false);
   const [custoLacreArmador, setCustoLacreArmador] = useState<boolean | null>(null);
+  const [showJustificativaNaoVistoriado, setShowJustificativaNaoVistoriado] = useState(false);
+  const [justificativaNaoVistoriado, setJustificativaNaoVistoriado] = useState("");
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
   const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
@@ -962,7 +964,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                                   key={opt.value}
                                   variant={isSelected ? "secondary" : "outline"}
                                   size="sm"
-                                  onClick={() => setSelectedStatus(opt.value)}
+                                  onClick={() => {
+                                    if (opt.value === 'nao_vistoriado') {
+                                      setShowJustificativaNaoVistoriado(true);
+                                    } else {
+                                      setSelectedStatus(opt.value);
+                                    }
+                                  }}
                                   className={`flex items-center gap-1.5 [&_svg]:!text-current ${isSelected ? "ring-2 ring-ring font-semibold" : ""}`}
                                   style={{ color: undefined }}
                                 >
@@ -1224,7 +1232,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   className="min-h-[60px]"
                 />
                 <Button onClick={handleSaveObservacao} disabled={loading || !observacaoTexto.trim()} size="sm" className="self-end">
-                  Salvar
+                  Atualizar Observação
                 </Button>
               </div>
 
@@ -1389,6 +1397,63 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de justificativa para Não Vistoriado */}
+      <Dialog open={showJustificativaNaoVistoriado} onOpenChange={setShowJustificativaNaoVistoriado}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-600" />
+              Motivo — Não Vistoriado
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Informe o motivo pelo qual a solicitação não foi vistoriada.
+            </p>
+            <Textarea
+              value={justificativaNaoVistoriado}
+              onChange={(e) => setJustificativaNaoVistoriado(e.target.value)}
+              placeholder="Descreva o motivo..."
+              className="min-h-[80px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowJustificativaNaoVistoriado(false)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              disabled={!justificativaNaoVistoriado.trim()}
+              onClick={async () => {
+                // Save justification as observation
+                setObservacaoTexto(justificativaNaoVistoriado.trim());
+                setSelectedStatus("nao_vistoriado");
+                setShowJustificativaNaoVistoriado(false);
+                // Auto-save observation
+                await supabase.from("observacao_historico").insert({
+                  solicitacao_id: solicitacao.id,
+                  observacao: justificativaNaoVistoriado.trim(),
+                  status_no_momento: "nao_vistoriado",
+                  autor_id: userId,
+                  autor_nome: null,
+                });
+                await supabase.from("solicitacoes").update({ observacoes: justificativaNaoVistoriado.trim() }).eq("id", solicitacao.id);
+                const { data: histData } = await supabase
+                  .from("observacao_historico")
+                  .select("*")
+                  .eq("solicitacao_id", solicitacao.id)
+                  .order("created_at", { ascending: false });
+                setObservacaoHistorico((histData as ObservacaoHistorico[]) || []);
+                setJustificativaNaoVistoriado("");
+                toast.success("Motivo registrado. Agora salve as alterações.");
+              }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={showRecusaConfirm} onOpenChange={setShowRecusaConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>

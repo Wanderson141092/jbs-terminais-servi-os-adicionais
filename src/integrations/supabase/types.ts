@@ -828,6 +828,51 @@ export type Database = {
           },
         ]
       }
+      modelos_relatorio: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_url: string | null
+          id: string
+          nome: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          nome: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          nome?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_rules: {
         Row: {
           ativo: boolean

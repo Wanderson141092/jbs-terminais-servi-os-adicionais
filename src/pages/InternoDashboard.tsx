@@ -711,13 +711,13 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground w-[130px]">Ações</TableHead>
                   <TableHead className="text-primary-foreground w-[50px]">$</TableHead>
                   <TableHead className="text-primary-foreground">Protocolo</TableHead>
+                  <TableHead className="text-primary-foreground">Alerta</TableHead>
                   <TableHead className="text-primary-foreground">Serviço Adicional</TableHead>
                   <TableHead className="text-primary-foreground">Data Serviço</TableHead>
                   <TableHead className="text-primary-foreground">Contêiner</TableHead>
                   <TableHead className="text-primary-foreground">Tipo Carga</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
-                  <TableHead className="text-primary-foreground">Alerta</TableHead>
                   {showApprovalColumns && <TableHead className="text-primary-foreground">Administrativa</TableHead>}
                   {showApprovalColumns && <TableHead className="text-primary-foreground">Operacional</TableHead>}
                   <TableHead className="text-primary-foreground">Data Solic.</TableHead>
@@ -799,18 +799,29 @@ const InternoDashboard = () => {
                       </TableCell>
                       <TableCell>
                         {needsLaunchConfirmation(s) ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedSolicitacao(s)}
-                            title={s.lancamento_confirmado ? "Lançamento Confirmado" : "Aguardando confirmação de lançamento"}
-                            className={s.lancamento_confirmado ? "text-muted-foreground" : "text-destructive"}
-                          >
-                            <DollarSign className="h-4 w-4" />
-                          </Button>
+                          s.lancamento_confirmado ? (
+                            <CheckCircle2 className="h-4 w-4 text-muted-foreground/50 mx-auto" />
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedSolicitacao(s)}
+                              title="Aguardando confirmação de lançamento"
+                              className="text-destructive"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </Button>
+                          )
                         ) : null}
                       </TableCell>
                       <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
+                      <TableCell>
+                        {s.cancelamento_solicitado && (
+                          <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 text-[10px] whitespace-nowrap">
+                            Cancelamento solicitado
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm">{s.tipo_operacao || "Posicionamento"}</TableCell>
                       <TableCell className="text-sm">
                         {(() => {
@@ -833,13 +844,6 @@ const InternoDashboard = () => {
                       </TableCell>
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
-                      <TableCell>
-                        {s.cancelamento_solicitado && (
-                          <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 text-[10px] whitespace-nowrap">
-                            Cancelamento solicitado
-                          </Badge>
-                        )}
-                      </TableCell>
                       {showApprovalColumns && (
                         <TableCell>
                           <ApprovalIndicator approved={s.comex_aprovado} />

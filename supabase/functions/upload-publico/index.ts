@@ -113,6 +113,93 @@ Deno.serve(async (req) => {
         );
       }
 
+      // External cancellation request
+      if (body.action === "cancelar_solicitacao") {
+        const { solicitacao_id } = body;
+        if (!solicitacao_id) {
+          return new Response(
+            JSON.stringify({ error: "Solicitação não informada." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Fetch current solicitation
+        const { data: sol, error: solErr } = await supabaseAdmin
+          .from("solicitacoes")
+          .select("id, status, tipo_operacao, protocolo")
+          .eq("id", solicitacao_id)
+          .maybeSingle();
+
+        if (solErr || !sol) {
+          return new Response(
+            JSON.stringify({ error: "Solicitação não encontrada." }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const cancellableStatuses = ["aguardando_confirmacao", "confirmado_aguardando_vistoria"];
+        if (!cancellableStatuses.includes(sol.status)) {
+          return new Response(
+            JSON.stringify({ error: "Esta solicitação não pode ser cancelada no status atual." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Early cancellation (before confirmation) → cancel directly
+        if (sol.status === "aguardando_confirmacao") {
+          const { error: updateErr } = await supabaseAdmin
+            .from("solicitacoes")
+            .update({ status: "cancelado", updated_at: new Date().toISOString() })
+            .eq("id", solicitacao_id);
+
+          if (updateErr) {
+            return new Response(
+              JSON.stringify({ error: "Erro ao cancelar solicitação." }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Notify sectors
+          try {
+            await supabaseAdmin.functions.invoke("notificar-status", {
+              body: { solicitacao_id, novo_status: "cancelado", origem: "cliente" },
+            });
+          } catch (_) { /* notification failure is non-blocking */ }
+
+          return new Response(
+            JSON.stringify({ success: true, message: "Solicitação cancelada com sucesso." }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Late cancellation (post-confirmation) → cancel directly too, internal team will handle costs
+        if (sol.status === "confirmado_aguardando_vistoria") {
+          const { error: updateErr } = await supabaseAdmin
+            .from("solicitacoes")
+            .update({ status: "cancelado", updated_at: new Date().toISOString() })
+            .eq("id", solicitacao_id);
+
+          if (updateErr) {
+            return new Response(
+              JSON.stringify({ error: "Erro ao cancelar solicitação." }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Notify sectors about late cancellation
+          try {
+            await supabaseAdmin.functions.invoke("notificar-status", {
+              body: { solicitacao_id, novo_status: "cancelado", origem: "cliente" },
+            });
+          } catch (_) { /* notification failure is non-blocking */ }
+
+          return new Response(
+            JSON.stringify({ success: true, message: "Solicitação de cancelamento registrada. A equipe avaliará possíveis custos operacionais." }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
       // Upload lacre photo (JSON with base64 - NOT USED, photo goes via FormData)
       if (body.action === "update_lacre_info") {
         const { solicitacao_id, lacre_armador_possui, data_posicionamento } = body;

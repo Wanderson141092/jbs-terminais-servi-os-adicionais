@@ -118,6 +118,8 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   // Lacre form state
   const [lacreColetado, setLacreColetado] = useState<boolean | null>(null);
   const [lacreFotoFile, setLacreFotoFile] = useState<File | null>(null);
@@ -130,6 +132,28 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
 
   const aprovacaoAdministrativo = servicoConfig?.aprovacao_administrativo ?? false;
   const aprovacaoOperacional = servicoConfig?.aprovacao_operacional ?? false;
+
+  const cancellableStatuses = ["aguardando_confirmacao", "confirmado_aguardando_vistoria"];
+  const canCancel = cancellableStatuses.includes(solicitacao.status);
+
+  const handleCancelSolicitacao = async () => {
+    setCancelling(true);
+    try {
+      const { data: response, error } = await supabase.functions.invoke("upload-publico", {
+        body: { action: "cancelar_solicitacao", solicitacao_id: solicitacao.id },
+      });
+      if (error || response?.error) {
+        throw new Error(response?.error || error?.message || "Erro ao cancelar.");
+      }
+      toast.success(response?.message || "Solicitação cancelada com sucesso.");
+      setShowCancelDialog(false);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao cancelar solicitação.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const allDocs = deferimentoDocs.filter(d => d.document_type === "deferimento" || !d.document_type);
   const lacreDocs = deferimentoDocs.filter(d => d.document_type === "lacre_armador");
@@ -386,9 +410,24 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               }
             </div>
             {/* Pendências sub-status */}
-            {solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas && solicitacao.pendencias_selecionadas.length > 0 && (
+             {solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas && solicitacao.pendencias_selecionadas.length > 0 && (
               <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1 mt-1">
                 Pendências: {solicitacao.pendencias_selecionadas.join(", ")}
+              </div>
+            )}
+
+            {/* Cancel button */}
+            {canCancel && (
+              <div className="mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/50 hover:bg-destructive/10 text-xs"
+                  onClick={() => setShowCancelDialog(true)}
+                >
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  Se deseja cancelar a solicitação clique aqui
+                </Button>
               </div>
             )}
           </div>
@@ -776,6 +815,39 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                   Confirmar e Enviar
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmação de cancelamento */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Confirmar Cancelamento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja cancelar esta solicitação?
+            </p>
+            {solicitacao.status !== "aguardando_confirmacao" && (
+              <Alert className="border-amber-400 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="ml-2 text-sm text-amber-700">
+                  Como a solicitação já foi confirmada, a equipe avaliará possíveis custos operacionais antes da efetivação do cancelamento.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)} disabled={cancelling}>
+              Voltar
+            </Button>
+            <Button variant="destructive" onClick={handleCancelSolicitacao} disabled={cancelling}>
+              {cancelling ? "Cancelando..." : "Confirmar Cancelamento"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -167,11 +167,13 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   {
     let state: Stage["state"] = "pending";
     let label = getTitle("aguardando_confirmacao", "Aguardando Confirmação");
+    let icon: React.ReactNode = <Clock className="h-4 w-4" />;
     if (status === "aguardando_confirmacao") {
       state = "current";
     } else if (currentOrder > 1) {
-      state = completedState;
-      // Once past this stage, show resolved label
+      // Past confirmation: always blue with ✓
+      state = isTerminal ? "error" : isEmPendencia ? "pending" : "current";
+      icon = isTerminal ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />;
       if (isEmPendencia) {
         label = currentStatusLabel?.valor || "Em Pendência";
       } else {
@@ -181,7 +183,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     stages.push({
       key: "aguardando_confirmacao",
       label,
-      icon: stateIcon || (state === "pending" && isEmPendencia ? <Check className="h-4 w-4" /> : null) || <Clock className="h-4 w-4" />,
+      icon,
       state,
     });
   }

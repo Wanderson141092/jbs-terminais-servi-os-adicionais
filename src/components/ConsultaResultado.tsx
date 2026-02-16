@@ -468,39 +468,64 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
 
                 {/* Sub-timeline do lacre */}
                 <div className="flex items-center gap-1 text-xs overflow-x-auto pb-1">
-                  {[
-                    { key: "aguardando_preenchimento", label: "Preencher Dados" },
-                    { key: "aguardando_confirmacao", label: "Aguardando Confirmação" },
-                    { key: "posicionamento_confirmado", label: "Posicionamento Confirmado" },
-                    { key: "aguardando_lacre", label: "Aguardando Lacre" },
-                    { key: "servico_concluido", label: "Serviço Concluído" },
-                  ].map((step, i, arr) => {
+                  {(() => {
                     const statusOrder = ["aguardando_preenchimento", "aguardando_confirmacao", "posicionamento_confirmado", "aguardando_lacre", "servico_concluido"];
                     const currentIdx = statusOrder.indexOf(lacreCurrentStatus);
-                    const stepIdx = statusOrder.indexOf(step.key);
                     const isRecusado = lacreCurrentStatus === "recusado";
-                    
-                    let bgColor = "bg-muted text-muted-foreground";
-                    if (isRecusado && step.key === "aguardando_preenchimento") {
-                      bgColor = "bg-red-100 text-red-700 border border-red-300";
-                    } else if (stepIdx < currentIdx) {
-                      bgColor = "bg-green-100 text-green-700 border border-green-300";
-                    } else if (stepIdx === currentIdx) {
-                      if (step.key === "aguardando_confirmacao") bgColor = "bg-blue-100 text-blue-700 border border-blue-300";
-                      else if (step.key === "posicionamento_confirmado") bgColor = "bg-green-100 text-green-700 border border-green-300";
-                      else if (step.key === "servico_concluido") bgColor = "bg-green-100 text-green-700 border border-green-300";
-                      else bgColor = "bg-amber-100 text-amber-700 border border-amber-300";
-                    }
-                    
-                    return (
+
+                    // Build visible steps with replacement logic:
+                    // - "aguardando_confirmacao" is replaced by "posicionamento_confirmado" once reached
+                    // - "aguardando_lacre" is replaced by "Lacre Armador Inserido" when servico_concluido
+                    const allSteps = [
+                      { key: "aguardando_preenchimento", label: "Preencher Dados" },
+                      // Slot 2: show "Aguardando Confirmação" only if not yet past it
+                      currentIdx >= statusOrder.indexOf("posicionamento_confirmado")
+                        ? { key: "posicionamento_confirmado", label: "Posicionamento Confirmado" }
+                        : currentIdx === statusOrder.indexOf("aguardando_confirmacao")
+                          ? { key: "aguardando_confirmacao", label: "Aguardando Confirmação" }
+                          : { key: "aguardando_confirmacao", label: "Aguardando Confirmação" },
+                      // Slot 3: show "Aguardando Lacre" or "Lacre Armador Inserido"
+                      currentIdx >= statusOrder.indexOf("servico_concluido")
+                        ? { key: "lacre_inserido", label: "Lacre Armador Inserido" }
+                        : currentIdx === statusOrder.indexOf("aguardando_lacre")
+                          ? { key: "aguardando_lacre", label: "Aguardando Lacre" }
+                          : { key: "aguardando_lacre", label: "Aguardando Lacre" },
+                      { key: "servico_concluido", label: "Serviço Concluído" },
+                    ];
+
+                    // Remove "posicionamento_confirmado" from its original slot since it replaced aguardando_confirmacao
+                    // and remove "aguardando_lacre" original when replaced by lacre_inserido
+                    // The allSteps already handles replacements, so just render them
+
+                    // Determine colors for each visible step
+                    const getStepColor = (step: { key: string }, stepPosition: number) => {
+                      if (isRecusado && stepPosition === 0) {
+                        return "bg-red-100 text-red-700 border border-red-300";
+                      }
+                      // Map position back to logical progression
+                      const positionToOrder: Record<number, number> = { 0: 0, 1: currentIdx >= 2 ? 2 : 1, 2: currentIdx >= 4 ? 4 : 3, 3: 4 };
+                      const logicalIdx = positionToOrder[stepPosition] ?? stepPosition;
+
+                      if (logicalIdx < currentIdx) {
+                        return "bg-green-100 text-green-700 border border-green-300";
+                      }
+                      if (logicalIdx === currentIdx) {
+                        if (step.key === "aguardando_confirmacao") return "bg-blue-100 text-blue-700 border border-blue-300";
+                        if (step.key === "posicionamento_confirmado" || step.key === "servico_concluido" || step.key === "lacre_inserido") return "bg-green-100 text-green-700 border border-green-300";
+                        return "bg-amber-100 text-amber-700 border border-amber-300";
+                      }
+                      return "bg-muted text-muted-foreground";
+                    };
+
+                    return allSteps.map((step, i) => (
                       <div key={step.key} className="flex items-center gap-1 shrink-0">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap ${bgColor}`}>
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap ${getStepColor(step, i)}`}>
                           {step.label}
                         </span>
-                        {i < arr.length - 1 && <span className="text-muted-foreground">→</span>}
+                        {i < allSteps.length - 1 && <span className="text-muted-foreground">→</span>}
                       </div>
-                    );
-                  })}
+                    ));
+                  })()}
                 </div>
 
                 {/* Cost warning */}

@@ -305,27 +305,36 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
 };
 
 // ─── Lacre armador sub-timeline for PDF ───
-const LACRE_STEPS = [
-  { key: "aguardando_preenchimento", label: "Preencher Dados" },
-  { key: "aguardando_confirmacao", label: "Aguardando Confirmação" },
-  { key: "posicionamento_confirmado", label: "Posicionamento Confirmado" },
-  { key: "aguardando_lacre", label: "Aguardando Lacre" },
-  { key: "servico_concluido", label: "Serviço Concluído" },
-];
-
 const getLacreStagesForPdf = (lacreStatus: string) => {
-  const statusOrder = LACRE_STEPS.map(s => s.key);
+  const statusOrder = ["aguardando_preenchimento", "aguardando_confirmacao", "posicionamento_confirmado", "aguardando_lacre", "servico_concluido"];
   const currentIdx = statusOrder.indexOf(lacreStatus);
   const isRecusado = lacreStatus === "recusado";
 
-  return LACRE_STEPS.map((step, stepIdx) => {
+  // Build steps with replacement logic (same as UI):
+  // - "aguardando_confirmacao" replaced by "posicionamento_confirmado" once reached
+  // - "aguardando_lacre" replaced by "Lacre Armador Inserido" when servico_concluido
+  const steps = [
+    { key: "aguardando_preenchimento", label: "Preencher Dados", logicalIdx: 0 },
+    currentIdx >= statusOrder.indexOf("posicionamento_confirmado")
+      ? { key: "posicionamento_confirmado", label: "Posicionamento Confirmado", logicalIdx: 2 }
+      : { key: "aguardando_confirmacao", label: "Aguardando Confirmação", logicalIdx: 1 },
+    currentIdx >= statusOrder.indexOf("servico_concluido")
+      ? { key: "lacre_inserido", label: "Lacre Armador Inserido", logicalIdx: 4 }
+      : currentIdx >= statusOrder.indexOf("aguardando_lacre")
+        ? { key: "aguardando_lacre", label: "Aguardando Lacre", logicalIdx: 3 }
+        : { key: "aguardando_lacre", label: "Aguardando Lacre", logicalIdx: 3 },
+    { key: "servico_concluido", label: "Serviço Concluído", logicalIdx: 4 },
+  ];
+
+  return steps.map((step) => {
+    const logicalIdx = step.logicalIdx;
     let state = "pending";
     if (isRecusado && step.key === "aguardando_preenchimento") {
       state = "error";
-    } else if (stepIdx < currentIdx) {
+    } else if (logicalIdx < currentIdx) {
       state = "completed";
-    } else if (stepIdx === currentIdx) {
-      if (step.key === "servico_concluido" || step.key === "posicionamento_confirmado") state = "completed";
+    } else if (logicalIdx === currentIdx) {
+      if (step.key === "servico_concluido" || step.key === "posicionamento_confirmado" || step.key === "lacre_inserido") state = "completed";
       else if (step.key === "aguardando_confirmacao") state = "current";
       else state = "warning";
     }

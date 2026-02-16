@@ -140,8 +140,8 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),
-    icon: stateIcon || priorIcon || <FileCheck className="h-4 w-4" />,
-    state: completedState,
+    icon: isTerminal ? <X className="h-4 w-4" /> : priorIcon || <Check className="h-4 w-4" />,
+    state: isTerminal ? "error" : isEmPendencia ? "pending" : "current",
   });
 
   // For Posicionamento cancellations, determine if it was early (before confirmation) or late (after confirmation)

@@ -5,7 +5,7 @@ const FALLBACK_LABELS: Record<string, string> = {
   aguardando_confirmacao: "Aguardando Confirmação",
   cancelado: "Cancelado",
   recusado: "Recusado",
-  confirmado_aguardando_vistoria: "Confirmado - Aguardando Vistoria",
+  confirmado_aguardando_vistoria: "Aguardando conclusão do serviço",
   vistoria_finalizada: "Vistoriado",
   vistoriado_com_pendencia: "Vistoriado com Pendência",
   nao_vistoriado: "Não Vistoriado",

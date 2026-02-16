@@ -497,7 +497,7 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     aprovacaoOperacional,
     deferimentoStatus: showDeferimento ? deferimentoStatus : null,
     hideInternal: true,
-    serviceName: solicitacao.tipo_operacao || undefined,
+    serviceName: solicitacao.tipo_operacao || servicoConfig?.nome || undefined,
     etapasConfig,
   });
 

@@ -258,6 +258,7 @@ Deno.serve(async (req) => {
         campos_visiveis: visibleFixedFields,
         etapas_config: etapasConfig,
         servico_config: servicoData ? {
+          nome: servicoData.nome,
           tipo_agendamento: servicoData.tipo_agendamento,
           deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],
           lacre_armador_status_ativacao: (servicoData as any).lacre_armador_status_ativacao || [],

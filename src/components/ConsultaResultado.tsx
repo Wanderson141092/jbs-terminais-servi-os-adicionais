@@ -364,6 +364,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
     if (status === "nao_vistoriado") return "text-red-700 bg-red-50 border-red-200";
     if (status === "confirmado_aguardando_vistoria") return "text-blue-700 bg-blue-50 border-blue-200";
     if (status === "recusado" || status === "cancelado") return "text-red-700 bg-red-50 border-red-200";
+    if (status === "aguardando_confirmacao") return "text-[#0B1B4D] bg-blue-100 border-blue-200";
     return "text-yellow-700 bg-yellow-50 border-yellow-200";
   };
 

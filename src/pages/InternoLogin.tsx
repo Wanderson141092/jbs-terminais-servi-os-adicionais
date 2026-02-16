@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import LoginOverlay from "@/components/LoginOverlay";
 
-// This page now redirects to the home page since login is handled via the overlay
 const InternoLogin = () => {
   const navigate = useNavigate();
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -17,15 +18,18 @@ const InternoLogin = () => {
       if (session) {
         navigate("/interno/dashboard");
       } else {
-        // Redirect to home page where the login overlay is available
-        navigate("/");
+        setShowLogin(true);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  return null;
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <LoginOverlay open={showLogin} onOpenChange={setShowLogin} />
+    </div>
+  );
 };
 
 export default InternoLogin;

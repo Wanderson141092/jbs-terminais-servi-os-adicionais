@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock, Check,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock, Ship, BarChart3, RotateCcw
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock, Ship, BarChart3, RotateCcw, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
@@ -835,9 +835,30 @@ const InternoDashboard = () => {
                       <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
                       <TableCell>
                         {s.cancelamento_solicitado && (
-                          <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 text-[10px] whitespace-nowrap">
-                            Cancelamento solicitado
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 text-[10px] whitespace-nowrap">
+                              Cancelamento solicitado
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              title="Recusar pedido de cancelamento"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm("Deseja recusar o pedido de cancelamento do cliente?")) return;
+                                const { error } = await supabase
+                                  .from("solicitacoes")
+                                  .update({ cancelamento_solicitado: false, cancelamento_solicitado_em: null })
+                                  .eq("id", s.id);
+                                if (error) { toast.error("Erro: " + error.message); return; }
+                                toast.success("Pedido de cancelamento recusado.");
+                                fetchSolicitacoes();
+                              }}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="text-sm">{s.tipo_operacao || "Posicionamento"}</TableCell>

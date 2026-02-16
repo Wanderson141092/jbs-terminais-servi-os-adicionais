@@ -814,14 +814,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </Badge>
               )}
 
-              {/* Mini status: Cobrança Posicionamento Lacre Armador — só exibe se cobrança = Sim */}
+              {/* Mini status: Custo Posic. Lacre — só exibe se aceite de cobrança = Sim */}
               {solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo === true && (
                 <Badge
                   variant="outline"
                   className="text-[10px] px-2 py-0.5 gap-1 font-semibold border-green-500 text-green-700 bg-green-50"
                 >
-                  <Key className="h-3 w-3" />
-                  Cobrança Posic. Lacre: Confirmado
+                  <DollarSign className="h-3 w-3" />
+                  Custo Posic. Lacre: Sim
                 </Badge>
               )}
             </div>

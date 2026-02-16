@@ -112,10 +112,11 @@ interface ConsultaResultadoProps {
   etapasConfig?: EtapaConfig[];
   lacreArmadorConfig?: LacreArmadorConfig | null;
   lacreArmadorDados?: LacreArmadorDados | null;
+  deferimentoTitulo?: string | null;
   onRefresh: () => void;
 }
 
-const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], lacreArmadorConfig = null, lacreArmadorDados = null, onRefresh }: ConsultaResultadoProps) => {
+const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], lacreArmadorConfig = null, lacreArmadorDados = null, deferimentoTitulo = null, onRefresh }: ConsultaResultadoProps) => {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -747,7 +748,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               <div className="space-y-3">
                 <p className="text-sm font-semibold flex items-center gap-2">
                   <FileText className="h-4 w-4 text-blue-600" />
-                  Deferimento
+                  {deferimentoTitulo || "Deferimento"}
                 </p>
                 {getDeferimentoStatusSection()}
               </div>

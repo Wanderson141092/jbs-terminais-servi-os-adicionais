@@ -52,6 +52,7 @@ const Index = () => {
   const [etapasConfig, setEtapasConfig] = useState<any[]>([]);
   const [lacreArmadorConfig, setLacreArmadorConfig] = useState<any>(null);
   const [lacreArmadorDados, setLacreArmadorDados] = useState<any>(null);
+  const [deferimentoTitulo, setDeferimentoTitulo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [buttons, setButtons] = useState<ExternalButton[]>([]);
@@ -116,6 +117,7 @@ const Index = () => {
       setEtapasConfig(response?.etapas_config || []);
       setLacreArmadorConfig(response?.lacre_armador_config || null);
       setLacreArmadorDados(response?.lacre_armador_dados || null);
+      setDeferimentoTitulo(response?.deferimento_titulo || null);
 
       if (!response?.solicitacao) {
         toast.warning("Nenhuma solicitação encontrada para este serviço com os dados informados.");
@@ -238,6 +240,7 @@ const Index = () => {
                   etapasConfig={etapasConfig}
                   lacreArmadorConfig={lacreArmadorConfig}
                   lacreArmadorDados={lacreArmadorDados}
+                  deferimentoTitulo={deferimentoTitulo}
                   onRefresh={() => handleSearch(lastSearchValor, lastSearchChave)}
                 />
               )}

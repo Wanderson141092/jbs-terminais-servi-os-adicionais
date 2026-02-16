@@ -208,6 +208,7 @@ Deno.serve(async (req) => {
           key === "solicitar_lacre_armador" || key === "lacre_armador_possui" || key === "lacre_armador_aceite_custo" ||
           key === "pendencias_selecionadas" || key === "status_vistoria" || key === "categoria" ||
           key === "tipo_operacao" || key === "observacoes" || key === "custo_posicionamento" ||
+          key === "armazem_justificativa" || key === "comex_justificativa" ||
           visibleFixedFields.includes(key)) {
         sanitizedSolicitacao[key] = value;
       }

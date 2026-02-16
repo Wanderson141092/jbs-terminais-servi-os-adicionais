@@ -114,10 +114,15 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // rather than using STATUS_ORDER (which assigns 99 to terminal states)
   let currentOrder = STATUS_ORDER[status] ?? 0;
   if (isTerminal && (isCancelled || isRecusado)) {
-    // Check if process was confirmed before terminal (approvals exist or custo_posicionamento was answered)
-    const wasConfirmed = (custoposicionamento !== null && custoposicionamento !== undefined) ||
-      (props.comexAprovado === true || props.armazemAprovado === true);
-    currentOrder = wasConfirmed ? 2 : 1;
+    if (isRecusado) {
+      // Recusado always appears right after "Solicitação Recebida" — no "Confirmado" step
+      currentOrder = 1;
+    } else {
+      // Cancelado: check if process was confirmed before cancellation
+      const wasConfirmed = (custoposicionamento !== null && custoposicionamento !== undefined) ||
+        (props.comexAprovado === true || props.armazemAprovado === true);
+      currentOrder = wasConfirmed ? 2 : 1;
+    }
   }
 
   // For terminal states at late stage (order>=2), all completed stages become "error" (red X)

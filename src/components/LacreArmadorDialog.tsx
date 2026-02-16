@@ -135,9 +135,69 @@ const LacreArmadorDialog = ({ solicitacao, userId, onClose }: LacreArmadorDialog
     } else {
       await logAudit(`lacre_status_${novoStatus}`, `Status do lacre armador atualizado para: ${STATUS_LABELS[novoStatus]?.label || novoStatus}`);
       toast.success(`Status atualizado: ${STATUS_LABELS[novoStatus]?.label || novoStatus}`);
+      
+      // When lacre service is concluded, auto-resolve lacre pendency
+      if (novoStatus === "servico_concluido") {
+        await autoResolveLacrePendency();
+      }
+      
       fetchLacreData();
     }
     setActionLoading(false);
+  };
+
+  const autoResolveLacrePendency = async () => {
+    // Fetch current solicitation data
+    const { data: sol } = await supabase
+      .from("solicitacoes")
+      .select("pendencias_selecionadas, status, solicitar_deferimento")
+      .eq("id", solicitacao.id)
+      .maybeSingle();
+    
+    if (!sol) return;
+    
+    const pendencias = (sol.pendencias_selecionadas || []) as string[];
+    const updatedPendencias = pendencias.filter(
+      (p: string) => !p.toLowerCase().includes("lacre")
+    );
+    
+    const updatePayload: any = {
+      pendencias_selecionadas: updatedPendencias,
+      updated_at: new Date().toISOString(),
+    };
+    
+    // If no remaining pendencies and status is vistoriado_com_pendencia, auto-advance
+    if (updatedPendencias.length === 0 && sol.status === "vistoriado_com_pendencia") {
+      // Check if deferimento is blocking
+      let deferimentoBlocking = false;
+      if (sol.solicitar_deferimento) {
+        const { data: defDocs } = await supabase
+          .from("deferimento_documents")
+          .select("status")
+          .eq("solicitacao_id", solicitacao.id)
+          .eq("document_type", "deferimento");
+        
+        const allAceitos = defDocs && defDocs.length > 0 && defDocs.every(d => d.status === "aceito");
+        if (!allAceitos) deferimentoBlocking = true;
+      }
+      
+      if (!deferimentoBlocking) {
+        updatePayload.status = "vistoria_finalizada";
+        updatePayload.status_vistoria = "Vistoria Finalizada";
+        await logAudit("status_atualizado", "Status atualizado automaticamente para Vistoria Finalizada após conclusão do lacre armador e resolução de todas as pendências.");
+        await createNotification(`Solicitação ${solicitacao.protocolo} finalizada automaticamente após conclusão do lacre.`, "status");
+        toast.success("Pendências resolvidas — status avançado para Vistoria Finalizada!");
+      } else {
+        await logAudit("pendencia_lacre_resolvida", "Pendência de lacre armador removida automaticamente. Aguardando deferimento para finalizar.");
+      }
+    } else {
+      await logAudit("pendencia_lacre_resolvida", `Pendência de lacre armador removida automaticamente. Pendências restantes: ${updatedPendencias.length > 0 ? updatedPendencias.join(", ") : "nenhuma"}`);
+    }
+    
+    await supabase
+      .from("solicitacoes")
+      .update(updatePayload)
+      .eq("id", solicitacao.id);
   };
 
   const logAudit = async (acao: string, detalhes: string) => {

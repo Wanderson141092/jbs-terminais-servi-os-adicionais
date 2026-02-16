@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Save, Edit, Trash2, Clock, Shield } from "lucide-react";
+import { ArrowLeft, Plus, Save, Edit, Trash2, Clock, Shield, Timer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import jbsLogo from "@/assets/jbs-terminais-logo.png";
 
@@ -57,6 +57,8 @@ const GestorRegras = () => {
   const [allowedServiceIds, setAllowedServiceIds] = useState<string[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [editingRegra, setEditingRegra] = useState<RegraServico | null>(null);
+  const [showCorteDialog, setShowCorteDialog] = useState(false);
+  const [corteRegra, setCorteRegra] = useState<RegraServico | null>(null);
   const [formData, setFormData] = useState({
     servico_id: "",
     hora_corte: "17:00",
@@ -238,6 +240,24 @@ const GestorRegras = () => {
     fetchData();
   };
 
+  const openCorteDialog = (regra: RegraServico) => {
+    setCorteRegra(regra);
+    setShowCorteDialog(true);
+  };
+
+  const saveCorteConfig = async (recusar: boolean, agendar: boolean) => {
+    if (!corteRegra) return;
+    const { error } = await supabase.from("regras_servico").update({
+      recusar_apos_corte: recusar,
+      agendar_proximo_dia: agendar,
+      updated_at: new Date().toISOString(),
+    }).eq("id", corteRegra.id);
+    if (error) { toast.error("Erro ao salvar"); return; }
+    toast.success("Comportamento após corte atualizado!");
+    setShowCorteDialog(false);
+    fetchData();
+  };
+
   const getServicoNome = (id: string) => servicos.find(s => s.id === id)?.nome || "—";
 
   if (loading) {
@@ -334,8 +354,11 @@ const GestorRegras = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openDialog(regra)}>
+                            <Button variant="ghost" size="icon" onClick={() => openDialog(regra)} title="Editar regra">
                               <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openCorteDialog(regra)} title="Comportamento após corte">
+                              <Timer className="h-4 w-4 text-orange-600" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -445,27 +468,54 @@ const GestorRegras = () => {
               <Switch checked={formData.aplica_dia_anterior} onCheckedChange={c => setFormData({ ...formData, aplica_dia_anterior: c })} />
             </div>
 
-            <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Comportamento após o corte</p>
-              <div className="flex items-center justify-between">
-                <div className="flex-1 pr-2">
-                  <Label className="text-sm">Recusar automaticamente</Label>
-                  <p className="text-[11px] text-muted-foreground">Pedido após o corte é recusado. Reativação somente por usuário interno com justificativa.</p>
-                </div>
-                <Switch checked={formData.recusar_apos_corte} onCheckedChange={c => setFormData({ ...formData, recusar_apos_corte: c, agendar_proximo_dia: c ? false : formData.agendar_proximo_dia })} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex-1 pr-2">
-                  <Label className="text-sm">Agendar para próximo dia ativo</Label>
-                  <p className="text-[11px] text-muted-foreground">Pedido após o corte será atendido no próximo dia marcado como ativo na regra.</p>
-                </div>
-                <Switch checked={formData.agendar_proximo_dia} onCheckedChange={c => setFormData({ ...formData, agendar_proximo_dia: c, recusar_apos_corte: c ? false : formData.recusar_apos_corte })} />
-              </div>
-            </div>
           </div>
           <DialogFooter className="shrink-0">
             <Button onClick={saveRegra} disabled={saving} className="w-full">
               <Save className="h-4 w-4 mr-2" />{editingRegra ? "Salvar" : "Criar Regra"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Comportamento após o Corte */}
+      <Dialog open={showCorteDialog} onOpenChange={setShowCorteDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5" />
+              Comportamento após o Corte
+            </DialogTitle>
+            {corteRegra && (
+              <p className="text-sm text-muted-foreground">{getServicoNome(corteRegra.servico_id)}</p>
+            )}
+          </DialogHeader>
+          {corteRegra && (
+            <div className="space-y-4 mt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 pr-2">
+                  <Label className="text-sm font-medium">Recusar automaticamente</Label>
+                  <p className="text-[11px] text-muted-foreground">Pedido após o corte é recusado. Reativação somente por usuário interno com justificativa.</p>
+                </div>
+                <Switch
+                  checked={corteRegra.recusar_apos_corte}
+                  onCheckedChange={c => setCorteRegra({ ...corteRegra, recusar_apos_corte: c, agendar_proximo_dia: c ? false : corteRegra.agendar_proximo_dia })}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex-1 pr-2">
+                  <Label className="text-sm font-medium">Agendar para próximo dia ativo</Label>
+                  <p className="text-[11px] text-muted-foreground">Pedido após o corte será atendido no próximo dia marcado como ativo na regra.</p>
+                </div>
+                <Switch
+                  checked={corteRegra.agendar_proximo_dia}
+                  onCheckedChange={c => setCorteRegra({ ...corteRegra, agendar_proximo_dia: c, recusar_apos_corte: c ? false : corteRegra.recusar_apos_corte })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => corteRegra && saveCorteConfig(corteRegra.recusar_apos_corte, corteRegra.agendar_proximo_dia)} className="w-full">
+              <Save className="h-4 w-4 mr-2" /> Salvar
             </Button>
           </DialogFooter>
         </DialogContent>

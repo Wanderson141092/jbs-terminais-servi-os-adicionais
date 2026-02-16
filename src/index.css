@@ -115,7 +115,7 @@
   }
 
   .status-aguardando_confirmacao {
-    @apply bg-blue-100 text-[#0B1B4D];
+    @apply bg-blue-50 text-blue-700;
   }
 
   .status-cancelado {

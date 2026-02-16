@@ -108,7 +108,11 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
         });
       }
     } else if (s.status === "nao_vistoriado") {
-      items.push({ label: "Não vistoriado", status: "error" });
+      items.push({
+        label: "Não vistoriado",
+        status: "error",
+        detail: s.observacoes || undefined,
+      });
     } else if (s.status === "confirmado_aguardando_vistoria") {
       items.push({ label: "Aguardando conclusão do serviço", status: "pending" });
     }

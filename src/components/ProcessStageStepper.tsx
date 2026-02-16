@@ -94,6 +94,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   const currentStatusLabel = statusLabels.find(sl => sl.sigla === status);
   const isNaoConforme = currentStatusLabel?.tipo_resultado === "nao_conforme";
   const isEmPendencia = currentStatusLabel?.tipo_resultado === "em_pendencia";
+  const isNeutro = !currentStatusLabel?.tipo_resultado || currentStatusLabel?.tipo_resultado === "neutro";
   
   // Fallback for hardcoded terminal states if no tipo_resultado available
   const isCancelled = status === "cancelado";
@@ -121,14 +122,16 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // For terminal states at late stage (order>=2), all completed stages become "error" (red X)
   // For terminal states at early stage (order<=1), terminal replaces aguardando_confirmacao
   // For em_pendencia states, completed stages revert to "pending" (gray with ✓)
-  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
+  // For neutral states (e.g. aguardando_confirmacao), prior stages use "current" (blue) to match
+  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : isNeutro ? "current" as const : "completed" as const;
 
   // Determine icon override for special states (only for terminal/error)
   const stateIcon = isTerminal ? <X className="h-4 w-4" /> : null;
 
   // Stage 1: Solicitação Recebida (always completed once exists)
   // For em_pendencia, prior stages get gray styling ("pending") but keep ✓ icon
-  const priorIcon = isEmPendencia ? <Check className="h-4 w-4" /> : null;
+  // For neutral status, prior stages use "current" styling with CircleDot icon
+  const priorIcon = isEmPendencia ? <Check className="h-4 w-4" /> : isNeutro ? <CircleDot className="h-4 w-4" /> : null;
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),

@@ -28,6 +28,7 @@ import { useStatusProcesso } from "@/hooks/useStatusProcesso";
 import AnaliseDialog from "@/components/AnaliseDialog";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import ReclassificacaoDialog from "@/components/ReclassificacaoDialog";
+import StatusCorrectionDialog from "@/components/StatusCorrectionDialog";
 import SetorSelector from "@/components/SetorSelector";
 import BatchApprovalDialog from "@/components/BatchApprovalDialog";
 import BatchStatusDialog from "@/components/BatchStatusDialog";
@@ -87,6 +88,7 @@ const InternoDashboard = () => {
   const [showExcelExport, setShowExcelExport] = useState(false);
   const [showNavisN4, setShowNavisN4] = useState(false);
   const [reativacaoSolicitacao, setReativacaoSolicitacao] = useState<any>(null);
+  const [correcaoStatusSolicitacao, setCorrecaoStatusSolicitacao] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   
@@ -808,6 +810,15 @@ const InternoDashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => setCorrecaoStatusSolicitacao(s)}
+                            title="Corrigir Status"
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => downloadInternalPdf(s)}
                             title="Salvar PDF"
                           >
@@ -1032,6 +1043,18 @@ const InternoDashboard = () => {
           userId={user.id}
           onClose={() => {
             setReativacaoSolicitacao(null);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
+
+      {/* Status Correction Dialog */}
+      {correcaoStatusSolicitacao && user && (
+        <StatusCorrectionDialog
+          solicitacao={correcaoStatusSolicitacao}
+          userId={user.id}
+          onClose={() => {
+            setCorrecaoStatusSolicitacao(null);
             fetchSolicitacoes();
           }}
         />

@@ -313,12 +313,57 @@ const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; 
   return y;
 };
 
-// ─── Checklist items (rows with colored accent bar + colored circle icon) ───
+// ─── Draw geometric icons ───
+const drawCheckIcon = (doc: jsPDF, cx: number, cy: number, r: number) => {
+  // White checkmark inside green circle
+  doc.setFillColor(...JBS_GREEN);
+  doc.circle(cx, cy, r, "F");
+  doc.setDrawColor(...JBS_WHITE);
+  doc.setLineWidth(1.2);
+  doc.line(cx - r * 0.45, cy, cx - r * 0.1, cy + r * 0.4);
+  doc.line(cx - r * 0.1, cy + r * 0.4, cx + r * 0.45, cy - r * 0.35);
+};
+
+const drawErrorIcon = (doc: jsPDF, cx: number, cy: number, r: number) => {
+  // White X inside red circle
+  doc.setFillColor(...COLOR_RED);
+  doc.circle(cx, cy, r, "F");
+  doc.setDrawColor(...JBS_WHITE);
+  doc.setLineWidth(1.2);
+  const d = r * 0.38;
+  doc.line(cx - d, cy - d, cx + d, cy + d);
+  doc.line(cx + d, cy - d, cx - d, cy + d);
+};
+
+const drawWarningIcon = (doc: jsPDF, cx: number, cy: number, r: number) => {
+  // White ! inside amber circle
+  doc.setFillColor(217, 140, 20);
+  doc.circle(cx, cy, r, "F");
+  doc.setDrawColor(...JBS_WHITE);
+  doc.setLineWidth(1.3);
+  doc.line(cx, cy - r * 0.45, cx, cy + r * 0.1);
+  doc.setFillColor(...JBS_WHITE);
+  doc.circle(cx, cy + r * 0.38, 0.7, "F");
+};
+
+const drawNeutralIcon = (doc: jsPDF, cx: number, cy: number, r: number) => {
+  // White clock inside blue circle
+  doc.setFillColor(...COLOR_BLUE_LIGHT);
+  doc.circle(cx, cy, r, "F");
+  doc.setDrawColor(...JBS_WHITE);
+  doc.setLineWidth(1.0);
+  // Clock hands
+  doc.line(cx, cy, cx, cy - r * 0.4);
+  doc.line(cx, cy, cx + r * 0.35, cy + r * 0.15);
+};
+
+// ─── Checklist items (rows with colored accent bar + drawn icon) ───
 const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; detail?: string }[], y: number): number => {
   const pageW = doc.internal.pageSize.getWidth();
   const rowH = 14;
   const rowW = pageW - MARGIN * 2;
   const pillR = 2.5;
+  const iconR = 4.5;
 
   for (const item of items) {
     y = ensureSpace(doc, y, rowH + 4);
@@ -329,11 +374,6 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
       item.status === "warning" ? [217, 140, 20] :
       item.status === "pending" ? COLOR_BLUE_LIGHT : [160, 160, 160];
 
-    const iconChar =
-      item.status === "done" ? "\u2713" :
-      item.status === "error" ? "X" :
-      item.status === "warning" ? "!" : "\u23F3";
-
     // Light row background
     doc.setFillColor(248, 249, 250);
     doc.roundedRect(MARGIN, y, rowW, rowH, pillR, pillR, "F");
@@ -342,18 +382,18 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
     doc.setFillColor(...color);
     doc.rect(MARGIN, y + 1, 3, rowH - 2, "F");
 
-    // Colored circle icon
+    // Draw geometric icon
     const circleX = MARGIN + 12;
     const circleY = y + rowH / 2;
-    const circleR = 4.5;
-    doc.setFillColor(...color);
-    doc.circle(circleX, circleY, circleR, "F");
-
-    // Icon character inside circle
-    doc.setTextColor(...JBS_WHITE);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text(iconChar, circleX, circleY + 2.5, { align: "center" });
+    if (item.status === "done") {
+      drawCheckIcon(doc, circleX, circleY, iconR);
+    } else if (item.status === "error") {
+      drawErrorIcon(doc, circleX, circleY, iconR);
+    } else if (item.status === "warning") {
+      drawWarningIcon(doc, circleX, circleY, iconR);
+    } else {
+      drawNeutralIcon(doc, circleX, circleY, iconR);
+    }
 
     // Label
     doc.setTextColor(...JBS_TEXT);

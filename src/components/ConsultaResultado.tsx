@@ -62,6 +62,8 @@ interface LacreArmadorConfig {
   tipo_aceite?: string;
   titulo_externo?: string;
   anexo_ativo?: boolean;
+  periodo_manha_ativo?: boolean;
+  periodo_tarde_ativo?: boolean;
 }
 
 interface LacreArmadorDados {
@@ -542,8 +544,8 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                         <Label className="text-sm font-medium">Período</Label>
                         <select value={lacrePeriodo} onChange={(e) => setLacrePeriodo(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                           <option value="">Selecione...</option>
-                          <option value="manha">Manhã</option>
-                          <option value="tarde">Tarde</option>
+                          {lacreArmadorConfig?.periodo_manha_ativo !== false && <option value="manha">Manhã</option>}
+                          {lacreArmadorConfig?.periodo_tarde_ativo !== false && <option value="tarde">Tarde</option>}
                         </select>
                       </div>
                     </div>

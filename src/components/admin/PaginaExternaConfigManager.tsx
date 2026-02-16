@@ -41,6 +41,8 @@ const LACRE_CONFIGS = [
   { key: "lacre_armador_titulo_externo", label: "Título Externo do Lacre", description: "Título exibido na seção de lacre armador na consulta externa" },
   { key: "lacre_armador_tipo_aceite", label: "Tipo de Aceite do Lacre", description: "Tipo de aceite para custo: 'informativo' ou 'aceite'" },
   { key: "lacre_armador_anexo_ativo", label: "Anexo de Foto do Lacre", description: "Ativa ou desativa o campo de anexo 'RIC do novo lacre com imagem do novo lacre' no formulário externo" },
+  { key: "lacre_armador_periodo_manha", label: "Período Manhã", description: "Ativa ou desativa a opção de período 'Manhã' no formulário de Lacre Armador" },
+  { key: "lacre_armador_periodo_tarde", label: "Período Tarde", description: "Ativa ou desativa a opção de período 'Tarde' no formulário de Lacre Armador" },
 ];
 
 const PaginaExternaConfigManager = () => {
@@ -432,7 +434,7 @@ const PaginaExternaConfigManager = () => {
                   <SelectItem value="aceite">Aceite obrigatório</SelectItem>
                 </SelectContent>
               </Select>
-            ) : editingConfig?.config_key === "lacre_armador_anexo_ativo" ? (
+            ) : ["lacre_armador_anexo_ativo", "lacre_armador_periodo_manha", "lacre_armador_periodo_tarde"].includes(editingConfig?.config_key || "") ? (
               <Select value={editValue || "true"} onValueChange={setEditValue}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

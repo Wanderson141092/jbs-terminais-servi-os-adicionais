@@ -204,33 +204,29 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
 
       {
         let state: Stage["state"] = "pending";
+        let label = getTitle("aguardando_servico", "Aguardando Serviço");
         if (status === "confirmado_aguardando_vistoria") {
           state = "current";
         } else if (currentOrder > 2) {
           state = completedState;
+          // Substitution: replace neutral label with result
+          if (status === "vistoria_finalizada") {
+            label = getTitle("servico_finalizado", "Serviço Concluído");
+          } else if (status === "vistoriado_com_pendencia") {
+            label = getTitle("servico_finalizado", "Serviço Concluído");
+          } else if (status === "nao_vistoriado") {
+            label = getTitle("nao_vistoriado", "Não Vistoriado");
+          }
         }
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
+          const isFinalResult = currentOrder > 2;
           stages.push({
             key: "aguardando_servico",
-            label: getTitle("aguardando_servico", "Aguardando Serviço"),
-            icon: stateIcon || (state === "pending" && isEmPendencia ? <Check className="h-4 w-4" /> : null) || <Clock className="h-4 w-4" />,
-            state,
-          });
-        }
-      }
-
-      // Serviço Concluído
-      {
-        let state: Stage["state"] = "pending";
-        if (status === "vistoria_finalizada" || status === "vistoriado_com_pendencia" || status === "nao_vistoriado") {
-          state = isEmPendencia ? "warning" : completedState;
-        }
-        if (currentOrder >= 2 || ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
-          stages.push({
-            key: "servico_finalizado",
-            label: getTitle("servico_finalizado", "Serviço Concluído"),
-            icon: isEmPendencia && state === "warning" ? <AlertTriangle className="h-4 w-4" /> : stateIcon || <Check className="h-4 w-4" />,
-            state,
+            label,
+            icon: isFinalResult
+              ? (isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : stateIcon || <Check className="h-4 w-4" />)
+              : (stateIcon || (state === "pending" && isEmPendencia ? <Check className="h-4 w-4" /> : null) || <Clock className="h-4 w-4" />),
+            state: isFinalResult && isEmPendencia ? "warning" : state,
           });
         }
       }
@@ -256,67 +252,67 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
 
       {
         let state: Stage["state"] = "pending";
+        let label = getTitle("aguardando_vistoria", "Aguardando Vistoria");
+        let icon: React.ReactNode = <Clock className="h-4 w-4" />;
+        let detail: string | undefined;
+
         if (status === "confirmado_aguardando_vistoria") {
           state = "current";
         } else if (currentOrder > 2) {
-          state = completedState;
+          // Substitution logic: replace neutral "Aguardando Vistoria" with the result
+          if (status === "vistoria_finalizada") {
+            state = completedState;
+            label = getTitle("vistoria_finalizada", "Vistoriado");
+            icon = isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : stateIcon || <Check className="h-4 w-4" />;
+            if (isEmPendencia) state = "warning";
+          } else if (status === "vistoriado_com_pendencia") {
+            state = "warning";
+            label = getTitle("vistoriado_com_pendencia", "Vistoriado");
+            icon = <AlertTriangle className="h-4 w-4" />;
+            const pendDetail = pendenciasSelecionadas?.length
+              ? `Pendências: ${pendenciasSelecionadas.join(", ")}`
+              : undefined;
+            const obsDetail = observacoes?.length ? observacoes[0] : undefined;
+            detail = [pendDetail, obsDetail].filter(Boolean).join(" — ");
+          } else if (status === "nao_vistoriado") {
+            state = isEmPendencia ? "warning" : "error";
+            label = getTitle("nao_vistoriado", "Não Vistoriado");
+            icon = isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : <X className="h-4 w-4" />;
+          } else {
+            state = completedState;
+            icon = stateIcon || <Check className="h-4 w-4" />;
+          }
         }
+
         if (currentOrder >= 2 || status === "confirmado_aguardando_vistoria") {
+          if (state === "pending" && isEmPendencia) {
+            icon = <Check className="h-4 w-4" />;
+          }
           stages.push({
             key: "aguardando_vistoria",
-            label: getTitle("aguardando_vistoria", "Aguardando Vistoria"),
-            icon: stateIcon || (state === "pending" && isEmPendencia ? <Check className="h-4 w-4" /> : null) || <Clock className="h-4 w-4" />,
+            label,
+            icon: state === "current" || state === "pending" ? (stateIcon || icon) : icon,
             state,
+            detail,
           });
         }
       }
 
-      // Vistoria result (only show when reached)
-      if (["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(status)) {
-        if (status === "vistoria_finalizada") {
-          stages.push({
-            key: "vistoria_finalizada",
-            label: getTitle("vistoria_finalizada", "Vistoriado"),
-            icon: isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : stateIcon || <Check className="h-4 w-4" />,
-            state: isEmPendencia ? "warning" : completedState,
-          });
-          // If process had pendências (resolved), show "Pendência Concluída" as positive
-          if (pendenciasSelecionadas?.length) {
-            stages.push({
-              key: "pendencia_concluida",
-              label: getTitle("pendencia_concluida", "Pendência Concluída"),
-              icon: <Check className="h-4 w-4" />,
-              state: "completed",
-            });
-          }
-        } else if (status === "vistoriado_com_pendencia") {
-          const pendDetail = pendenciasSelecionadas?.length
-            ? `Pendências: ${pendenciasSelecionadas.join(", ")}`
-            : undefined;
-          const obsDetail = observacoes?.length ? observacoes[0] : undefined;
-          const detail = [pendDetail, obsDetail].filter(Boolean).join(" — ");
-          // Show "Vistoriado" as warning + pending "Pendência Concluída"
-          stages.push({
-            key: "vistoriado_com_pendencia",
-            label: getTitle("vistoriado_com_pendencia", "Vistoriado"),
-            icon: <AlertTriangle className="h-4 w-4" />,
-            state: "warning",
-            detail,
-          });
-          stages.push({
-            key: "pendencia_concluida",
-            label: getTitle("pendencia_concluida", "Pendência Concluída"),
-            icon: <Clock className="h-4 w-4" />,
-            state: "pending",
-          });
-        } else if (status === "nao_vistoriado") {
-          stages.push({
-            key: "nao_vistoriado",
-            label: getTitle("nao_vistoriado", "Não Vistoriado"),
-            icon: isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : <X className="h-4 w-4" />,
-            state: isEmPendencia ? "warning" : "error",
-          });
-        }
+      // "Pendência Concluída" branch: show when vistoriado_com_pendencia or when vistoria_finalizada with prior pendências
+      if (status === "vistoriado_com_pendencia") {
+        stages.push({
+          key: "pendencia_concluida",
+          label: getTitle("pendencia_concluida", "Pendência Concluída"),
+          icon: <Clock className="h-4 w-4" />,
+          state: "pending",
+        });
+      } else if (status === "vistoria_finalizada" && pendenciasSelecionadas?.length) {
+        stages.push({
+          key: "pendencia_concluida",
+          label: getTitle("pendencia_concluida", "Pendência Concluída"),
+          icon: <Check className="h-4 w-4" />,
+          state: "completed",
+        });
       }
     }
   } else {

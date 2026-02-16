@@ -290,7 +290,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (canCancelConfirmacao && !canCancelDireto) {
       // Requires cost validation
       if (custoposicionamento === null) {
-        toast.error("Informe se há custo de posicionamento antes de salvar.");
+        toast.error("Informe se há cobrança de posicionamento antes de salvar.");
         return;
       }
     }
@@ -322,7 +322,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
     let details = `Status atualizado para: Cancelado`;
     if (canCancelConfirmacao) {
-      details += `. Cancelamento com confirmação interna. Custo de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
+      details += `. Cancelamento com confirmação interna. Cobrança de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
       if (custoposicionamento === true) {
         details += `. Lançamento financeiro ativado.`;
       }
@@ -399,15 +399,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
     
-    // Validação: se lacre armador ativado, exigir resposta sobre custo
+    // Validação: se lacre armador ativado, exigir resposta sobre cobrança
     if (solicitarLacreArmador && custoLacreArmador === null) {
-      toast.error("Informe se há custo de serviço para o lacre armador antes de salvar.");
+      toast.error("Informe se há cobrança de serviço para o lacre armador antes de salvar.");
       return;
     }
     
-    // Validação: cancelamento pós-confirmação requer resposta sobre custo
+    // Validação: cancelamento pós-confirmação requer resposta sobre cobrança
     if (isLateCancel(selectedStatus) && custoposicionamento === null) {
-      toast.error("Informe se há custo de posicionamento antes de salvar.");
+      toast.error("Informe se há cobrança de posicionamento antes de salvar.");
       return;
     }
     
@@ -505,7 +505,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     
     let details = `Status atualizado para: ${statusLabel}`;
     if (isLateCancel(selectedStatus)) {
-      details += `. Cancelamento tardio (pós-confirmação). Custo de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
+      details += `. Cancelamento tardio (pós-confirmação). Cobrança de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
       if (custoposicionamento === true) {
         details += `. Lançamento financeiro ativado.`;
       }
@@ -516,7 +516,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (solicitarLacreArmador !== solicitacao.solicitar_lacre_armador) {
       details += `. Lacre Armador: ${solicitarLacreArmador ? "Ativado" : "Desativado"}`;
       if (solicitarLacreArmador && custoLacreArmador !== null) {
-        details += `. Custo de serviço: ${custoLacreArmador ? "Sim" : "Não"}`;
+        details += `. Cobrança de serviço: ${custoLacreArmador ? "Sim" : "Não"}`;
         if (custoLacreArmador) details += `. Lançamento financeiro ativado.`;
       }
     }
@@ -785,14 +785,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </Badge>
               )}
 
-              {/* Mini status: Custo Posicionamento Lacre Armador — só exibe se custo = Sim */}
+              {/* Mini status: Cobrança Posicionamento Lacre Armador — só exibe se cobrança = Sim */}
               {solicitacao.solicitar_lacre_armador && solicitacao.lacre_armador_aceite_custo === true && (
                 <Badge
                   variant="outline"
                   className="text-[10px] px-2 py-0.5 gap-1 font-semibold border-green-500 text-green-700 bg-green-50"
                 >
                   <Key className="h-3 w-3" />
-                  Custo Posic. Lacre: Confirmado
+                  Cobrança Posic. Lacre: Confirmado
                 </Badge>
               )}
             </div>
@@ -1004,15 +1004,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           )}
                         </div>
 
-                        {/* Custo de Serviço para Lacre Armador */}
+                        {/* Cobrança de Serviço para Lacre Armador */}
                         {solicitarLacreArmador && isPosicionamento && (
                           <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200 ml-6">
                             <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
                               <DollarSign className="h-4 w-4" />
-                              Há custo de serviço (lacre armador)?
+                              Há cobrança de serviço (lacre armador)?
                             </Label>
                             <p className="text-xs text-amber-700">
-                              Confirme se houve custo operacional para o novo posicionamento de inserção do lacre armador. Se sim, o lançamento financeiro será exigido.
+                              Confirme se houve cobrança operacional para o novo posicionamento de inserção do lacre armador. Se sim, o lançamento financeiro será exigido.
                             </p>
                             <div className="flex gap-4 mt-2">
                               <label className="flex items-center gap-2 cursor-pointer">
@@ -1402,10 +1402,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <div className="space-y-2 border rounded-md p-3 bg-amber-50 border-amber-200">
                 <Label className="text-sm font-semibold text-amber-800 flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
-                  Há custo de posicionamento?
+                  Há cobrança de posicionamento?
                 </Label>
                 <p className="text-xs text-amber-700">
-                  Cancelamento após confirmação requer validação de custo operacional.
+                  Cancelamento após confirmação requer validação de cobrança operacional.
                 </p>
                 <div className="flex gap-4 mt-2">
                   <label className="flex items-center gap-2 cursor-pointer">

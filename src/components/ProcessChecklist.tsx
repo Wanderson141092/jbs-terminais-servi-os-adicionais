@@ -87,7 +87,7 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
 
   // Final service conclusion label
   const finalName = serviceName || s.tipo_operacao || "Serviço";
-  const finalLabel = `Serviço "${finalName}" concluído.`;
+  const finalLabel = `Serviço ${finalName} concluído.`;
 
   if (isPosic) {
     // Posicionamento: vistoria-based items

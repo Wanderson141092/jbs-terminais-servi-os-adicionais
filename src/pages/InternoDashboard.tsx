@@ -807,6 +807,7 @@ const InternoDashboard = () => {
                               <Lock className="h-4 w-4" />
                             </Button>
                           )}
+                          {s.status !== "recusado" && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -816,6 +817,7 @@ const InternoDashboard = () => {
                           >
                             <RotateCcw className="h-4 w-4" />
                           </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"

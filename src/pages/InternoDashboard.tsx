@@ -52,6 +52,8 @@ interface Servico {
   deferimento_status_ativacao?: string[];
   lacre_armador_status_ativacao?: string[];
   aprovacao_ativada?: boolean;
+  aprovacao_administrativo?: boolean;
+  aprovacao_operacional?: boolean;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -367,8 +369,19 @@ const InternoDashboard = () => {
     return servico.lacre_armador_status_ativacao.includes(s.status);
   };
 
-  // Check if service needs approval
-  const isServicoPositionamento = tipoServicoFilter.toLowerCase().includes("posicionamento") || tipoServicoFilter === "Todos";
+  // Check if approval columns should be shown
+  // Only show when the service has both administrativo AND operacional approval
+  const showApprovalColumns = (() => {
+    if (tipoServicoFilter === "Todos") {
+      // Show if ANY service has both approvals enabled
+      return servicos.some(s => s.aprovacao_ativada && s.aprovacao_administrativo && s.aprovacao_operacional);
+    }
+    const svc = servicos.find(s => s.nome === tipoServicoFilter);
+    return svc?.aprovacao_ativada && svc?.aprovacao_administrativo && svc?.aprovacao_operacional;
+  })();
+
+  // Count pending cancellations
+  const cancelamentoPendenteCount = dashboardFiltered.filter(s => s.cancelamento_solicitado === true).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -704,8 +717,9 @@ const InternoDashboard = () => {
                   <TableHead className="text-primary-foreground">Tipo Carga</TableHead>
                   <TableHead className="text-primary-foreground">Cliente</TableHead>
                   <TableHead className="text-primary-foreground">Status</TableHead>
-                  <TableHead className="text-primary-foreground">Administrativa</TableHead>
-                  <TableHead className="text-primary-foreground">Operacional</TableHead>
+                  <TableHead className="text-primary-foreground">Alerta</TableHead>
+                  {showApprovalColumns && <TableHead className="text-primary-foreground">Administrativa</TableHead>}
+                  {showApprovalColumns && <TableHead className="text-primary-foreground">Operacional</TableHead>}
                   <TableHead className="text-primary-foreground">Data Solic.</TableHead>
                 </TableRow>
               </TableHeader>
@@ -820,11 +834,22 @@ const InternoDashboard = () => {
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
                       <TableCell>
-                        <ApprovalIndicator approved={s.comex_aprovado} />
+                        {s.cancelamento_solicitado && (
+                          <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 text-[10px] whitespace-nowrap">
+                            Cancelamento solicitado
+                          </Badge>
+                        )}
                       </TableCell>
-                      <TableCell>
-                        <ApprovalIndicator approved={s.armazem_aprovado} />
-                      </TableCell>
+                      {showApprovalColumns && (
+                        <TableCell>
+                          <ApprovalIndicator approved={s.comex_aprovado} />
+                        </TableCell>
+                      )}
+                      {showApprovalColumns && (
+                        <TableCell>
+                          <ApprovalIndicator approved={s.armazem_aprovado} />
+                        </TableCell>
+                      )}
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(s.created_at).toLocaleDateString("pt-BR")}
                       </TableCell>

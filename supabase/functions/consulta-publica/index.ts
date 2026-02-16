@@ -164,7 +164,10 @@ Deno.serve(async (req) => {
     ]);
 
     const deferimentoDocs = deferimentoRes.data;
-    const observacoes = observacoesRes.data || [];
+    // Filter out internal-only observations (status corrections)
+    const observacoes = (observacoesRes.data || []).filter(
+      (o: any) => !o.observacao?.startsWith("[Correção de Status]")
+    );
 
     // Filter status labels by service
     const statusLabels = (statusLabelsRes.data || [])

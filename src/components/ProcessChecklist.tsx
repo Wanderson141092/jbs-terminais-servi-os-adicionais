@@ -120,8 +120,14 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
     // Non-Posicionamento: show intermediate or final stage
     if (s.status === "confirmado_aguardando_vistoria") {
       items.push({ label: "Aguardando conclusão do serviço", status: "pending" });
+    } else if (s.status === "nao_vistoriado") {
+      items.push({
+        label: "Não vistoriado",
+        status: "error",
+        detail: s.observacoes || undefined,
+      });
     } else {
-      const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
+      const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia"];
       if (finishedStatuses.includes(s.status)) {
         const name = serviceName || s.tipo_operacao || "Serviço";
         items.push({

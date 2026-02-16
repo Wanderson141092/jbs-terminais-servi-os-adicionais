@@ -1329,9 +1329,11 @@ export type Database = {
           codigo_prefixo: string
           created_at: string
           deferimento_embutidos: boolean
+          deferimento_pendencias_ativacao: string[] | null
           deferimento_status_ativacao: string[] | null
           descricao: string | null
           id: string
+          lacre_armador_pendencias_ativacao: string[] | null
           lacre_armador_status_ativacao: string[] | null
           nome: string
           status_confirmacao_lancamento: string[] | null
@@ -1347,9 +1349,11 @@ export type Database = {
           codigo_prefixo: string
           created_at?: string
           deferimento_embutidos?: boolean
+          deferimento_pendencias_ativacao?: string[] | null
           deferimento_status_ativacao?: string[] | null
           descricao?: string | null
           id?: string
+          lacre_armador_pendencias_ativacao?: string[] | null
           lacre_armador_status_ativacao?: string[] | null
           nome: string
           status_confirmacao_lancamento?: string[] | null
@@ -1365,9 +1369,11 @@ export type Database = {
           codigo_prefixo?: string
           created_at?: string
           deferimento_embutidos?: boolean
+          deferimento_pendencias_ativacao?: string[] | null
           deferimento_status_ativacao?: string[] | null
           descricao?: string | null
           id?: string
+          lacre_armador_pendencias_ativacao?: string[] | null
           lacre_armador_status_ativacao?: string[] | null
           nome?: string
           status_confirmacao_lancamento?: string[] | null

@@ -491,27 +491,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             ))}
           </div>
 
-          {/* Observações (do histórico interno, visíveis externamente) */}
-          {observacoes.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-                  <FileText className="h-3.5 w-3.5" /> Acompanhamento
-                </p>
-                <div className="space-y-2">
-                  {observacoes.map((obs, i) => (
-                    <div key={i} className="bg-muted/30 rounded-lg p-3 border">
-                      <p className="text-sm">{obs.observacao}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(obs.created_at).toLocaleString("pt-BR")}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+          {/* Acompanhamento removido - uso interno apenas */}
 
           {/* Lacre Armador Section - Mini-form & Sub-timeline */}
           {showLacreArmador && (

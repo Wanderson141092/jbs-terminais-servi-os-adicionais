@@ -380,7 +380,10 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             </div>
             <Separator className="my-1" />
             <div className={`inline-flex items-center px-3 py-1 rounded-md border text-sm font-medium ${getStatusColor(solicitacao.status)}`}>
-              <StatusBadge status={solicitacao.status} />
+              {solicitacao.status === "vistoria_finalizada" && isPositionamento
+                ? <span className="status-badge">Serviço Concluído</span>
+                : <StatusBadge status={solicitacao.status} />
+              }
             </div>
             {/* Pendências sub-status */}
             {solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas && solicitacao.pendencias_selecionadas.length > 0 && (

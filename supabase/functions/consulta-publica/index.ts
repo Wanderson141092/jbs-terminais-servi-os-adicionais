@@ -147,9 +147,8 @@ Deno.serve(async (req) => {
         .order("ordem"),
       supabaseAdmin
         .from("system_config")
-        .select("config_key, config_value")
-        .in("config_key", ["lacre_armador_mensagem_custo", "lacre_armador_tipo_aceite", "lacre_armador_titulo_externo", "lacre_armador_anexo_ativo"])
-        .eq("is_active", true),
+        .select("config_key, config_value, is_active")
+        .in("config_key", ["lacre_armador_mensagem_custo", "lacre_armador_tipo_aceite", "lacre_armador_titulo_externo", "lacre_armador_anexo_ativo"]),
       supabaseAdmin
         .from("lacre_armador_dados")
         .select("*")
@@ -240,9 +239,17 @@ Deno.serve(async (req) => {
       status_gatilho: e.status_gatilho || [],
     }));
 
-    // Build lacre config map
+    // Build lacre config map - respect is_active flag
     const lacreConfigMap: Record<string, string> = {};
     (lacreConfigRes.data || []).forEach((c: any) => {
+      if (c.is_active === false) {
+        // For anexo_ativo, inactive means disabled
+        if (c.config_key === "lacre_armador_anexo_ativo") {
+          lacreConfigMap[c.config_key] = "false";
+        }
+        // Skip other inactive configs
+        return;
+      }
       lacreConfigMap[c.config_key] = c.config_value;
     });
 

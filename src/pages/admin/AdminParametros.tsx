@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch, Ban, HelpCircle } from "lucide-react";
+import { Save, Settings, ArrowLeft, Plus, Edit, Trash2, Clock, FileText, Globe, Eye, Link2, List, Bell, GitBranch, Ban } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
@@ -37,6 +37,8 @@ interface RegraServico {
   limite_sex: number | null;
   limite_sab: number | null;
   aplica_dia_anterior: boolean;
+  recusar_apos_corte: boolean;
+  agendar_proximo_dia: boolean;
   ativo: boolean;
 }
 
@@ -108,6 +110,8 @@ const AdminParametros = () => {
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [showRegraDialog, setShowRegraDialog] = useState(false);
   const [editingRegra, setEditingRegra] = useState<RegraServico | null>(null);
+  const [showCorteDialog, setShowCorteDialog] = useState(false);
+  const [corteRegra, setCorteRegra] = useState<RegraServico | null>(null);
   const [regraFormData, setRegraFormData] = useState({
     servico_id: "",
     hora_corte: "17:00",
@@ -580,7 +584,7 @@ const AdminParametros = () => {
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => navigate("/interno/admin/parametros/ajuda")}>
-          <HelpCircle className="h-4 w-4 mr-2" />
+          <FileText className="h-4 w-4 mr-2" />
           Manual
         </Button>
       </div>
@@ -821,6 +825,12 @@ const AdminParametros = () => {
                           <div className="flex gap-1">
                             <Button variant="ghost" size="icon" onClick={() => openRegraDialog(regra)}>
                               <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => {
+                              setCorteRegra(regra);
+                              setShowCorteDialog(true);
+                            }} title="Comportamento após corte">
+                              <Clock className="h-4 w-4 text-orange-600" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -1346,6 +1356,80 @@ const AdminParametros = () => {
           </div>
           <DialogFooter className="mt-4">
             <Button onClick={saveNotifRule} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog para Comportamento após Corte */}
+      <Dialog open={showCorteDialog} onOpenChange={setShowCorteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-orange-600" />
+              Comportamento após o Corte
+            </DialogTitle>
+          </DialogHeader>
+          {corteRegra && (
+            <div className="space-y-4 mt-2">
+              <p className="text-sm text-muted-foreground">
+                Defina o que acontece quando uma solicitação é enviada após o horário de corte para <strong>{getServicoNome(corteRegra.servico_id)}</strong>.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border rounded-md p-3">
+                  <div>
+                    <Label className="text-sm font-medium">Recusar automaticamente</Label>
+                    <p className="text-xs text-muted-foreground">Solicitações após o corte são recusadas.</p>
+                  </div>
+                  <Switch
+                    checked={corteRegra.recusar_apos_corte}
+                    onCheckedChange={(checked) => {
+                      setCorteRegra({
+                        ...corteRegra,
+                        recusar_apos_corte: checked,
+                        agendar_proximo_dia: checked ? false : corteRegra.agendar_proximo_dia,
+                      });
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between border rounded-md p-3">
+                  <div>
+                    <Label className="text-sm font-medium">Agendar para próximo dia ativo</Label>
+                    <p className="text-xs text-muted-foreground">Solicitações após o corte são reagendadas.</p>
+                  </div>
+                  <Switch
+                    checked={corteRegra.agendar_proximo_dia}
+                    onCheckedChange={(checked) => {
+                      setCorteRegra({
+                        ...corteRegra,
+                        agendar_proximo_dia: checked,
+                        recusar_apos_corte: checked ? false : corteRegra.recusar_apos_corte,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              onClick={async () => {
+                if (!corteRegra) return;
+                setSaving(true);
+                const { error } = await supabase.from("regras_servico").update({
+                  recusar_apos_corte: corteRegra.recusar_apos_corte,
+                  agendar_proximo_dia: corteRegra.agendar_proximo_dia,
+                  updated_at: new Date().toISOString(),
+                }).eq("id", corteRegra.id);
+                if (error) { toast.error("Erro ao salvar"); }
+                else { toast.success("Comportamento após corte atualizado!"); }
+                setSaving(false);
+                setShowCorteDialog(false);
+                fetchAllData();
+              }}
+              disabled={saving}
+            >
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Salvando..." : "Salvar"}
             </Button>

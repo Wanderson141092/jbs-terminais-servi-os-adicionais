@@ -744,7 +744,13 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
           {showDeferimento && (
             <>
               <Separator />
-              {getDeferimentoStatusSection()}
+              <div className="space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  Deferimento
+                </p>
+                {getDeferimentoStatusSection()}
+              </div>
             </>
           )}
         </CardContent>

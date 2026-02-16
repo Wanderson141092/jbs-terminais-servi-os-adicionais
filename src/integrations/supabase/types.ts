@@ -1442,6 +1442,8 @@ export type Database = {
           armazem_data: string | null
           armazem_justificativa: string | null
           armazem_usuario_id: string | null
+          cancelamento_solicitado: boolean | null
+          cancelamento_solicitado_em: string | null
           categoria: string | null
           chave_consulta: string
           cliente_email: string
@@ -1479,6 +1481,8 @@ export type Database = {
           armazem_data?: string | null
           armazem_justificativa?: string | null
           armazem_usuario_id?: string | null
+          cancelamento_solicitado?: boolean | null
+          cancelamento_solicitado_em?: string | null
           categoria?: string | null
           chave_consulta?: string
           cliente_email: string
@@ -1516,6 +1520,8 @@ export type Database = {
           armazem_data?: string | null
           armazem_justificativa?: string | null
           armazem_usuario_id?: string | null
+          cancelamento_solicitado?: boolean | null
+          cancelamento_solicitado_em?: string | null
           categoria?: string | null
           chave_consulta?: string
           cliente_email?: string

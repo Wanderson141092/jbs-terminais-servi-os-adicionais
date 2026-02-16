@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -299,6 +300,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     const updatePayload: any = {
       status: "cancelado",
       status_vistoria: "Cancelado",
+      cancelamento_solicitado: false,
       updated_at: new Date().toISOString(),
     };
 
@@ -714,6 +716,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Alerta de Cancelamento Pendente */}
+            {(solicitacao as any).cancelamento_solicitado === true && solicitacao.status !== "cancelado" && (
+              <Alert className="border-amber-400 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="ml-2 text-sm text-amber-700 font-medium">
+                  O cliente solicitou o cancelamento desta solicitação. Utilize o botão "Cancelar" abaixo para confirmar ou recusar.
+                </AlertDescription>
+              </Alert>
+            )}
             {/* Campos editáveis de cliente */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">

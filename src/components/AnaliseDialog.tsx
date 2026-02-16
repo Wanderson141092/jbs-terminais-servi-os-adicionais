@@ -922,22 +922,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   <p className="text-sm font-semibold">Próxima Etapa:</p>
                   {(() => {
                     const currentOrdem = statusOrdemMap[solicitacao.status];
-                    // Find next step(s): options with ordem > current, grouped by the smallest next ordem
-                    const nextOptions = statusOptions
-                      .filter(opt => opt.ordem !== undefined && currentOrdem !== undefined && opt.ordem > currentOrdem)
-                      .sort((a: any, b: any) => a.ordem - b.ordem);
-                    
-                    // Group by the smallest next ordem value
-                    const minNextOrdem = nextOptions.length > 0 ? nextOptions[0].ordem : null;
-                    const immediateNext = minNextOrdem !== null 
-                      ? nextOptions.filter((opt: any) => opt.ordem === minNextOrdem)
-                      : [];
+                    if (currentOrdem === undefined) {
+                      return <p className="text-xs text-muted-foreground">Status atual sem ordem definida.</p>;
+                    }
 
-                    // Also show all other options as a secondary fallback
-                    const otherOptions = statusOptions.filter(opt => 
-                      opt.value !== solicitacao.status && 
-                      !immediateNext.some((n: any) => n.value === opt.value)
-                    );
+                    // Only show the immediate next ordem (ordem = currentOrdem + 1 step, no skipping)
+                    const allOrdens = [...new Set(statusOptions.map(o => o.ordem).filter((o: number | undefined) => o !== undefined && o > currentOrdem))].sort((a: number, b: number) => a - b);
+                    const nextOrdem = allOrdens.length > 0 ? allOrdens[0] : null;
+                    const immediateNext = nextOrdem !== null
+                      ? statusOptions.filter((opt: any) => opt.ordem === nextOrdem)
+                      : [];
 
                     return (
                       <div className="space-y-2">
@@ -958,27 +952,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground">Não há próxima etapa disponível.</p>
-                        )}
-
-                        {otherOptions.length > 0 && (
-                          <details className="mt-1">
-                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                              Outros status disponíveis ({otherOptions.length})
-                            </summary>
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {otherOptions.map((opt: any) => (
-                                <Button
-                                  key={opt.value}
-                                  variant={selectedStatus === opt.value ? "secondary" : "ghost"}
-                                  size="sm"
-                                  onClick={() => setSelectedStatus(opt.value)}
-                                  className={`text-xs h-7 ${selectedStatus === opt.value ? "ring-1 ring-primary" : ""}`}
-                                >
-                                  {opt.label}
-                                </Button>
-                              ))}
-                            </div>
-                          </details>
                         )}
                       </div>
                     );

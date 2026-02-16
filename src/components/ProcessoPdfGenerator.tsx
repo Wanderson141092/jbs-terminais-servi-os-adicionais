@@ -8,13 +8,13 @@ import logoSrc from "@/assets/jbs-terminais-logo.png";
 
 type RGB = [number, number, number];
 
-const JBS_BLUE: RGB = [11, 27, 77];
+const JBS_BLUE: RGB = [31, 42, 124]; // #1F2A7C
 const JBS_GREEN: RGB = [122, 193, 67];
 const JBS_WHITE: RGB = [255, 255, 255];
-const JBS_GRAY: RGB = [51, 51, 51];
-const JBS_GRAY_MED: RGB = [120, 120, 120];
-const JBS_GRAY_LIGHT: RGB = [245, 247, 250];
-const JBS_BLUE_SOFT: RGB = [230, 235, 248];
+const JBS_TEXT: RGB = [31, 41, 51]; // #1F2933
+const JBS_LABEL: RGB = [107, 114, 128]; // #6B7280
+const JBS_BORDER: RGB = [229, 231, 235]; // #E5E7EB
+const JBS_FOOTER_BG: RGB = [244, 246, 248]; // #F4F6F8
 
 const COLOR_RED: RGB = [200, 40, 40];
 const COLOR_AMBER: RGB = [200, 160, 30];
@@ -38,6 +38,7 @@ interface PdfOptions {
   camposDinamicosExternos?: { campo_nome: string; valor: string }[];
 }
 
+// ─── Logo loader ───
 const loadLogoBase64 = (): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -82,131 +83,153 @@ const getStateColor = (state: string): RGB => {
   }
 };
 
-// ─── Shared drawing helpers ───
+// ─── Drawing helpers matching HTML layout ───
 
-const drawCorporateHeader = (doc: jsPDF, logoBase64: string | null, title: string, subtitle: string, confidential = false) => {
+const MARGIN = 20;
+
+const drawHeader = (doc: jsPDF, logoBase64: string | null, title: string, subtitle: string, confidential = false) => {
   const pageW = doc.internal.pageSize.getWidth();
+  const headerH = 32;
+
+  // Blue background
   doc.setFillColor(...JBS_BLUE);
-  doc.rect(0, 0, pageW, 38, "F");
-  doc.setFillColor(...JBS_GREEN);
-  doc.rect(0, 38, pageW, 1.5, "F");
+  doc.rect(0, 0, pageW, headerH, "F");
+
+  // Logo on white background
   if (logoBase64) {
     doc.setFillColor(...JBS_WHITE);
-    doc.roundedRect(12, 6, 46, 26, 3, 3, "F");
-    doc.addImage(logoBase64, "PNG", 14, 8, 42, 22);
+    doc.roundedRect(MARGIN, 6, 40, 20, 2, 2, "F");
+    doc.addImage(logoBase64, "PNG", MARGIN + 2, 7, 36, 18);
   }
+
+  // Title + subtitle
+  const textX = logoBase64 ? MARGIN + 48 : MARGIN;
   doc.setTextColor(...JBS_WHITE);
-  doc.setFontSize(15);
+  doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text(title, 66, 18);
-  doc.setFontSize(8);
+  doc.text(title, textX, 16);
+  doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(200, 210, 230);
-  doc.text(subtitle, 66, 26);
+  doc.setTextColor(220, 225, 240);
+  doc.text(subtitle, textX, 24);
+
   if (confidential) {
     doc.setFillColor(180, 30, 30);
     const cLabel = "CONFIDENCIAL";
-    const cw = doc.getTextWidth(cLabel) + 10;
-    doc.roundedRect(pageW - 14 - cw, 8, cw, 12, 2, 2, "F");
-    doc.setTextColor(...JBS_WHITE);
     doc.setFontSize(6.5);
+    const cw = doc.getTextWidth(cLabel) + 10;
+    doc.roundedRect(pageW - MARGIN - cw, 10, cw, 12, 2, 2, "F");
+    doc.setTextColor(...JBS_WHITE);
     doc.setFont("helvetica", "bold");
-    doc.text(cLabel, pageW - 14 - cw + 5, 15.5);
+    doc.text(cLabel, pageW - MARGIN - cw + 5, 17.5);
   }
+
+  return headerH + 8;
 };
 
-const drawCorporateFooter = (doc: jsPDF) => {
+const drawFooter = (doc: jsPDF) => {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  doc.setDrawColor(...JBS_GREEN);
-  doc.setLineWidth(0.8);
-  doc.line(14, pageH - 18, pageW - 14, pageH - 18);
-  doc.setTextColor(...JBS_GRAY_MED);
-  doc.setFontSize(6.5);
-  doc.setFont("helvetica", "normal");
-  doc.text("JBS Terminais  ·  Sistema de Gestão de Processos", 14, pageH - 12);
-  doc.text(`Emitido em ${new Date().toLocaleString("pt-BR")}  |  Pág. ${doc.getCurrentPageInfo().pageNumber}`, pageW - 14, pageH - 12, { align: "right" });
-};
+  const footerH = 16;
+  const footerY = pageH - footerH;
 
-const drawProtocolBanner = (doc: jsPDF, protocolo: string, status: string, y: number): number => {
-  const pageW = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...JBS_BLUE_SOFT);
-  doc.roundedRect(14, y, pageW - 28, 22, 3, 3, "F");
-  doc.setFillColor(...JBS_BLUE);
-  doc.rect(14, y, 3, 22, "F");
-  doc.setTextColor(...JBS_BLUE);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("PROTOCOLO", 24, y + 8);
-  doc.setFontSize(12);
-  doc.text(protocolo, 24, y + 17);
-  const statusText = getStatusLabel(status).toUpperCase();
-  const statusColor = getStatusColor(status);
-  doc.setFillColor(...statusColor);
-  const sw = doc.getTextWidth(statusText) * 0.65 + 16;
-  doc.roundedRect(pageW - 18 - sw, y + 5, sw, 12, 2, 2, "F");
-  doc.setTextColor(...JBS_WHITE);
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.text(statusText, pageW - 18 - sw + 8, y + 13);
-  return y + 30;
-};
+  doc.setFillColor(...JBS_FOOTER_BG);
+  doc.rect(0, footerY, pageW, footerH, "F");
+  doc.setDrawColor(...JBS_BORDER);
+  doc.setLineWidth(0.3);
+  doc.line(0, footerY, pageW, footerY);
 
-const drawSectionHeader = (doc: jsPDF, label: string, y: number): number => {
-  const pageW = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...JBS_BLUE);
-  doc.roundedRect(14, y, pageW - 28, 9, 2, 2, "F");
-  doc.setTextColor(...JBS_WHITE);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.text(label, 20, y + 6.2);
-  return y + 14;
-};
-
-const drawStatusPill = (doc: jsPDF, label: string, color: RGB, x: number, y: number): number => {
-  doc.setFillColor(...color);
-  const pw = doc.getTextWidth(label) + 14;
-  doc.roundedRect(x, y, pw, 11, 2, 2, "F");
-  doc.setTextColor(...JBS_WHITE);
+  doc.setTextColor(...JBS_LABEL);
   doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.text(label, x + 7, y + 7.5);
-  return pw;
+  doc.setFont("helvetica", "normal");
+  doc.text("JBS Terminais • Sistema de Gestão de Processos", MARGIN, footerY + 10);
+  doc.text(
+    `Emitido em ${new Date().toLocaleString("pt-BR")}  |  Pág. ${doc.getCurrentPageInfo().pageNumber}`,
+    pageW - MARGIN, footerY + 10, { align: "right" }
+  );
+};
+
+const drawSectionBorder = (doc: jsPDF, y: number): number => {
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.setDrawColor(...JBS_BORDER);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, pageW - MARGIN, y);
+  return y;
 };
 
 const ensureSpace = (doc: jsPDF, y: number, needed: number): number => {
   const pageH = doc.internal.pageSize.getHeight();
-  if (y + needed > pageH - 25) {
+  if (y + needed > pageH - 22) {
     doc.addPage();
-    drawCorporateFooter(doc);
-    return 20;
+    drawFooter(doc);
+    return 16;
   }
   return y;
 };
 
-const drawFieldsTable = (doc: jsPDF, fields: string[][], startY: number): number => {
-  autoTable(doc, {
-    startY,
-    body: fields,
-    theme: "plain",
-    styles: { fontSize: 8.5, cellPadding: { top: 3.5, bottom: 3.5, left: 8, right: 8 }, lineWidth: 0 },
-    columnStyles: {
-      0: { fontStyle: "bold", textColor: JBS_BLUE as any, cellWidth: 52 },
-      1: { textColor: JBS_GRAY as any },
-    },
-    alternateRowStyles: { fillColor: JBS_GRAY_LIGHT as any },
-    didDrawPage: () => drawCorporateFooter(doc),
-    margin: { left: 14, right: 14 },
-  });
-  return (doc as any).lastAutoTable.finalY + 6;
+// Draw a field (label on top, value below) at a given position
+const drawField = (doc: jsPDF, label: string, value: string, x: number, y: number, maxW: number) => {
+  doc.setTextColor(...JBS_LABEL);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.text(label.toUpperCase(), x, y);
+
+  doc.setTextColor(...JBS_TEXT);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  const lines = doc.splitTextToSize(value || "—", maxW);
+  doc.text(lines, x, y + 6);
+  return lines.length * 5 + 10;
 };
 
-// ─── Draw timeline stages as horizontal pills ───
+// Draw fields in a 3-column grid (matching .grid class in HTML)
+const drawFieldsGrid = (doc: jsPDF, fields: [string, string][], startY: number, cols = 3): number => {
+  const pageW = doc.internal.pageSize.getWidth();
+  const usable = pageW - MARGIN * 2;
+  const colW = usable / cols;
+  let y = startY;
+
+  for (let i = 0; i < fields.length; i += cols) {
+    y = ensureSpace(doc, y, 20);
+    let maxH = 0;
+    for (let c = 0; c < cols && i + c < fields.length; c++) {
+      const [label, value] = fields[i + c];
+      const h = drawField(doc, label, value, MARGIN + c * colW, y, colW - 10);
+      if (h > maxH) maxH = h;
+    }
+    y += maxH + 4;
+  }
+  return y;
+};
+
+// Section title (simple text, not a filled bar)
+const drawSectionTitle = (doc: jsPDF, label: string, y: number): number => {
+  y = ensureSpace(doc, y, 16);
+  doc.setTextColor(...JBS_TEXT);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text(label, MARGIN, y + 4);
+  return y + 10;
+};
+
+// Status pill
+const drawStatusPill = (doc: jsPDF, label: string, color: RGB, x: number, y: number): number => {
+  doc.setFillColor(...color);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  const pw = doc.getTextWidth(label) + 14;
+  doc.roundedRect(x, y, pw, 11, 2, 2, "F");
+  doc.setTextColor(...JBS_WHITE);
+  doc.text(label, x + 7, y + 7.5);
+  return pw;
+};
+
+// ─── Timeline stages (horizontal pills with arrows) ───
 const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; detail?: string }[], y: number, indent = 0): number => {
   const pageW = doc.internal.pageSize.getWidth();
-  const startX = 20 + indent;
+  const startX = MARGIN + 4 + indent;
   let x = startX;
-  const maxX = pageW - 20;
+  const maxX = pageW - MARGIN;
 
   for (let i = 0; i < stages.length; i++) {
     const stage = stages[i];
@@ -218,23 +241,20 @@ const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; 
     const tw = doc.getTextWidth(label) + 12;
     const arrowW = i < stages.length - 1 ? 8 : 0;
 
-    // Wrap to next line if needed
     if (x + tw + arrowW > maxX) {
       x = startX;
       y += 14;
       y = ensureSpace(doc, y, 14);
     }
 
-    // Draw pill
     doc.setFillColor(...color);
     doc.roundedRect(x, y, tw, 10, 2, 2, "F");
     doc.setTextColor(...JBS_WHITE);
     doc.text(label, x + 6, y + 7);
     x += tw;
 
-    // Arrow
     if (i < stages.length - 1) {
-      doc.setTextColor(...JBS_GRAY_MED);
+      doc.setTextColor(...JBS_LABEL);
       doc.setFontSize(8);
       doc.text("→", x + 2, y + 7);
       x += arrowW;
@@ -243,15 +263,14 @@ const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; 
 
   y += 14;
 
-  // Draw details
   for (const stage of stages) {
     if (stage.detail) {
       y = ensureSpace(doc, y, 10);
-      doc.setTextColor(...JBS_GRAY_MED);
+      doc.setTextColor(...JBS_LABEL);
       doc.setFontSize(7);
       doc.setFont("helvetica", "italic");
       const lines = doc.splitTextToSize(stage.detail, pageW - 40 - indent);
-      doc.text(lines, 20 + indent, y);
+      doc.text(lines, MARGIN + 4 + indent, y);
       y += lines.length * 5 + 2;
     }
   }
@@ -259,7 +278,7 @@ const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; 
   return y;
 };
 
-// ─── Draw checklist items ───
+// ─── Checklist items ───
 const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; detail?: string }[], y: number): number => {
   const pageW = doc.internal.pageSize.getWidth();
 
@@ -273,30 +292,27 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
       item.status === "pending" ? "current" : "pending"
     );
 
-    // Circle
     doc.setFillColor(...color);
-    doc.circle(24, y + 4, 3, "F");
+    doc.circle(MARGIN + 6, y + 4, 3, "F");
     doc.setTextColor(...JBS_WHITE);
     doc.setFontSize(6);
     doc.setFont("helvetica", "bold");
     const icon = item.status === "done" ? "✓" : item.status === "error" ? "✗" : item.status === "warning" ? "!" : "○";
-    doc.text(icon, 22.5, y + 5.5);
+    doc.text(icon, MARGIN + 4.5, y + 5.5);
 
-    // Label
-    doc.setTextColor(...JBS_GRAY);
-    doc.setFontSize(8);
+    doc.setTextColor(...JBS_TEXT);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "normal");
-    doc.text(item.label, 30, y + 5.5);
-
+    doc.text(item.label, MARGIN + 14, y + 5.5);
     y += 10;
 
     if (item.detail) {
       y = ensureSpace(doc, y, 8);
-      doc.setTextColor(...JBS_GRAY_MED);
+      doc.setTextColor(...JBS_LABEL);
       doc.setFontSize(7);
       doc.setFont("helvetica", "italic");
       const lines = doc.splitTextToSize(item.detail, pageW - 50);
-      doc.text(lines, 30, y);
+      doc.text(lines, MARGIN + 14, y);
       y += lines.length * 5 + 2;
     }
   }
@@ -304,15 +320,12 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
   return y;
 };
 
-// ─── Lacre armador sub-timeline for PDF ───
+// ─── Lacre armador sub-timeline ───
 const getLacreStagesForPdf = (lacreStatus: string) => {
   const statusOrder = ["aguardando_preenchimento", "aguardando_confirmacao", "posicionamento_confirmado", "aguardando_lacre", "servico_concluido"];
   const currentIdx = statusOrder.indexOf(lacreStatus);
   const isRecusado = lacreStatus === "recusado";
 
-  // Build steps with replacement logic (same as UI):
-  // - "aguardando_confirmacao" replaced by "posicionamento_confirmado" once reached
-  // - "aguardando_lacre" replaced by "Lacre Armador Inserido" when servico_concluido
   const steps = [
     { key: "aguardando_preenchimento", label: "Preencher Dados", logicalIdx: 0 },
     currentIdx >= statusOrder.indexOf("posicionamento_confirmado")
@@ -320,9 +333,7 @@ const getLacreStagesForPdf = (lacreStatus: string) => {
       : { key: "aguardando_confirmacao", label: "Aguardando Confirmação", logicalIdx: 1 },
     currentIdx >= statusOrder.indexOf("servico_concluido")
       ? { key: "lacre_inserido", label: "Lacre Armador Inserido", logicalIdx: 4 }
-      : currentIdx >= statusOrder.indexOf("aguardando_lacre")
-        ? { key: "aguardando_lacre", label: "Aguardando Lacre", logicalIdx: 3 }
-        : { key: "aguardando_lacre", label: "Aguardando Lacre", logicalIdx: 3 },
+      : { key: "aguardando_lacre", label: "Aguardando Lacre", logicalIdx: 3 },
     { key: "servico_concluido", label: "Serviço Concluído", logicalIdx: 4 },
   ];
 
@@ -343,7 +354,7 @@ const getLacreStagesForPdf = (lacreStatus: string) => {
 };
 
 // ═══════════════════════════════════════════════
-// EXTERNAL PDF – mirrors the consultation page
+// EXTERNAL PDF
 // ═══════════════════════════════════════════════
 const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): Promise<jsPDF> => {
   const doc = new jsPDF();
@@ -366,26 +377,57 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   let logoBase64: string | null = null;
   try { logoBase64 = await loadLogoBase64(); } catch { /* fallback */ }
 
-  drawCorporateHeader(doc, logoBase64, "Comprovante de Solicitação", "Documento gerado para acompanhamento do cliente");
-  let y = 48;
+  let y = drawHeader(doc, logoBase64, "Comprovante de Solicitação", new Date().toLocaleString("pt-BR"));
 
-  // ─── Protocol + Status ───
-  y = drawProtocolBanner(doc, solicitacao.protocolo, solicitacao.status, y);
+  // ─── Protocol + Status section ───
+  y = ensureSpace(doc, y, 24);
+  const halfW = (pageW - MARGIN * 2) / 2;
+  drawField(doc, "Protocolo", solicitacao.protocolo, MARGIN, y, halfW - 10);
+  drawField(doc, "Status", getStatusLabel(solicitacao.status), MARGIN + halfW, y, halfW - 10);
+  y += 22;
+  y = drawSectionBorder(doc, y);
+  y += 6;
 
-  // ─── Pendências inline ───
+  // ─── Pendências ───
   if (solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas?.length > 0) {
     doc.setFillColor(255, 250, 230);
-    doc.roundedRect(14, y, pageW - 28, 12, 2, 2, "F");
+    doc.roundedRect(MARGIN, y, pageW - MARGIN * 2, 12, 2, 2, "F");
     doc.setTextColor(180, 120, 0);
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.text("Pendências: " + solicitacao.pendencias_selecionadas.join(", "), 20, y + 8);
+    doc.text("Pendências: " + solicitacao.pendencias_selecionadas.join(", "), MARGIN + 6, y + 8);
     y += 16;
   }
 
-  // ─── 1. Progresso do Processo (Timeline Stepper) ───
-  y = ensureSpace(doc, y, 30);
-  y = drawSectionHeader(doc, "PROGRESSO DO PROCESSO", y);
+  // ─── Informações da Solicitação (3-col grid) ───
+  const isPosic = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
+  const isAgendamento = servicoConfig?.tipo_agendamento === "data_horario";
+  const dateLabel = isPosic ? "Posicionar dia" : isAgendamento ? "Agendar para" : "Data do serviço";
+  let dateValue = "—";
+  if (isAgendamento && solicitacao.data_agendamento) {
+    dateValue = new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } else if (solicitacao.data_posicionamento) {
+    dateValue = new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR");
+  }
+
+  const infoFields: [string, string][] = [
+    solicitacao.tipo_operacao ? ["Serviço", solicitacao.tipo_operacao] : null,
+    solicitacao.categoria ? ["Categoria", solicitacao.categoria] : null,
+    solicitacao.tipo_carga ? ["Tipo de Carga", formatTipoCarga(solicitacao.tipo_carga)] : null,
+    solicitacao.numero_conteiner ? ["Contêiner", solicitacao.numero_conteiner] : null,
+    solicitacao.lpco ? ["LPCO", solicitacao.lpco] : null,
+    dateValue !== "—" ? [dateLabel, dateValue] : null,
+    ...camposDinamicosExternos.map(c => [c.campo_nome, c.valor] as [string, string]),
+  ].filter(Boolean) as [string, string][];
+
+  if (infoFields.length > 0) {
+    y = drawFieldsGrid(doc, infoFields, y, 3);
+  }
+  y = drawSectionBorder(doc, y);
+  y += 6;
+
+  // ─── Progresso do Processo ───
+  y = drawSectionTitle(doc, "Progresso do Processo", y);
 
   const stages = getStages({
     status: solicitacao.status,
@@ -407,28 +449,28 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
 
   y = drawTimelineStages(doc, stages, y);
 
-  // Deferimento sub-timeline
   if (showDeferimento) {
     const defStages = getDeferimentoStages(deferimentoStatus ?? null, etapasConfig);
     if (defStages.length > 0) {
       y = ensureSpace(doc, y, 20);
       const defColor: RGB = deferimentoStatus === "recusado" ? COLOR_RED : deferimentoStatus === "recebido" ? JBS_GREEN : deferimentoStatus === "aguardando" ? COLOR_BLUE_LIGHT : COLOR_AMBER;
       doc.setTextColor(...defColor);
-      doc.setFontSize(7);
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
-      doc.text("DEFERIMENTO", 26, y + 4);
+      doc.text("DEFERIMENTO", MARGIN + 10, y + 4);
       y += 8;
-      // Draw left border accent
       doc.setDrawColor(...defColor);
       doc.setLineWidth(1.5);
-      doc.line(22, y - 12, 22, y + 12);
+      doc.line(MARGIN + 6, y - 12, MARGIN + 6, y + 12);
       y = drawTimelineStages(doc, defStages, y, 10);
     }
   }
 
-  // ─── 2. Checklist ───
-  y = ensureSpace(doc, y, 20);
-  y = drawSectionHeader(doc, "CHECKLIST DO PROCESSO", y);
+  y = drawSectionBorder(doc, y);
+  y += 6;
+
+  // ─── Checklist ───
+  y = drawSectionTitle(doc, "Checklist do Processo", y);
 
   const checkItems = getCheckItems({
     solicitacao: {
@@ -446,70 +488,43 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   });
 
   y = drawChecklistItems(doc, checkItems, y);
+  y = drawSectionBorder(doc, y);
+  y += 6;
 
-  // ─── 3. Informações da Solicitação ───
-  y = ensureSpace(doc, y, 20);
-  y = drawSectionHeader(doc, "INFORMAÇÕES DA SOLICITAÇÃO", y);
-
-  const isPosic = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");
-  const isAgendamento = servicoConfig?.tipo_agendamento === "data_horario";
-
-  const dateLabel = isPosic ? "Posicionar dia" : isAgendamento ? "Agendar para" : "Data do serviço";
-  let dateValue = "—";
-  if (isAgendamento && solicitacao.data_agendamento) {
-    dateValue = new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  } else if (solicitacao.data_posicionamento) {
-    dateValue = new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR");
-  }
-
-  const fields = [
-    solicitacao.tipo_operacao ? ["Serviço solicitado", solicitacao.tipo_operacao] : null,
-    solicitacao.numero_conteiner ? ["Contêiner", solicitacao.numero_conteiner] : null,
-    solicitacao.lpco ? ["LPCO", solicitacao.lpco] : null,
-    solicitacao.tipo_carga ? ["Tipo de Carga", formatTipoCarga(solicitacao.tipo_carga)] : null,
-    dateValue !== "—" ? [dateLabel, dateValue] : null,
-    ...camposDinamicosExternos.map(c => [c.campo_nome, c.valor]),
-  ].filter(Boolean) as string[][];
-
-  if (fields.length > 0) {
-    y = drawFieldsTable(doc, fields, y);
-  }
-
-  // ─── 4. Acompanhamento (Observações) ───
+  // ─── Acompanhamento (Observações) ───
   if (observacoes.length > 0) {
-    y = ensureSpace(doc, y, 20);
-    y = drawSectionHeader(doc, "ACOMPANHAMENTO", y);
+    y = drawSectionTitle(doc, "Acompanhamento", y);
 
     for (const obs of observacoes) {
       y = ensureSpace(doc, y, 16);
-      doc.setFillColor(...JBS_GRAY_LIGHT);
-      const obsLines = doc.splitTextToSize(obs.observacao, pageW - 50);
+      doc.setFillColor(...JBS_FOOTER_BG);
+      const obsLines = doc.splitTextToSize(obs.observacao, pageW - MARGIN * 2 - 20);
       const obsH = obsLines.length * 5 + 12;
-      doc.roundedRect(20, y, pageW - 40, obsH, 2, 2, "F");
+      doc.roundedRect(MARGIN + 4, y, pageW - MARGIN * 2 - 8, obsH, 2, 2, "F");
 
-      doc.setTextColor(...JBS_GRAY);
-      doc.setFontSize(8);
+      doc.setTextColor(...JBS_TEXT);
+      doc.setFontSize(8.5);
       doc.setFont("helvetica", "normal");
-      doc.text(obsLines, 26, y + 8);
+      doc.text(obsLines, MARGIN + 10, y + 8);
 
-      doc.setTextColor(...JBS_GRAY_MED);
+      doc.setTextColor(...JBS_LABEL);
       doc.setFontSize(6.5);
-      doc.text(new Date(obs.created_at).toLocaleString("pt-BR"), pageW - 26, y + 8, { align: "right" });
+      doc.text(new Date(obs.created_at).toLocaleString("pt-BR"), pageW - MARGIN - 6, y + 8, { align: "right" });
 
       y += obsH + 4;
     }
+    y = drawSectionBorder(doc, y);
+    y += 6;
   }
 
-  // ─── 5. Lacre Armador ───
+  // ─── Lacre Armador ───
   if (showLacreArmador && lacreArmadorDados) {
-    y = ensureSpace(doc, y, 30);
-    y = drawSectionHeader(doc, lacreArmadorConfig?.titulo_externo?.toUpperCase() || "REGULARIZAÇÃO DE LACRE ARMADOR", y);
+    y = drawSectionTitle(doc, lacreArmadorConfig?.titulo_externo || "Regularização de Lacre Armador", y);
 
     const lacreStatus = lacreArmadorDados.lacre_status || "aguardando_preenchimento";
     const lacreStages = getLacreStagesForPdf(lacreStatus);
     y = drawTimelineStages(doc, lacreStages, y);
 
-    // Status messages
     const lacreMessages: Record<string, { label: string; color: RGB }> = {
       aguardando_confirmacao: { label: "Aguardando confirmação do posicionamento pela equipe.", color: COLOR_BLUE_LIGHT },
       posicionamento_confirmado: { label: "O posicionamento para inclusão do lacre foi confirmado.", color: JBS_GREEN },
@@ -521,87 +536,80 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     if (msg) {
       y = ensureSpace(doc, y, 12);
       doc.setTextColor(...msg.color);
-      doc.setFontSize(8);
+      doc.setFontSize(8.5);
       doc.setFont("helvetica", "bold");
-      doc.text(msg.label, 20, y + 4);
+      doc.text(msg.label, MARGIN + 4, y + 4);
       y += 10;
     }
 
     if (lacreStatus === "recusado" && lacreArmadorDados.motivo_recusa) {
       y = ensureSpace(doc, y, 12);
       doc.setTextColor(...COLOR_RED);
-      doc.setFontSize(8);
+      doc.setFontSize(8.5);
       doc.setFont("helvetica", "bold");
-      doc.text("Solicitação recusada — Motivo: " + lacreArmadorDados.motivo_recusa, 20, y + 4);
+      doc.text("Solicitação recusada — Motivo: " + lacreArmadorDados.motivo_recusa, MARGIN + 4, y + 4);
       y += 10;
     }
 
-    // Submitted data (excluding personal info)
     if (lacreStatus !== "aguardando_preenchimento") {
-      y = ensureSpace(doc, y, 20);
-      const lacreFields: string[][] = [];
-      lacreFields.push(["Lacre coletado", lacreArmadorDados.lacre_coletado ? "Sim" : "Não"]);
+      const lacreFields: [string, string][] = [
+        ["Lacre coletado", lacreArmadorDados.lacre_coletado ? "Sim" : "Não"],
+      ];
       if (lacreArmadorDados.data_posicionamento_lacre) {
         const periodo = lacreArmadorDados.periodo_lacre === "manha" ? "Manhã" : "Tarde";
         lacreFields.push(["Data / Período", `${new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} — ${periodo}`]);
       }
-      // Personal info (nome, telefone, email) excluded per requirement
       if (lacreFields.length > 0) {
-        y = drawFieldsTable(doc, lacreFields, y);
+        y = drawFieldsGrid(doc, lacreFields, y, 2);
       }
     }
+    y = drawSectionBorder(doc, y);
+    y += 6;
   }
 
-  // ─── 6. Deferimento Status Detail ───
+  // ─── Deferimento Status Detail ───
   if (showDeferimento && deferimentoStatus) {
-    y = ensureSpace(doc, y, 20);
-    y = drawSectionHeader(doc, "STATUS DO DEFERIMENTO", y);
+    y = drawSectionTitle(doc, "Status do Deferimento", y);
 
-    if (deferimentoStatus === "recebido") {
-      doc.setTextColor(...JBS_GREEN);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.text("Deferimento Recebido — Todos os documentos foram aprovados.", 20, y + 5);
-      y += 12;
-    } else if (deferimentoStatus === "aguardando") {
-      doc.setTextColor(...COLOR_BLUE_LIGHT);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.text("Aguardando Atendimento — Documento(s) enviado(s), em análise.", 20, y + 5);
-      y += 12;
-    } else if (deferimentoStatus === "recusado") {
-      doc.setTextColor(...COLOR_RED);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.text("Documento Recusado — Reenvio necessário.", 20, y + 5);
-      y += 12;
-    } else {
-      doc.setTextColor(...COLOR_AMBER);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.text("Aguardando envio do deferimento.", 20, y + 5);
-      y += 12;
-    }
+    const defMessages: Record<string, { text: string; color: RGB }> = {
+      recebido: { text: "Deferimento Recebido — Todos os documentos foram aprovados.", color: JBS_GREEN },
+      aguardando: { text: "Aguardando Atendimento — Documento(s) enviado(s), em análise.", color: COLOR_BLUE_LIGHT },
+      recusado: { text: "Documento Recusado — Reenvio necessário.", color: COLOR_RED },
+    };
+    const defMsg = defMessages[deferimentoStatus] || { text: "Aguardando envio do deferimento.", color: COLOR_AMBER };
+    doc.setTextColor(...defMsg.color);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(defMsg.text, MARGIN + 4, y + 4);
+    y += 12;
   }
 
-  drawCorporateFooter(doc);
+  drawFooter(doc);
   return doc;
 };
 
 // ═══════════════════════════════════════════════
-// INTERNAL PDF (admin dashboard report)
+// INTERNAL PDF
 // ═══════════════════════════════════════════════
 const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): Promise<jsPDF> => {
   const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
   const { aprovacaoAtivada = false, deferimentoStatus } = options;
   let logoBase64: string | null = null;
   try { logoBase64 = await loadLogoBase64(); } catch { /* fallback */ }
 
-  drawCorporateHeader(doc, logoBase64, "Relatório Interno de Processo", `Gerado em ${new Date().toLocaleString("pt-BR")}  |  Uso interno`, true);
-  let y = 48;
-  y = drawProtocolBanner(doc, solicitacao.protocolo, solicitacao.status, y);
+  let y = drawHeader(doc, logoBase64, "Relatório Interno de Processo", new Date().toLocaleString("pt-BR"), true);
 
-  const allFields = [
+  // ─── Protocol + Status ───
+  const halfW = (pageW - MARGIN * 2) / 2;
+  drawField(doc, "Protocolo", solicitacao.protocolo, MARGIN, y, halfW - 10);
+  drawField(doc, "Status", getStatusLabel(solicitacao.status), MARGIN + halfW, y, halfW - 10);
+  y += 22;
+  y = drawSectionBorder(doc, y);
+  y += 6;
+
+  // ─── All fields in 3-col grid ───
+  const allFields: [string, string][] = [
     ["Cliente", solicitacao.cliente_nome || "—"],
     ["E-mail", solicitacao.cliente_email || "—"],
     ["CNPJ", solicitacao.cnpj || "—"],
@@ -613,53 +621,78 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     ["Data Posicionamento", solicitacao.data_posicionamento
       ? new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR") : "—"],
     ["Status Vistoria", solicitacao.status_vistoria || "—"],
-    ["Observações", solicitacao.observacoes || "—"],
     ["Data Solicitação", new Date(solicitacao.created_at).toLocaleString("pt-BR")],
   ];
 
-  y = drawFieldsTable(doc, allFields, y);
+  y = drawFieldsGrid(doc, allFields, y, 3);
 
+  // Observações as full-width
+  if (solicitacao.observacoes) {
+    y = ensureSpace(doc, y, 16);
+    doc.setTextColor(...JBS_LABEL);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.text("OBSERVAÇÕES", MARGIN, y);
+    doc.setTextColor(...JBS_TEXT);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    const obsLines = doc.splitTextToSize(solicitacao.observacoes, pageW - MARGIN * 2);
+    doc.text(obsLines, MARGIN, y + 6);
+    y += obsLines.length * 5 + 12;
+  }
+
+  y = drawSectionBorder(doc, y);
+  y += 6;
+
+  // ─── Aprovações ───
   if (aprovacaoAtivada) {
-    y = drawSectionHeader(doc, "APROVAÇÕES", y);
+    y = drawSectionTitle(doc, "Aprovações", y);
     const approvals = [
       { label: "Administrativo", approved: solicitacao.comex_aprovado, justificativa: solicitacao.comex_justificativa },
       { label: "Operacional", approved: solicitacao.armazem_aprovado, justificativa: solicitacao.armazem_justificativa },
     ];
     for (const ap of approvals) {
+      y = ensureSpace(doc, y, 14);
       const statusLabel = ap.approved === true ? "APROVADO" : ap.approved === false ? "RECUSADO" : "PENDENTE";
       const statusBg: RGB = ap.approved === true ? JBS_GREEN : ap.approved === false ? COLOR_RED : COLOR_AMBER;
-      doc.setTextColor(...JBS_GRAY);
-      doc.setFontSize(8.5);
+      doc.setTextColor(...JBS_TEXT);
+      doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      doc.text(ap.label, 22, y + 7);
-      const pw = drawStatusPill(doc, statusLabel, statusBg, 72, y + 1);
+      doc.text(ap.label, MARGIN + 4, y + 7);
+      const pw = drawStatusPill(doc, statusLabel, statusBg, MARGIN + 56, y + 1);
       if (ap.justificativa) {
-        doc.setTextColor(...JBS_GRAY_MED);
+        doc.setTextColor(...JBS_LABEL);
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "italic");
-        doc.text(ap.justificativa.substring(0, 70), 72 + pw + 6, y + 7);
+        doc.text(ap.justificativa.substring(0, 70), MARGIN + 56 + pw + 6, y + 7);
       }
       y += 16;
     }
+    y = drawSectionBorder(doc, y);
+    y += 6;
   }
 
+  // ─── Deferimento ───
   if (solicitacao.solicitar_deferimento && deferimentoStatus) {
-    y = drawSectionHeader(doc, "DEFERIMENTO", y);
+    y = drawSectionTitle(doc, "Deferimento", y);
     const defLabel = deferimentoStatus === "recebido" ? "RECEBIDO" : deferimentoStatus === "recusado" ? "RECUSADO" : "AGUARDANDO";
     const defColor: RGB = deferimentoStatus === "recebido" ? JBS_GREEN : deferimentoStatus === "recusado" ? COLOR_RED : COLOR_AMBER;
-    drawStatusPill(doc, defLabel, defColor, 22, y);
+    drawStatusPill(doc, defLabel, defColor, MARGIN + 4, y);
     y += 18;
+    y = drawSectionBorder(doc, y);
+    y += 6;
   }
 
+  // ─── Lançamento ───
   if (solicitacao.lancamento_confirmado !== undefined && solicitacao.lancamento_confirmado !== null) {
-    y = drawSectionHeader(doc, "LANÇAMENTO", y);
+    y = drawSectionTitle(doc, "Lançamento", y);
     const lancLabel = solicitacao.lancamento_confirmado ? "CONFIRMADO" : "PENDENTE";
     const lancColor: RGB = solicitacao.lancamento_confirmado ? JBS_GREEN : COLOR_AMBER;
-    drawStatusPill(doc, lancLabel, lancColor, 22, y);
+    drawStatusPill(doc, lancLabel, lancColor, MARGIN + 4, y);
     y += 18;
   }
 
-  drawCorporateFooter(doc);
+  drawFooter(doc);
   return doc;
 };
 

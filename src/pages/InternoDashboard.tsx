@@ -91,6 +91,7 @@ const InternoDashboard = () => {
   const [correcaoStatusSolicitacao, setCorrecaoStatusSolicitacao] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
+  const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   
   const { isAdmin } = useAdminCheck(user?.id || null);
   const { statusOptions, statusLabels } = useStatusProcesso();
@@ -134,6 +135,15 @@ const InternoDashboard = () => {
       .eq("ativo", true)
       .order("nome");
     setServicos((data || []) as Servico[]);
+  }, []);
+
+  const fetchCobrancaConfigs = useCallback(async () => {
+    const { data } = await supabase
+      .from("lancamento_cobranca_config")
+      .select("*")
+      .eq("ativo", true)
+      .order("created_at");
+    setCobrancaConfigs(data || []);
   }, []);
 
   const fetchSolicitacoes = useCallback(async () => {
@@ -200,8 +210,9 @@ const InternoDashboard = () => {
       fetchUnread();
       fetchServicos();
       fetchDeferimentoCounts();
+      fetchCobrancaConfigs();
     }
-  }, [user, fetchProfile, fetchSolicitacoes, fetchUnread, fetchServicos, fetchDeferimentoCounts]);
+  }, [user, fetchProfile, fetchSolicitacoes, fetchUnread, fetchServicos, fetchDeferimentoCounts, fetchCobrancaConfigs]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -842,7 +853,13 @@ const InternoDashboard = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => setSelectedSolicitacao(s)}
-                              title="Aguardando confirmação de lançamento"
+                              title={(() => {
+                                const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+                                const cfg = cobrancaConfigs.find((c: any) => 
+                                  c.tipo === "servico" && (c.servico_ids.length === 0 || (servico && c.servico_ids.includes(servico.id)))
+                                );
+                                return cfg ? `${cfg.rotulo_analise} — Pendente` : "Aguardando confirmação de lançamento";
+                              })()}
                               className="text-destructive"
                             >
                               <DollarSign className="h-4 w-4" />

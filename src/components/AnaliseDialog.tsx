@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [observacaoTexto, setObservacaoTexto] = useState("");
   const [observacaoHistorico, setObservacaoHistorico] = useState<ObservacaoHistorico[]>([]);
   const [statusOptions, setStatusOptions] = useState<any[]>([]);
+  const [statusOrdemMap, setStatusOrdemMap] = useState<Record<string, number>>({});
   const [pendenciaOpcoes, setPendenciaOpcoes] = useState<any[]>([]);
   const [pendenciasSelecionadas, setPendenciasSelecionadas] = useState<string[]>([]);
   const [solicitarDeferimento, setSolicitarDeferimento] = useState(false);
@@ -107,8 +108,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       // Map sigla (DB enum value) -> valor (display label)
       const dynamicOptions = filteredStatus.map((s: any) => ({
         value: s.sigla || s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-        label: s.valor
+        label: s.valor,
+        ordem: s.ordem
       }));
+      
+      // Build ordem map
+      const ordemMap: Record<string, number> = {};
+      dynamicOptions.forEach((opt: any) => { ordemMap[opt.value] = opt.ordem; });
+      setStatusOrdemMap(ordemMap);
       
       // Filter out cancelado and recusado from the dropdown - they are now managed by dedicated buttons
       const filteredOptions = dynamicOptions.filter((opt: any) => 
@@ -912,17 +919,70 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <>
                 <Separator />
                 <div className="space-y-3 bg-muted/20 p-4 rounded-lg border">
-                  <p className="text-sm font-semibold">Atualizar Status & Ações:</p>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o novo status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <p className="text-sm font-semibold">Próxima Etapa:</p>
+                  {(() => {
+                    const currentOrdem = statusOrdemMap[solicitacao.status];
+                    // Find next step(s): options with ordem > current, grouped by the smallest next ordem
+                    const nextOptions = statusOptions
+                      .filter(opt => opt.ordem !== undefined && currentOrdem !== undefined && opt.ordem > currentOrdem)
+                      .sort((a: any, b: any) => a.ordem - b.ordem);
+                    
+                    // Group by the smallest next ordem value
+                    const minNextOrdem = nextOptions.length > 0 ? nextOptions[0].ordem : null;
+                    const immediateNext = minNextOrdem !== null 
+                      ? nextOptions.filter((opt: any) => opt.ordem === minNextOrdem)
+                      : [];
+
+                    // Also show all other options as a secondary fallback
+                    const otherOptions = statusOptions.filter(opt => 
+                      opt.value !== solicitacao.status && 
+                      !immediateNext.some((n: any) => n.value === opt.value)
+                    );
+
+                    return (
+                      <div className="space-y-2">
+                        {immediateNext.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {immediateNext.map((opt: any) => (
+                              <Button
+                                key={opt.value}
+                                variant={selectedStatus === opt.value ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setSelectedStatus(opt.value)}
+                                className={`flex items-center gap-1.5 ${selectedStatus === opt.value ? "ring-2 ring-primary" : ""}`}
+                              >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                                {opt.label}
+                              </Button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Não há próxima etapa disponível.</p>
+                        )}
+
+                        {otherOptions.length > 0 && (
+                          <details className="mt-1">
+                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                              Outros status disponíveis ({otherOptions.length})
+                            </summary>
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {otherOptions.map((opt: any) => (
+                                <Button
+                                  key={opt.value}
+                                  variant={selectedStatus === opt.value ? "secondary" : "ghost"}
+                                  size="sm"
+                                  onClick={() => setSelectedStatus(opt.value)}
+                                  className={`text-xs h-7 ${selectedStatus === opt.value ? "ring-1 ring-primary" : ""}`}
+                                >
+                                  {opt.label}
+                                </Button>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Custo de Posicionamento removed from here - now in cancel dialog */}
 

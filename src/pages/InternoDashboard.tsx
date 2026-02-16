@@ -767,8 +767,8 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Reativação button - only for recusado */}
-                          {s.status === "recusado" && (
+                          {/* Reativação button - only for recusado, NOT client-cancelled */}
+                          {s.status === "recusado" && !s.cancelamento_solicitado && (
                             <Button
                               variant="ghost"
                               size="sm"

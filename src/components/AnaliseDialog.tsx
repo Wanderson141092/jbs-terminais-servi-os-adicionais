@@ -34,6 +34,7 @@ interface ServicoConfig {
   status_confirmacao_lancamento?: string[];
   deferimento_status_ativacao?: string[];
   lacre_armador_status_ativacao?: string[];
+  lacre_armador_pendencias_ativacao?: string[];
 }
 
 interface ObservacaoHistorico {
@@ -1036,7 +1037,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   {(() => {
                     const isPosicionamento = servicoConfig?.nome?.toLowerCase().includes("posicionamento");
                     const lacreStatusAtivacao = servicoConfig?.lacre_armador_status_ativacao || [];
-                    const showLacre = isPosicionamento && lacreStatusAtivacao.length > 0 && lacreStatusAtivacao.includes(solicitacao.status);
+                    const lacrePendenciasAtivacao = servicoConfig?.lacre_armador_pendencias_ativacao || [];
+                    const statusMatch = lacreStatusAtivacao.length > 0 && lacreStatusAtivacao.includes(solicitacao.status);
+                    const pendenciasMatch = lacrePendenciasAtivacao.length === 0 || lacrePendenciasAtivacao.some((p: string) => (solicitacao.pendencias_selecionadas || []).includes(p));
+                    const showLacre = isPosicionamento && statusMatch && pendenciasMatch;
                     if (!showLacre && !solicitarLacreArmador) return null;
                     const showLacreConfirmLancamento = solicitarLacreArmador && isPosicionamento && custoLacreArmador === true && solicitacao.lancamento_confirmado === false;
                     return (
@@ -1132,13 +1136,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       "cancelado",
                       "servico_concluido",
                       "vistoria_finalizada",
+                      "vistoriado_com_pendencia",
                     ];
                     if (terminalStatuses.includes(solicitacao.status)) return null;
-
-                    const currentOrdem = statusOrdemMap[solicitacao.status];
-                    const allOrdens = [...new Set(statusOptions.map(o => o.ordem).filter((o: number | undefined) => o !== undefined && o > (currentOrdem ?? -1)))].sort((a: number, b: number) => a - b);
-                    const hasNextSteps = allOrdens.length > 0;
-                    if (!hasNextSteps && selectedStatus === solicitacao.status) return null;
                     return (
                       <Button 
                         onClick={handleUpdateStatus} 

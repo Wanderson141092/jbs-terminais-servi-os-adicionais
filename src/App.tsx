@@ -28,7 +28,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/servicos-adicionais" element={<Index />} />
           <Route path="/interno" element={<InternoLogin />} />
           <Route path="/recuperar-senha" element={<RecuperarSenha />} />
           <Route path="/interno/dashboard" element={<InternoDashboard />} />

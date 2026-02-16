@@ -12,14 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { servico_id, valor, chave } = await req.json();
-
-    if (!servico_id || typeof servico_id !== "string") {
-      return new Response(
-        JSON.stringify({ error: "Serviço inválido." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const { valor, chave } = await req.json();
 
     if (!valor || typeof valor !== "string" || valor.trim().length < 3 || valor.trim().length > 50) {
       return new Response(
@@ -36,28 +29,12 @@ Deno.serve(async (req) => {
     }
 
     const chaveUpper = chave.toUpperCase().trim();
+    const valorUpper = valor.toUpperCase().trim();
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    const { data: servicoData, error: servicoError } = await supabaseAdmin
-      .from("servicos")
-      .select("id, nome, tipo_agendamento, deferimento_status_ativacao, lacre_armador_status_ativacao, aprovacao_administrativo, aprovacao_operacional")
-      .eq("id", servico_id)
-      .eq("ativo", true)
-      .maybeSingle();
-
-    if (servicoError || !servicoData) {
-      return new Response(
-        JSON.stringify({ error: "Serviço não encontrado." }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const tipoOperacao = servicoData.nome;
-    const valorUpper = valor.toUpperCase().trim();
 
     const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, solicitar_lacre_armador, lacre_armador_possui, lacre_armador_aceite_custo, pendencias_selecionadas, observacoes, custo_posicionamento";
 
@@ -68,7 +45,6 @@ Deno.serve(async (req) => {
       .from("solicitacoes")
       .select(selectFields)
       .eq("protocolo", valorUpper)
-      .eq("tipo_operacao", tipoOperacao)
       .eq("chave_consulta", chaveUpper)
       .maybeSingle();
 
@@ -80,7 +56,6 @@ Deno.serve(async (req) => {
         .from("solicitacoes")
         .select(selectFields)
         .eq("numero_conteiner", valorUpper)
-        .eq("tipo_operacao", tipoOperacao)
         .eq("chave_consulta", chaveUpper)
         .maybeSingle();
       solicitacao = byContainer;
@@ -92,7 +67,6 @@ Deno.serve(async (req) => {
         .from("solicitacoes")
         .select(selectFields)
         .eq("lpco", valorUpper)
-        .eq("tipo_operacao", tipoOperacao)
         .eq("chave_consulta", chaveUpper)
         .maybeSingle();
       solicitacao = byLpco;
@@ -104,6 +78,16 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Resolve servico from tipo_operacao to get config
+    const { data: servicoData } = await supabaseAdmin
+      .from("servicos")
+      .select("id, nome, tipo_agendamento, deferimento_status_ativacao, lacre_armador_status_ativacao, aprovacao_administrativo, aprovacao_operacional")
+      .eq("nome", solicitacao.tipo_operacao)
+      .eq("ativo", true)
+      .maybeSingle();
+
+    const servicoId = servicoData?.id || null;
 
     // Fetch deferimento documents, observations, status labels, field config, dynamic fields, lacre data in parallel
     const [deferimentoRes, observacoesRes, statusLabelsRes, camposFixosRes, camposDinamicosRes, camposValoresRes, etapasConfigRes, lacreConfigRes, lacreArmadorDadosRes] = await Promise.all([
@@ -161,7 +145,7 @@ Deno.serve(async (req) => {
 
     // Filter status labels by service
     const statusLabels = (statusLabelsRes.data || [])
-      .filter((s: any) => s.servico_ids.length === 0 || s.servico_ids.includes(servicoData.id))
+      .filter((s: any) => !servicoId || s.servico_ids.length === 0 || s.servico_ids.includes(servicoId))
       .map((s: any) => ({
         sigla: s.sigla,
         valor: s.valor,
@@ -271,13 +255,13 @@ Deno.serve(async (req) => {
         campos_dinamicos_externos: dynamicFieldsForExternal,
         campos_visiveis: visibleFixedFields,
         etapas_config: etapasConfig,
-        servico_config: {
+        servico_config: servicoData ? {
           tipo_agendamento: servicoData.tipo_agendamento,
           deferimento_status_ativacao: servicoData.deferimento_status_ativacao || [],
           lacre_armador_status_ativacao: (servicoData as any).lacre_armador_status_ativacao || [],
           aprovacao_administrativo: servicoData.aprovacao_administrativo ?? false,
           aprovacao_operacional: servicoData.aprovacao_operacional ?? false,
-        },
+        } : null,
         lacre_armador_config: {
           mensagem_custo: lacreConfigMap["lacre_armador_mensagem_custo"] || "",
           tipo_aceite: lacreConfigMap["lacre_armador_tipo_aceite"] || "informativo",

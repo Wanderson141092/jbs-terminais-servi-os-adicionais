@@ -113,6 +113,7 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
         status: "error",
         detail: s.observacoes || undefined,
       });
+      items.push({ label: "Serviço concluído", status: "done" });
     } else if (s.status === "confirmado_aguardando_vistoria") {
       items.push({ label: "Aguardando conclusão do serviço", status: "pending" });
     }
@@ -126,6 +127,7 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
         status: "error",
         detail: s.observacoes || undefined,
       });
+      items.push({ label: "Serviço concluído", status: "done" });
     } else {
       const finishedStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia"];
       if (finishedStatuses.includes(s.status)) {

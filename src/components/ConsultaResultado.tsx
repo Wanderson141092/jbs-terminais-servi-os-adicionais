@@ -700,15 +700,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                     {lacreArmadorDados.data_posicionamento_lacre && (
                       <p><strong>Data:</strong> {new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} — {lacreArmadorDados.periodo_lacre === "manha" ? "Manhã" : "Tarde"}</p>
                     )}
-                    {lacreArmadorDados.responsavel_nome && <p><strong>Responsável:</strong> {lacreArmadorDados.responsavel_nome}</p>}
-                    {lacreArmadorDados.responsavel_telefone && <p><strong>Telefone:</strong> {lacreArmadorDados.responsavel_telefone}</p>}
-                    {lacreArmadorDados.responsavel_email && <p><strong>E-mail:</strong> {lacreArmadorDados.responsavel_email}</p>}
-                    {lacreArmadorDados.foto_lacre_url && (
-                      <div className="mt-2">
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">RIC do novo lacre com imagem do novo lacre</p>
-                        <img src={lacreArmadorDados.foto_lacre_url} alt="RIC do novo lacre" className="max-w-[200px] rounded border" />
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

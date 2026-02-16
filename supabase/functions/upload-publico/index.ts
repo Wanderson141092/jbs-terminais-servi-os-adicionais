@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         // Fetch current solicitation
         const { data: sol, error: solErr } = await supabaseAdmin
           .from("solicitacoes")
-          .select("id, status, tipo_operacao, protocolo")
+          .select("id, status, tipo_operacao, protocolo, cancelamento_solicitado")
           .eq("id", solicitacao_id)
           .maybeSingle();
 
@@ -172,29 +172,41 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Late cancellation (post-confirmation) → cancel directly too, internal team will handle costs
+        // Late cancellation (post-confirmation) → set pending flag, internal team must confirm
         if (sol.status === "confirmado_aguardando_vistoria") {
+          // Check if cancellation already requested
+          if (sol.cancelamento_solicitado) {
+            return new Response(
+              JSON.stringify({ error: "Cancelamento já foi solicitado para esta solicitação. Aguarde a análise da equipe." }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
           const { error: updateErr } = await supabaseAdmin
             .from("solicitacoes")
-            .update({ status: "cancelado", updated_at: new Date().toISOString() })
+            .update({ 
+              cancelamento_solicitado: true, 
+              cancelamento_solicitado_em: new Date().toISOString(),
+              updated_at: new Date().toISOString() 
+            })
             .eq("id", solicitacao_id);
 
           if (updateErr) {
             return new Response(
-              JSON.stringify({ error: "Erro ao cancelar solicitação." }),
+              JSON.stringify({ error: "Erro ao solicitar cancelamento." }),
               { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
-          // Notify sectors about late cancellation
+          // Notify sectors about pending cancellation request
           try {
             await supabaseAdmin.functions.invoke("notificar-status", {
-              body: { solicitacao_id, novo_status: "cancelado", origem: "cliente" },
+              body: { solicitacao_id, novo_status: "cancelamento_pendente", origem: "cliente" },
             });
           } catch (_) { /* notification failure is non-blocking */ }
 
           return new Response(
-            JSON.stringify({ success: true, message: "Solicitação de cancelamento registrada. A equipe avaliará possíveis custos operacionais." }),
+            JSON.stringify({ success: true, message: "Solicitação de cancelamento registrada. A equipe avaliará possíveis custos operacionais antes da efetivação." }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }

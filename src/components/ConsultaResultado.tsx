@@ -133,8 +133,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   const aprovacaoAdministrativo = servicoConfig?.aprovacao_administrativo ?? false;
   const aprovacaoOperacional = servicoConfig?.aprovacao_operacional ?? false;
 
+  const cancelamentoSolicitado = (solicitacao as any).cancelamento_solicitado === true;
   const cancellableStatuses = ["aguardando_confirmacao", "confirmado_aguardando_vistoria"];
-  const canCancel = cancellableStatuses.includes(solicitacao.status);
+  const canCancel = cancellableStatuses.includes(solicitacao.status) && !cancelamentoSolicitado;
 
   const handleCancelSolicitacao = async () => {
     setCancelling(true);
@@ -417,7 +418,15 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               </div>
             )}
 
-            {/* Cancel button */}
+            {/* Cancel button or pending cancel message */}
+            {cancelamentoSolicitado && solicitacao.status !== "cancelado" && (
+              <Alert className="mt-2 border-amber-400 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="ml-2 text-sm text-amber-700">
+                  Cancelamento solicitado. Aguardando confirmação da equipe interna.
+                </AlertDescription>
+              </Alert>
+            )}
             {canCancel && (
               <div className="mt-2">
                 <Button

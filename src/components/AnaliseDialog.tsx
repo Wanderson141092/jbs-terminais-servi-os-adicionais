@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock, ChevronRight } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -109,7 +109,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       const dynamicOptions = filteredStatus.map((s: any) => ({
         value: s.sigla || s.valor.toLowerCase().replace(/ /g, '_').replace(/-/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
         label: s.valor,
-        ordem: s.ordem
+        ordem: s.ordem,
+        tipo_resultado: s.tipo_resultado || 'neutro'
       }));
       
       // Build ordem map
@@ -941,18 +942,40 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       <div className="space-y-2">
                         {immediateNext.length > 0 ? (
                           <div className="flex flex-wrap gap-2">
-                            {immediateNext.map((opt: any) => (
-                              <Button
-                                key={opt.value}
-                                variant={selectedStatus === opt.value ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setSelectedStatus(opt.value)}
-                                className={`flex items-center gap-1.5 ${selectedStatus === opt.value ? "ring-2 ring-primary" : ""}`}
-                              >
-                                <ChevronRight className="h-3.5 w-3.5" />
-                                {opt.label}
-                              </Button>
-                            ))}
+                            {immediateNext.map((opt: any) => {
+                              const colorMap: Record<string, string> = {
+                                conforme: "border-emerald-500 text-emerald-700 bg-emerald-50 hover:bg-emerald-100",
+                                nao_conforme: "border-red-500 text-red-700 bg-red-50 hover:bg-red-100",
+                                em_pendencia: "border-amber-500 text-amber-700 bg-amber-50 hover:bg-amber-100",
+                                neutro: "border-blue-500 text-blue-700 bg-blue-50 hover:bg-blue-100",
+                              };
+                              const selectedColorMap: Record<string, string> = {
+                                conforme: "bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400",
+                                nao_conforme: "bg-red-600 text-white hover:bg-red-700 ring-2 ring-red-400",
+                                em_pendencia: "bg-amber-600 text-white hover:bg-amber-700 ring-2 ring-amber-400",
+                                neutro: "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-400",
+                              };
+                              const iconMap: Record<string, React.ReactNode> = {
+                                conforme: <CheckCircle2 className="h-3.5 w-3.5" />,
+                                nao_conforme: <XCircle className="h-3.5 w-3.5" />,
+                                em_pendencia: <AlertTriangle className="h-3.5 w-3.5" />,
+                                neutro: <Clock className="h-3.5 w-3.5" />,
+                              };
+                              const tipo = opt.tipo_resultado || 'neutro';
+                              const isSelected = selectedStatus === opt.value;
+                              return (
+                                <Button
+                                  key={opt.value}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedStatus(opt.value)}
+                                  className={`flex items-center gap-1.5 ${isSelected ? selectedColorMap[tipo] : colorMap[tipo]}`}
+                                >
+                                  {iconMap[tipo]}
+                                  {opt.label}
+                                </Button>
+                              );
+                            })}
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground">Não há próxima etapa disponível.</p>

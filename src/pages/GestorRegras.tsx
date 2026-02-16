@@ -370,11 +370,11 @@ const GestorRegras = () => {
 
       {/* Dialog de Regra */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-lg max-h-[90vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{editingRegra ? "Editar Regra" : "Nova Regra"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-2 max-h-[75vh] overflow-y-auto pr-1">
+          <div className="space-y-4 mt-2 overflow-y-auto pr-1 flex-1 min-h-0">
             <div>
               <Label>Serviço</Label>
               <Select value={formData.servico_id} onValueChange={v => setFormData({ ...formData, servico_id: v })} disabled={!!editingRegra}>
@@ -463,7 +463,7 @@ const GestorRegras = () => {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button onClick={saveRegra} disabled={saving} className="w-full">
               <Save className="h-4 w-4 mr-2" />{editingRegra ? "Salvar" : "Criar Regra"}
             </Button>

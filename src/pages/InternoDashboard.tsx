@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock, Check,
   Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock, Ship, BarChart3
+  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock, Ship, BarChart3, RotateCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
@@ -41,6 +41,7 @@ import { useAdminCheck } from "@/hooks/useAdminCheck";
 import useNotifications from "@/hooks/useNotifications";
 import DeferimentoDialog from "@/components/DeferimentoDialog";
 import LacreArmadorDialog from "@/components/LacreArmadorDialog";
+import ReativacaoDialog from "@/components/ReativacaoDialog";
 
 interface Servico {
   id: string;
@@ -85,6 +86,7 @@ const InternoDashboard = () => {
   const [lacreArmadorSolicitacao, setLacreArmadorSolicitacao] = useState<any>(null);
   const [showExcelExport, setShowExcelExport] = useState(false);
   const [showNavisN4, setShowNavisN4] = useState(false);
+  const [reativacaoSolicitacao, setReativacaoSolicitacao] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   
@@ -765,6 +767,18 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
+                          {/* Reativação button - only for recusado */}
+                          {s.status === "recusado" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setReativacaoSolicitacao(s)}
+                              title="Reativar solicitação"
+                              className="text-emerald-600 hover:text-emerald-700"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
                           {/* Deferimento button - only for Posicionamento from aguardando_vistoria onwards */}
                           {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
                             <Button
@@ -989,6 +1003,18 @@ const InternoDashboard = () => {
       
       {/* Navis N4 Export Dialog */}
       <NavisN4ExportDialog open={showNavisN4} onClose={() => setShowNavisN4(false)} />
+
+      {/* Reativação Dialog */}
+      {reativacaoSolicitacao && user && (
+        <ReativacaoDialog
+          solicitacao={reativacaoSolicitacao}
+          userId={user.id}
+          onClose={() => {
+            setReativacaoSolicitacao(null);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
     </div>
   );
 };

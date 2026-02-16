@@ -123,7 +123,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // For terminal states at early stage (order<=1), terminal replaces aguardando_confirmacao
   // For em_pendencia states, completed stages revert to "pending" (gray with ✓)
   // For neutral states (e.g. aguardando_confirmacao), prior stages use "current" (blue) to match
-  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
+  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : isNeutro ? "current" as const : "completed" as const;
 
   // Determine icon override for special states (only for terminal/error)
   const stateIcon = isTerminal ? <X className="h-4 w-4" /> : null;
@@ -131,7 +131,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // Stage 1: Solicitação Recebida (always completed once exists)
   // For em_pendencia, prior stages get gray styling ("pending") but keep ✓ icon
   // For neutral status, prior stages use "current" styling with CircleDot icon
-  const priorIcon = isEmPendencia ? <Check className="h-4 w-4" /> : null;
+  const priorIcon = (isEmPendencia || isNeutro) ? <Check className="h-4 w-4" /> : null;
   stages.push({
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),
@@ -497,7 +497,7 @@ const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; l
               )}
               title={stage.label}
             >
-              {stateIcons[stage.state] || stage.icon}
+              {stage.icon || stateIcons[stage.state]}
             </div>
             {i < stages.length - 1 && (
               <div className={cn("w-4 h-0.5 rounded", stateStyles[stage.state].line)} />
@@ -529,7 +529,7 @@ const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; l
                 stateStyles[stage.state].circle
               )}
             >
-              {stateIcons[stage.state] || stage.icon}
+              {stage.icon || stateIcons[stage.state]}
             </div>
             <span className={cn("text-xs mt-2 text-center leading-tight", stateStyles[stage.state].label)}>
               {stage.label}

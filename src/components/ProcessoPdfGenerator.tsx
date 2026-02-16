@@ -221,12 +221,12 @@ const drawStatusPill = (doc: jsPDF, label: string, color: RGB, x: number, y: num
 // ─── State marker text ───
 const getStateMarker = (state: string): string => {
   switch (state) {
-    case "completed": return "OK";
-    case "done": return "OK";
+    case "completed": return "\u2713";
+    case "done": return "\u2713";
     case "error": return "X";
     case "warning": return "!";
-    case "current": return "...";
-    default: return "-";
+    case "current": return "\u23F3";
+    default: return "\u23F3";
   }
 };
 

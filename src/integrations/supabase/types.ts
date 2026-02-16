@@ -1212,6 +1212,7 @@ export type Database = {
       }
       regras_servico: {
         Row: {
+          agendar_proximo_dia: boolean
           aplica_dia_anterior: boolean
           ativo: boolean
           created_at: string
@@ -1225,10 +1226,12 @@ export type Database = {
           limite_seg: number | null
           limite_sex: number | null
           limite_ter: number | null
+          recusar_apos_corte: boolean
           servico_id: string
           updated_at: string
         }
         Insert: {
+          agendar_proximo_dia?: boolean
           aplica_dia_anterior?: boolean
           ativo?: boolean
           created_at?: string
@@ -1242,10 +1245,12 @@ export type Database = {
           limite_seg?: number | null
           limite_sex?: number | null
           limite_ter?: number | null
+          recusar_apos_corte?: boolean
           servico_id: string
           updated_at?: string
         }
         Update: {
+          agendar_proximo_dia?: boolean
           aplica_dia_anterior?: boolean
           ativo?: boolean
           created_at?: string
@@ -1259,6 +1264,7 @@ export type Database = {
           limite_seg?: number | null
           limite_sex?: number | null
           limite_ter?: number | null
+          recusar_apos_corte?: boolean
           servico_id?: string
           updated_at?: string
         }

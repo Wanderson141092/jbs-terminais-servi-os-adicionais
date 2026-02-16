@@ -15,6 +15,7 @@ import AdminLogs from "./pages/admin/AdminLogs";
 import AdminIntegracoes from "./pages/admin/AdminIntegracoes";
 
 import AdminHistoricoIntegracoes from "./pages/admin/AdminHistoricoIntegracoes";
+import AdminParametrosAjuda from "./pages/admin/AdminParametrosAjuda";
 import AdminFormularios from "./pages/admin/AdminFormularios";
 import GestorRegras from "./pages/GestorRegras";
 import NotFound from "./pages/NotFound";
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/recuperar-senha" element={<RecuperarSenha />} />
           <Route path="/interno/dashboard" element={<InternoDashboard />} />
           <Route path="/interno/admin/parametros" element={<AdminParametros />} />
+          <Route path="/interno/admin/parametros/ajuda" element={<AdminParametrosAjuda />} />
           <Route path="/interno/admin/usuarios" element={<AdminUsuarios />} />
           <Route path="/interno/admin/setores" element={<AdminSetores />} />
           <Route path="/interno/admin/servicos" element={<AdminServicos />} />

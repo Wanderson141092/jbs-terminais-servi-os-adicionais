@@ -370,11 +370,11 @@ const GestorRegras = () => {
 
       {/* Dialog de Regra */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingRegra ? "Editar Regra" : "Nova Regra"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-2 max-h-[65vh] overflow-y-auto pr-1">
+          <div className="space-y-4 mt-2 max-h-[75vh] overflow-y-auto pr-1">
             <div>
               <Label>Serviço</Label>
               <Select value={formData.servico_id} onValueChange={v => setFormData({ ...formData, servico_id: v })} disabled={!!editingRegra}>

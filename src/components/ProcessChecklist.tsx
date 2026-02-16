@@ -77,7 +77,7 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
     const vistoriaStatuses = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
     
     if (s.status === "vistoria_finalizada") {
-      items.push({ label: "Vistoria finalizada sem pendência", status: "done" });
+      items.push({ label: "Vistoriado sem pendência", status: "done" });
     } else if (s.status === "vistoriado_com_pendencia") {
       const pendDetail = s.pendencias_selecionadas?.length
         ? s.pendencias_selecionadas.join(", ")

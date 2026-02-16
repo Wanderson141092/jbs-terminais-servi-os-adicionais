@@ -183,10 +183,10 @@ const LacreArmadorDialog = ({ solicitacao, userId, onClose }: LacreArmadorDialog
       
       if (!deferimentoBlocking) {
         updatePayload.status = "vistoria_finalizada";
-        updatePayload.status_vistoria = "Vistoria Finalizada";
-        await logAudit("status_atualizado", "Status atualizado automaticamente para Vistoria Finalizada após conclusão do lacre armador e resolução de todas as pendências.");
+        updatePayload.status_vistoria = "Vistoriado";
+        await logAudit("status_atualizado", "Status atualizado automaticamente para Vistoriado após conclusão do lacre armador e resolução de todas as pendências.");
         await createNotification(`Solicitação ${solicitacao.protocolo} finalizada automaticamente após conclusão do lacre.`, "status");
-        toast.success("Pendências resolvidas — status avançado para Vistoria Finalizada!");
+        toast.success("Pendências resolvidas — status avançado para Vistoriado!");
       } else {
         await logAudit("pendencia_lacre_resolvida", "Pendência de lacre armador removida automaticamente. Aguardando deferimento para finalizar.");
       }

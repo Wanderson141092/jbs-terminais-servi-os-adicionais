@@ -1126,6 +1126,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   })()}
 
                   {(() => {
+                    const terminalStatuses = [
+                      "nao_vistoriado",
+                      "recusado",
+                      "cancelado",
+                      "servico_concluido",
+                      "vistoria_finalizada",
+                    ];
+                    if (terminalStatuses.includes(solicitacao.status)) return null;
+
                     const currentOrdem = statusOrdemMap[solicitacao.status];
                     const allOrdens = [...new Set(statusOptions.map(o => o.ordem).filter((o: number | undefined) => o !== undefined && o > (currentOrdem ?? -1)))].sort((a: number, b: number) => a - b);
                     const hasNextSteps = allOrdens.length > 0;

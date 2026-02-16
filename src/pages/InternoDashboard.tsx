@@ -765,28 +765,32 @@ const InternoDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Deferimento button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => isDeferimentoActive(s) ? setDeferimentoSolicitacao(s) : null}
-                            title="Deferimento"
-                            disabled={!isDeferimentoActive(s)}
-                            className={isDeferimentoActive(s) ? "text-blue-600 hover:text-blue-700" : "text-muted-foreground/40"}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          {/* Lacre Armador button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => isLacreArmadorActive(s) ? setLacreArmadorSolicitacao(s) : null}
-                            title="Lacre Armador"
-                            disabled={!isLacreArmadorActive(s)}
-                            className={isLacreArmadorActive(s) ? "text-amber-600 hover:text-amber-700" : "text-muted-foreground/40"}
-                          >
-                            <Lock className="h-4 w-4" />
-                          </Button>
+                          {/* Deferimento button - only for Posicionamento from aguardando_vistoria onwards */}
+                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => isDeferimentoActive(s) ? setDeferimentoSolicitacao(s) : null}
+                              title="Deferimento"
+                              disabled={!isDeferimentoActive(s)}
+                              className={isDeferimentoActive(s) ? "text-blue-600 hover:text-blue-700" : "text-muted-foreground/40"}
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {/* Lacre Armador button - only for Posicionamento from aguardando_vistoria onwards */}
+                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => isLacreArmadorActive(s) ? setLacreArmadorSolicitacao(s) : null}
+                              title="Lacre Armador"
+                              disabled={!isLacreArmadorActive(s)}
+                              className={isLacreArmadorActive(s) ? "text-amber-600 hover:text-amber-700" : "text-muted-foreground/40"}
+                            >
+                              <Lock className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"

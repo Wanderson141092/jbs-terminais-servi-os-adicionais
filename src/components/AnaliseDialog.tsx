@@ -930,25 +930,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     </Badge>
                   );
                 }
-                // "pendencia" type: only shows if lacre_armador_aceite_custo === true
+                // "pendencia" type: now shown next to the lacre toggle, skip here
                 if (cfg.tipo === "pendencia") {
-                  if (solicitacao.lacre_armador_aceite_custo !== true) return null;
-                  const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
-                  const isConfirmed = registro?.confirmado === true;
-                  return (
-                    <Badge
-                      key={cfg.id}
-                      variant="outline"
-                      className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
-                        isConfirmed
-                          ? "border-green-500 text-green-700 bg-green-50"
-                          : "border-red-500 text-red-700 bg-red-50"
-                      }`}
-                    >
-                      <DollarSign className="h-3 w-3" />
-                      {cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Lanç. Posic. Lacre Pendente"}
-                    </Badge>
-                  );
+                  return null;
                 }
                 return null;
               })}
@@ -1174,11 +1158,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     const pendenciasMatch = lacrePendenciasAtivacao.length === 0 || lacrePendenciasAtivacao.some((p: string) => (solicitacao.pendencias_selecionadas || []).includes(p));
                     const showLacre = isPosicionamento && statusMatch && pendenciasMatch;
                     if (!showLacre && !solicitarLacreArmador) return null;
-                    const showLacreConfirmLancamento = solicitarLacreArmador && isPosicionamento && custoLacreArmador === true && solicitacao.lancamento_confirmado === false;
-                    return (
+                    // Pendencia billing badge logic
+                     const pendenciaConfig = cobrancaConfigs.find((cfg: any) => cfg.tipo === "pendencia");
+                     const pendenciaRegistro = pendenciaConfig ? lancamentoRegistros.find((r: any) => r.cobranca_config_id === pendenciaConfig.id) : null;
+                     const pendenciaConfirmed = pendenciaRegistro?.confirmado === true;
+                     const showPendenciaBadge = solicitarLacreArmador && isPosicionamento && solicitacao.lacre_armador_aceite_custo === true;
+                     return (
                       <>
                         <div className="flex gap-2">
-                          <div className={`flex-1 flex items-center justify-between border rounded-md p-2.5 ${showLacre ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
+                          <div className={`flex-1 basis-1/2 flex items-center justify-between border rounded-md p-2.5 ${showLacre ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
                             <div className="flex items-center gap-2">
                               <Lock className="h-4 w-4 text-amber-600 shrink-0" />
                               <div className="flex flex-col">
@@ -1199,21 +1187,29 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                             />
                           </div>
 
-                          {/* Confirmação de lançamento do lacre - ao lado */}
-                          {showLacreConfirmLancamento && (
-                            <div className="flex-1 border rounded-md p-2.5 bg-red-50 border-red-200 flex flex-col justify-center">
-                              <div className="flex items-center gap-1.5 text-red-600 mb-1.5">
-                              <DollarSign className="h-3.5 w-3.5" />
-                                <span className="text-xs font-semibold">Lanç. Posic. Lacre Pendente</span>
+                          {/* Custo Posic. Lacre - ao lado, 50% */}
+                          {showPendenciaBadge && (
+                            <div className={`flex-1 basis-1/2 border rounded-md p-2.5 flex flex-col justify-center ${
+                              pendenciaConfirmed
+                                ? "bg-green-50 border-green-200"
+                                : "bg-red-50 border-red-200"
+                            }`}>
+                              <div className={`flex items-center gap-1.5 mb-1.5 ${pendenciaConfirmed ? "text-green-600" : "text-red-600"}`}>
+                                <DollarSign className="h-3.5 w-3.5" />
+                                <span className="text-xs font-semibold">
+                                  {pendenciaConfig?.rotulo_analise || "Custo Posic. Lacre"}: {pendenciaConfirmed ? "Confirmado" : "Aguardando confirmação"}
+                                </span>
                               </div>
-                              <Button 
-                                size="sm"
-                                variant="outline"
-                                className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-7 w-full"
-                                onClick={() => setShowLancamentoDialog(true)}
-                              >
-                                Confirmar Lançamento
-                              </Button>
+                              {!pendenciaConfirmed && (
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-7 w-full"
+                                  onClick={() => setShowLancamentoDialog(true)}
+                                >
+                                  Confirmar Lançamento
+                                </Button>
+                              )}
                             </div>
                           )}
                         </div>

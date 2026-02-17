@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Users, ArrowLeft, Save, Shield, Edit, Trash2, Ban, CheckCircle, Plus, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useGestorCheck } from "@/hooks/useGestorCheck";
 
 interface Profile {
   id: string;
@@ -60,6 +62,7 @@ const useCurrentUserIsMaster = () => {
 };
 const AdminUsuarios = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
@@ -80,6 +83,14 @@ const AdminUsuarios = () => {
   const [passwordLoading, setPasswordLoading] = useState(false);
   
   const currentUserIsMaster = useCurrentUserIsMaster();
+  const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
+  const { isGestor, gestorSetorEmail } = useGestorCheck(currentUserId);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id || null);
+    });
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -359,6 +370,17 @@ const AdminUsuarios = () => {
     return labels[setor] || setor;
   };
 
+  // Access guard: only admin or gestor
+  if (!loading && !isCurrentUserAdmin && !isGestor) {
+    navigate("/interno/dashboard");
+    return null;
+  }
+
+  // Filter profiles for gestor: only show users from same setor
+  const displayedProfiles = isGestor && !isCurrentUserAdmin
+    ? profiles.filter(p => p.email_setor === gestorSetorEmail)
+    : profiles;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -380,14 +402,18 @@ const AdminUsuarios = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
-            <Key className="h-4 w-4 mr-2" />
-            Alterar Senha Admin
-          </Button>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Criar Usuário
-          </Button>
+          {isCurrentUserAdmin && (
+            <>
+              <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
+                <Key className="h-4 w-4 mr-2" />
+                Alterar Senha Admin
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Usuário
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -516,7 +542,7 @@ const AdminUsuarios = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Usuários Cadastrados ({profiles.length})</CardTitle>
+          <CardTitle>Usuários Cadastrados ({displayedProfiles.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -526,13 +552,13 @@ const AdminUsuarios = () => {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Setor</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Tipo</TableHead>
+                {isCurrentUserAdmin && <TableHead>Tipo</TableHead>}
                 <TableHead>Cadastro</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {profiles.map((profile) => {
+              {displayedProfiles.map((profile) => {
                 const isMaster = isAdminMaster(profile);
                 const isUserAdmin = isAdmin(profile.id);
                 
@@ -574,6 +600,7 @@ const AdminUsuarios = () => {
                         <Badge variant="secondary">Ativo</Badge>
                       )}
                     </TableCell>
+                    {isCurrentUserAdmin && (
                     <TableCell>
                       {currentUserIsMaster ? (
                         <Button
@@ -599,6 +626,7 @@ const AdminUsuarios = () => {
                         </Button>
                       )}
                     </TableCell>
+                    )}
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(profile.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
@@ -608,7 +636,7 @@ const AdminUsuarios = () => {
                           <Edit className="h-4 w-4" />
                         </Button>
 
-                        {!isMaster && (
+                        {isCurrentUserAdmin && !isMaster && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -623,7 +651,7 @@ const AdminUsuarios = () => {
                           </Button>
                         )}
 
-                        {!isMaster && (
+                        {isCurrentUserAdmin && !isMaster && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon">

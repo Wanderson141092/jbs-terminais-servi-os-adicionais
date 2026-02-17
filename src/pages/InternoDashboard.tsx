@@ -884,27 +884,46 @@ const InternoDashboard = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {needsLaunchConfirmation(s) ? (
-                          isLancamentoAllConfirmed(s) ? (
-                            <Check className="h-4 w-4 text-muted-foreground/50 mx-auto" />
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedSolicitacao(s)}
-                              title={(() => {
-                                const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
-                                const cfg = cobrancaConfigs.find((c: any) => 
-                                  c.tipo === "servico" && (c.servico_ids.length === 0 || (servico && c.servico_ids.includes(servico.id)))
+                        {(() => {
+                          if (!needsLaunchConfirmation(s)) return null;
+                          const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+                          const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
+                            const matchService = cfg.servico_ids.length === 0 || (servico && cfg.servico_ids.includes(servico.id));
+                            if (!matchService) return false;
+                            const statusAtivacao = cfg.status_ativacao || [];
+                            if (statusAtivacao.length > 0 && !statusAtivacao.includes(s.status)) return false;
+                            if (cfg.tipo === "pendencia" && s.lacre_armador_aceite_custo !== true) return false;
+                            return true;
+                          });
+                          if (applicableConfigs.length === 0) {
+                            // Legacy fallback
+                            const allConf = isLancamentoAllConfirmed(s);
+                            return allConf 
+                              ? <Check className="h-4 w-4 text-muted-foreground/50 mx-auto" />
+                              : <Button variant="ghost" size="sm" onClick={() => setSelectedSolicitacao(s)} className="text-destructive" title="Aguardando confirmação de lançamento"><DollarSign className="h-4 w-4" /></Button>;
+                          }
+                          return (
+                            <div className="flex items-center gap-0.5 justify-center">
+                              {applicableConfigs.map((cfg: any) => {
+                                const registro = lancamentoRegistros.find((r: any) => r.solicitacao_id === s.id && r.cobranca_config_id === cfg.id);
+                                const isConfirmed = registro?.confirmado === true;
+                                return (
+                                  <button
+                                    key={cfg.id}
+                                    onClick={() => setSelectedSolicitacao(s)}
+                                    title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : "Pendente"}`}
+                                    className="p-0.5 rounded hover:bg-muted/50 transition-colors"
+                                  >
+                                    {isConfirmed 
+                                      ? <Check className="h-3.5 w-3.5 text-muted-foreground/50" />
+                                      : <DollarSign className="h-3.5 w-3.5 text-destructive" />
+                                    }
+                                  </button>
                                 );
-                                return cfg ? `${cfg.rotulo_analise} — Pendente` : "Aguardando confirmação de lançamento";
-                              })()}
-                              className="text-destructive"
-                            >
-                              <DollarSign className="h-4 w-4" />
-                            </Button>
-                          )
-                        ) : null}
+                              })}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="font-mono text-sm font-medium">{s.protocolo}</TableCell>
                       <TableCell>

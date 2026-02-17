@@ -119,6 +119,13 @@ const AdminUsuarios = () => {
   };
 
   const isAdmin = (userId: string) => userRoles.some(r => r.user_id === userId && r.role === "admin");
+  const isUserGestor = (userId: string) => userRoles.some(r => r.user_id === userId && r.role === "gestor");
+  
+  const getUserRole = (userId: string): "admin" | "gestor" | "user" => {
+    if (isAdmin(userId)) return "admin";
+    if (isUserGestor(userId)) return "gestor";
+    return "user";
+  };
   
   const isAdminMaster = (profile: Profile) => {
     if (profile.email === ADMIN_MASTER_EMAIL) return true;
@@ -169,40 +176,40 @@ const AdminUsuarios = () => {
     fetchData();
   };
 
-  const toggleAdminRole = async (userId: string) => {
+  const setUserRole = async (userId: string, newRole: "admin" | "gestor" | "user") => {
     const profile = profiles.find(p => p.id === userId);
     if (!profile) return;
 
-    if (isAdminMaster(profile) && isAdmin(userId)) {
+    if (isAdminMaster(profile) && newRole !== "admin") {
       toast.error("Não é possível remover a permissão de Admin do usuário Admin Master");
       return;
     }
 
-    const hasAdmin = isAdmin(userId);
+    // Remove all existing roles for this user
+    const { error: deleteError } = await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId);
     
-    if (hasAdmin) {
-      const { error } = await supabase
+    if (deleteError) {
+      toast.error("Erro ao atualizar permissão");
+      return;
+    }
+
+    // If new role is not 'user', insert the role
+    if (newRole !== "user") {
+      const { error: insertError } = await supabase
         .from("user_roles")
-        .delete()
-        .eq("user_id", userId)
-        .eq("role", "admin");
+        .insert({ user_id: userId, role: newRole });
       
-      if (error) {
-        toast.error("Erro ao remover permissão de admin");
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from("user_roles")
-        .insert({ user_id: userId, role: "admin" });
-      
-      if (error) {
-        toast.error("Erro ao adicionar permissão de admin");
+      if (insertError) {
+        toast.error("Erro ao atualizar permissão");
         return;
       }
     }
 
-    toast.success(hasAdmin ? "Permissão de admin removida" : "Permissão de admin concedida");
+    const roleLabels = { admin: "Admin", gestor: "Gestor", user: "Usuário" };
+    toast.success(`Perfil alterado para ${roleLabels[newRole]}`);
     fetchData();
   };
 
@@ -602,28 +609,33 @@ const AdminUsuarios = () => {
                     </TableCell>
                     {isCurrentUserAdmin && (
                     <TableCell>
-                      {currentUserIsMaster ? (
-                        <Button
-                          variant={isUserAdmin ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleAdminRole(profile.id)}
-                          disabled={isMaster && isUserAdmin}
-                          title={isMaster && isUserAdmin ? "Admin Master não pode perder permissão" : ""}
+                      {currentUserIsMaster && !(isMaster && isUserAdmin) ? (
+                        <Select
+                          value={getUserRole(profile.id)}
+                          onValueChange={(value) => setUserRole(profile.id, value as "admin" | "gestor" | "user")}
                         >
-                          <Shield className="h-4 w-4 mr-1" />
-                          {isUserAdmin ? "Admin" : "Usuário"}
-                        </Button>
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="z-[100] bg-popover">
+                            <SelectItem value="admin">
+                              <span className="flex items-center gap-1">
+                                <Shield className="h-3 w-3" /> Admin
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="gestor">
+                              <span className="flex items-center gap-1">
+                                <Shield className="h-3 w-3" /> Gestor
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="user">Usuário</SelectItem>
+                          </SelectContent>
+                        </Select>
                       ) : (
-                        <Button
-                          variant={isUserAdmin ? "default" : "outline"}
-                          size="sm"
-                          disabled
-                          title="Apenas o Admin Master pode alterar permissões"
-                          className="cursor-not-allowed opacity-60"
-                        >
-                          <Shield className="h-4 w-4 mr-1" />
-                          {isUserAdmin ? "Admin" : "Usuário"}
-                        </Button>
+                        <Badge variant={isUserAdmin ? "default" : getUserRole(profile.id) === "gestor" ? "secondary" : "outline"}>
+                          {isUserAdmin ? "Admin" : getUserRole(profile.id) === "gestor" ? "Gestor" : "Usuário"}
+                          {isMaster && isUserAdmin && " (Master)"}
+                        </Badge>
                       )}
                     </TableCell>
                     )}

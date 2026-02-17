@@ -21,6 +21,34 @@ import { Button } from "@/components/ui/button";
 import { Info, Image as ImageIcon, ChevronDown, Search, Check } from "lucide-react";
 import type { PerguntaComCondicao } from "./types";
 
+/** Aplica máscara caractere a caractere: A=letra, 9=número, X=ambos, outro=literal fixo */
+const applyMask = (rawValue: string, mascara: string): string => {
+  const upper = rawValue.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  let result = "";
+  let rawIdx = 0;
+
+  for (let maskIdx = 0; maskIdx < mascara.length && rawIdx < upper.length; maskIdx++) {
+    const m = mascara[maskIdx];
+    const ch = upper[rawIdx];
+
+    if (m === "A") {
+      if (/[A-Z]/.test(ch)) { result += ch; rawIdx++; }
+      else { rawIdx++; maskIdx--; } // skip invalid char
+    } else if (m === "9") {
+      if (/[0-9]/.test(ch)) { result += ch; rawIdx++; }
+      else { rawIdx++; maskIdx--; }
+    } else if (m === "X") {
+      if (/[A-Z0-9]/.test(ch)) { result += ch; rawIdx++; }
+      else { rawIdx++; maskIdx--; }
+    } else {
+      // literal fixo — insere automaticamente
+      result += m;
+    }
+  }
+
+  return result;
+};
+
 interface FormFieldRendererProps {
   pergunta: PerguntaComCondicao;
   value: any;
@@ -358,6 +386,28 @@ const FormFieldRenderer = ({
         />
       )}
 
+      {pergunta.tipo === "texto_formatado" && (() => {
+        const mascara = config?.mascara as string | undefined;
+        const maxChars = config?.max_chars as number | undefined;
+        return (
+          <Input
+            value={value || ""}
+            onChange={(e) => {
+              if (mascara) {
+                onValueChange(applyMask(e.target.value, mascara));
+              } else {
+                let val = e.target.value.toUpperCase();
+                if (maxChars) val = val.slice(0, maxChars);
+                onValueChange(val);
+              }
+            }}
+            placeholder={pergunta.placeholder || ""}
+            maxLength={mascara ? mascara.length : (maxChars || undefined)}
+            className="font-mono"
+          />
+        );
+      })()}
+
       {pergunta.tipo === "data_hora" && (
         <Input
           type="datetime-local"
@@ -432,12 +482,16 @@ const FormFieldRenderer = ({
                   <Input
                     value={campoValue}
                     onChange={(e) => {
-                      let val = e.target.value.toUpperCase();
-                      if (campo.max_chars) val = val.slice(0, campo.max_chars);
-                      handleCampoChange(val);
+                      if (campo.mascara) {
+                        handleCampoChange(applyMask(e.target.value, campo.mascara));
+                      } else {
+                        let val = e.target.value.toUpperCase();
+                        if (campo.max_chars) val = val.slice(0, campo.max_chars);
+                        handleCampoChange(val);
+                      }
                     }}
                     placeholder={campo.placeholder || ""}
-                    maxLength={campo.max_chars || undefined}
+                    maxLength={campo.mascara ? campo.mascara.length : (campo.max_chars || undefined)}
                     className="font-mono"
                   />
                 )}

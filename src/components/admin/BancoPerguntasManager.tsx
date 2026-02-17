@@ -511,20 +511,19 @@ const BancoPerguntasManager = () => {
               <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
                 <Label className="text-base font-semibold">Configuração de Formato</Label>
                 <p className="text-xs text-muted-foreground -mt-2">
-                  Use "A" para indicar posição que aceita apenas letras, "9" para apenas números, 
-                  e qualquer outra letra será aceita como caractere literal fixo (ex: U em contêiner). 
-                  Caracteres especiais (-, /, .) são separadores fixos.
+                  Use "A" para letras, "9" para números, "X" para letra ou número,
+                  e qualquer outro caractere será fixo (separador).
                 </p>
                 <div>
                   <Label>Máscara de formato</Label>
                   <Input
                     value={formData.formato_mascara}
                     onChange={(e) => setFormData({ ...formData, formato_mascara: e.target.value.toUpperCase() })}
-                    placeholder="Ex: AAAU9999999 ou 999.999.999-99"
+                    placeholder="Ex: AAAU9999999 ou XXX-9999"
                     className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Exemplos: Contêiner = AAAU9999999 | CPF = 999.999.999-99 | CNPJ = 99.999.999/9999-99
+                    Exemplos: Contêiner = AAAU9999999 | CPF = 999.999.999-99 | Código Misto = XXX-9999
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

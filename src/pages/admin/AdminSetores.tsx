@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -332,20 +333,46 @@ const AdminSetores = () => {
                 <p className="text-xs text-muted-foreground mb-2">
                   Selecione um ou mais perfis para este setor
                 </p>
-                <div className="space-y-2">
-                  {PERFIS_DISPONIVEIS.map(perfil => (
-                    <div key={perfil.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={perfil.value}
-                        checked={formData.perfis.includes(perfil.value)}
-                        onCheckedChange={() => togglePerfil(perfil.value)}
-                      />
-                      <Label htmlFor={perfil.value} className="cursor-pointer">
-                        {perfil.label}
-                      </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start font-normal">
+                      {formData.perfis.length > 0 ? (
+                        <div className="flex gap-1 flex-wrap">
+                          {formData.perfis.map(p => {
+                            const perfil = PERFIS_DISPONIVEIS.find(pd => pd.value === p);
+                            return (
+                              <Badge key={p} variant="secondary" className="text-xs">
+                                {perfil?.label || p}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Selecione os perfis...</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-2 z-[100] bg-popover" align="start">
+                    <div className="space-y-1">
+                      {PERFIS_DISPONIVEIS.map(perfil => (
+                        <div
+                          key={perfil.value}
+                          className="flex items-center space-x-2 rounded-md px-2 py-1.5 hover:bg-accent cursor-pointer"
+                          onClick={() => togglePerfil(perfil.value)}
+                        >
+                          <Checkbox
+                            id={`perfil-${perfil.value}`}
+                            checked={formData.perfis.includes(perfil.value)}
+                            onCheckedChange={() => togglePerfil(perfil.value)}
+                          />
+                          <Label htmlFor={`perfil-${perfil.value}`} className="cursor-pointer text-sm flex-1">
+                            {perfil.label}
+                          </Label>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label>Descrição / Nome do Setor</Label>

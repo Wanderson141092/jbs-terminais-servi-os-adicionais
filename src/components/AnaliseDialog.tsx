@@ -1205,7 +1205,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                                   size="sm"
                                   variant="outline"
                                   className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-7 w-full"
-                                  onClick={() => setShowLancamentoDialog(true)}
+                                  onClick={() => handleConfirmarLancamento(pendenciaConfig?.id)}
                                 >
                                   Confirmar Lançamento
                                 </Button>
@@ -1572,7 +1572,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowLancamentoDialog(false)}>Cancelar</Button>
-            <Button onClick={() => handleConfirmarLancamento()} disabled={loading} className="jbs-btn-primary">
+            <Button onClick={() => {
+              const servicoCfg = cobrancaConfigs.find((c: any) => c.tipo === "servico");
+              handleConfirmarLancamento(servicoCfg?.id);
+            }} disabled={loading} className="jbs-btn-primary">
               <Check className="h-4 w-4 mr-2" />
               Confirmar Lançamento
             </Button>

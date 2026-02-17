@@ -455,16 +455,16 @@ const AdminUsuarios = () => {
         </div>
         <div className="flex gap-2">
           {isCurrentUserAdmin && (
-            <>
-              <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
-                <Key className="h-4 w-4 mr-2" />
-                Alterar Senha Admin
-              </Button>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Criar Usuário
-              </Button>
-            </>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
+              <Key className="h-4 w-4 mr-2" />
+              Alterar Senha Admin
+            </Button>
+          )}
+          {(isCurrentUserAdmin || isGestor) && (
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Usuário
+            </Button>
           )}
         </div>
       </div>
@@ -634,7 +634,7 @@ const AdminUsuarios = () => {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Setor</TableHead>
                 <TableHead>Status</TableHead>
-                {isCurrentUserAdmin && <TableHead>Tipo</TableHead>}
+                {(isCurrentUserAdmin || isGestor) && <TableHead>Tipo</TableHead>}
                 <TableHead>Cadastro</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
@@ -682,9 +682,9 @@ const AdminUsuarios = () => {
                         <Badge variant="secondary">Ativo</Badge>
                       )}
                     </TableCell>
-                    {isCurrentUserAdmin && (
+                    {(isCurrentUserAdmin || isGestor) && (
                     <TableCell>
-                      {currentUserIsMaster && !(isMaster && isUserAdmin) ? (
+                      {isCurrentUserAdmin && currentUserIsMaster && !(isMaster && isUserAdmin) ? (
                         <Select
                           value={getUserRole(profile.id)}
                           onValueChange={(value) => setUserRole(profile.id, value as "admin" | "gestor" | "user")}
@@ -698,6 +698,23 @@ const AdminUsuarios = () => {
                                 <Shield className="h-3 w-3" /> Admin
                               </span>
                             </SelectItem>
+                            <SelectItem value="gestor">
+                              <span className="flex items-center gap-1">
+                                <Shield className="h-3 w-3" /> Gestor
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="user">Usuário</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : isGestor && !isCurrentUserAdmin && !isUserAdmin && profile.id !== currentUserId ? (
+                        <Select
+                          value={getUserRole(profile.id)}
+                          onValueChange={(value) => setUserRole(profile.id, value as "gestor" | "user")}
+                        >
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="z-[100] bg-popover">
                             <SelectItem value="gestor">
                               <span className="flex items-center gap-1">
                                 <Shield className="h-3 w-3" /> Gestor
@@ -727,7 +744,7 @@ const AdminUsuarios = () => {
                           <Key className="h-4 w-4" />
                         </Button>
 
-                        {isCurrentUserAdmin && !isMaster && (
+                        {(isCurrentUserAdmin || (isGestor && !isUserAdmin)) && !isMaster && profile.id !== currentUserId && (
                           <Button
                             variant="ghost"
                             size="icon"

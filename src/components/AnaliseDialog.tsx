@@ -1282,13 +1282,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 
             {(() => {
-              // Build list of pending cobranca configs (both servico and pendencia)
-              const pendingCobrancas = cobrancaConfigs.filter((cfg: any) => {
+              // Build list of ALL applicable cobranca configs (both servico and pendencia)
+              const applicableCobrancas = cobrancaConfigs.filter((cfg: any) => {
                 const statusAtivacao = cfg.status_ativacao || [];
                 if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
                 if (cfg.tipo === "pendencia" && solicitacao.lacre_armador_aceite_custo !== true) return false;
-                const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
-                if (registro?.confirmado === true) return false;
                 return true;
               });
 
@@ -1297,30 +1295,36 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               const statusLanc = svcConf?.status_confirmacao_lancamento || [];
               const legacyMatch = statusLanc.includes(solicitacao.status);
               
-              if (pendingCobrancas.length === 0 && !legacyMatch) return null;
-              if (pendingCobrancas.length === 0 && solicitacao.lancamento_confirmado) return null;
+              if (applicableCobrancas.length === 0 && !legacyMatch) return null;
+              if (applicableCobrancas.length === 0 && solicitacao.lancamento_confirmado) return null;
               
               return (
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    {pendingCobrancas.map((cfg: any) => (
-                      <div key={cfg.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-center gap-2 text-red-600 mb-2">
-                          <DollarSign className="h-5 w-5" />
-                          <span className="font-semibold">{cfg.rotulo_analise}: Aguardando confirmação</span>
+                    {applicableCobrancas.map((cfg: any) => {
+                      const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
+                      const isConfirmed = registro?.confirmado === true;
+                      return (
+                        <div key={cfg.id} className={`border rounded-lg p-4 ${isConfirmed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                          <div className={`flex items-center gap-2 mb-2 ${isConfirmed ? "text-green-600" : "text-red-600"}`}>
+                            {isConfirmed ? <Check className="h-5 w-5" /> : <DollarSign className="h-5 w-5" />}
+                            <span className="font-semibold">{cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Aguardando confirmação"}</span>
+                          </div>
+                          {!isConfirmed && (
+                            <Button 
+                              onClick={() => handleConfirmarLancamento(cfg.id)} 
+                              variant="outline" 
+                              disabled={loading}
+                              className="border-red-300 text-red-600 hover:bg-red-50 w-full"
+                            >
+                              Confirmar Lançamento — {cfg.rotulo_analise}
+                            </Button>
+                          )}
                         </div>
-                        <Button 
-                          onClick={() => handleConfirmarLancamento(cfg.id)} 
-                          variant="outline" 
-                          disabled={loading}
-                          className="border-red-300 text-red-600 hover:bg-red-50 w-full"
-                        >
-                          Confirmar Lançamento — {cfg.rotulo_analise}
-                        </Button>
-                      </div>
-                    ))}
-                    {pendingCobrancas.length === 0 && legacyMatch && !solicitacao.lancamento_confirmado && (
+                      );
+                    })}
+                    {applicableCobrancas.length === 0 && legacyMatch && !solicitacao.lancamento_confirmado && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 text-red-600 mb-2">
                           <DollarSign className="h-5 w-5" />

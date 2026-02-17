@@ -410,6 +410,59 @@ const FormFieldRenderer = ({
           )}
         </div>
       )}
+
+      {pergunta.tipo === "resposta_conjunta" && config?.campos && (
+        <div className="grid grid-cols-2 gap-4">
+          {(config.campos as any[]).map((campo: any, idx: number) => {
+            const campoKey = idx === 0 ? "campo1" : "campo2";
+            const currentObj = (value as Record<string, any>) || {};
+            const campoValue = currentObj[campoKey] || "";
+
+            const handleCampoChange = (v: any) => {
+              onValueChange({ ...currentObj, [campoKey]: v });
+            };
+
+            return (
+              <div key={idx} className="space-y-1">
+                {campo.rotulo && <Label className="text-sm">{campo.rotulo}</Label>}
+                {campo.tipo === "texto" && (
+                  <Input value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} placeholder={campo.placeholder || ""} />
+                )}
+                {campo.tipo === "texto_formatado" && (
+                  <Input
+                    value={campoValue}
+                    onChange={(e) => {
+                      let val = e.target.value.toUpperCase();
+                      if (campo.max_chars) val = val.slice(0, campo.max_chars);
+                      handleCampoChange(val);
+                    }}
+                    placeholder={campo.placeholder || ""}
+                    maxLength={campo.max_chars || undefined}
+                    className="font-mono"
+                  />
+                )}
+                {campo.tipo === "numero" && (
+                  <Input type="number" value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} placeholder={campo.placeholder || ""} />
+                )}
+                {campo.tipo === "email" && (
+                  <Input type="email" value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} placeholder={campo.placeholder || ""} />
+                )}
+                {campo.tipo === "data" && (
+                  <Input type="date" value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} />
+                )}
+                {campo.tipo === "select" && campo.opcoes && (
+                  <SearchableSelect
+                    options={campo.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }))}
+                    value={campoValue}
+                    onValueChange={handleCampoChange}
+                    placeholder={campo.placeholder || "Selecione..."}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

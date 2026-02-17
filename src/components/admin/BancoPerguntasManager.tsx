@@ -33,6 +33,16 @@ export const QUESTION_TYPES = [
   { value: "checkbox", label: "Checkbox" },
   { value: "arquivo", label: "Upload de Arquivo" },
   { value: "informativo", label: "Bloco Informativo" },
+  { value: "resposta_conjunta", label: "Resposta Conjunta" },
+];
+
+const SUBCAMPO_TYPES = [
+  { value: "texto", label: "Texto" },
+  { value: "texto_formatado", label: "Texto Formatado" },
+  { value: "numero", label: "Número" },
+  { value: "select", label: "Seleção Única" },
+  { value: "email", label: "E-mail" },
+  { value: "data", label: "Data" },
 ];
 
 export interface BancoPergunta {
@@ -81,6 +91,19 @@ const BancoPerguntasManager = () => {
     // select / multipla_escolha modo
     selecao_modo: "menu" as "menu" | "botoes" | "radio",
     multipla_modo: "check" as "check" | "menu" | "botoes",
+    // resposta_conjunta config
+    conjunta_campo1_tipo: "texto",
+    conjunta_campo1_rotulo: "",
+    conjunta_campo1_placeholder: "",
+    conjunta_campo1_opcoes: "",
+    conjunta_campo1_mascara: "",
+    conjunta_campo1_max_chars: "",
+    conjunta_campo2_tipo: "texto",
+    conjunta_campo2_rotulo: "",
+    conjunta_campo2_placeholder: "",
+    conjunta_campo2_opcoes: "",
+    conjunta_campo2_mascara: "",
+    conjunta_campo2_max_chars: "",
   });
 
   useEffect(() => {
@@ -123,6 +146,18 @@ const BancoPerguntasManager = () => {
         numero_max: config?.max?.toString() || "",
         selecao_modo: config?.modo_exibicao || "menu",
         multipla_modo: config?.modo_exibicao || "check",
+        conjunta_campo1_tipo: config?.campos?.[0]?.tipo || "texto",
+        conjunta_campo1_rotulo: config?.campos?.[0]?.rotulo || "",
+        conjunta_campo1_placeholder: config?.campos?.[0]?.placeholder || "",
+        conjunta_campo1_opcoes: config?.campos?.[0]?.opcoes?.join("\n") || "",
+        conjunta_campo1_mascara: config?.campos?.[0]?.mascara || "",
+        conjunta_campo1_max_chars: config?.campos?.[0]?.max_chars?.toString() || "",
+        conjunta_campo2_tipo: config?.campos?.[1]?.tipo || "texto",
+        conjunta_campo2_rotulo: config?.campos?.[1]?.rotulo || "",
+        conjunta_campo2_placeholder: config?.campos?.[1]?.placeholder || "",
+        conjunta_campo2_opcoes: config?.campos?.[1]?.opcoes?.join("\n") || "",
+        conjunta_campo2_mascara: config?.campos?.[1]?.mascara || "",
+        conjunta_campo2_max_chars: config?.campos?.[1]?.max_chars?.toString() || "",
       });
     } else {
       setEditing(null);
@@ -147,6 +182,18 @@ const BancoPerguntasManager = () => {
         numero_max: "",
         selecao_modo: "menu",
         multipla_modo: "check",
+        conjunta_campo1_tipo: "texto",
+        conjunta_campo1_rotulo: "",
+        conjunta_campo1_placeholder: "",
+        conjunta_campo1_opcoes: "",
+        conjunta_campo1_mascara: "",
+        conjunta_campo1_max_chars: "",
+        conjunta_campo2_tipo: "texto",
+        conjunta_campo2_rotulo: "",
+        conjunta_campo2_placeholder: "",
+        conjunta_campo2_opcoes: "",
+        conjunta_campo2_mascara: "",
+        conjunta_campo2_max_chars: "",
       });
     }
     setShowDialog(true);
@@ -188,6 +235,22 @@ const BancoPerguntasManager = () => {
     }
     if (formData.tipo === "multipla_escolha") {
       config.modo_exibicao = formData.multipla_modo;
+    }
+    if (formData.tipo === "resposta_conjunta") {
+      const buildCampo = (prefix: "conjunta_campo1" | "conjunta_campo2") => {
+        const tipo = formData[`${prefix}_tipo`];
+        const opcoes = formData[`${prefix}_opcoes`]
+          .split("\n").filter((o: string) => o.trim()).map((o: string) => o.trim());
+        return {
+          tipo,
+          rotulo: formData[`${prefix}_rotulo`],
+          placeholder: formData[`${prefix}_placeholder`],
+          opcoes: opcoes.length > 0 ? opcoes : null,
+          mascara: formData[`${prefix}_mascara`] || null,
+          max_chars: formData[`${prefix}_max_chars`] ? parseInt(formData[`${prefix}_max_chars`]) : null,
+        };
+      };
+      config.campos = [buildCampo("conjunta_campo1"), buildCampo("conjunta_campo2")];
     }
 
     const payload = {
@@ -492,6 +555,65 @@ const BancoPerguntasManager = () => {
                   />
                   <Label htmlFor="formato_maiusculo" className="cursor-pointer">Transformar em maiúsculo automaticamente</Label>
                 </div>
+              </div>
+            )}
+
+            {formData.tipo === "resposta_conjunta" && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold">Configuração da Resposta Conjunta</Label>
+                {([1, 2] as const).map((num) => {
+                  const prefix = `conjunta_campo${num}` as "conjunta_campo1" | "conjunta_campo2";
+                  const tipoKey = `${prefix}_tipo` as keyof typeof formData;
+                  const rotuloKey = `${prefix}_rotulo` as keyof typeof formData;
+                  const placeholderKey = `${prefix}_placeholder` as keyof typeof formData;
+                  const opcoesKey = `${prefix}_opcoes` as keyof typeof formData;
+                  const mascaraKey = `${prefix}_mascara` as keyof typeof formData;
+                  const maxCharsKey = `${prefix}_max_chars` as keyof typeof formData;
+                  return (
+                    <div key={num} className="border rounded-md p-3 space-y-3 bg-background">
+                      <Label className="font-semibold">Subcampo {num}</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Tipo</Label>
+                          <Select value={formData[tipoKey] as string} onValueChange={(v) => setFormData({ ...formData, [tipoKey]: v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {SUBCAMPO_TYPES.map((t) => (
+                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Rótulo</Label>
+                          <Input value={formData[rotuloKey] as string} onChange={(e) => setFormData({ ...formData, [rotuloKey]: e.target.value })} placeholder="Ex: Prefixo" />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Placeholder</Label>
+                        <Input value={formData[placeholderKey] as string} onChange={(e) => setFormData({ ...formData, [placeholderKey]: e.target.value })} placeholder="Texto de ajuda" />
+                      </div>
+                      {formData[tipoKey] === "select" && (
+                        <div>
+                          <Label>Opções (uma por linha)</Label>
+                          <Textarea value={formData[opcoesKey] as string} onChange={(e) => setFormData({ ...formData, [opcoesKey]: e.target.value })} placeholder={"Opção 1\nOpção 2"} rows={3} />
+                        </div>
+                      )}
+                      {formData[tipoKey] === "texto_formatado" && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Máscara</Label>
+                            <Input value={formData[mascaraKey] as string} onChange={(e) => setFormData({ ...formData, [mascaraKey]: e.target.value.toUpperCase() })} placeholder="Ex: 9999" className="font-mono" />
+                          </div>
+                          <div>
+                            <Label>Máx. caracteres</Label>
+                            <Input type="number" value={formData[maxCharsKey] as string} onChange={(e) => setFormData({ ...formData, [maxCharsKey]: e.target.value })} placeholder="Ex: 4" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

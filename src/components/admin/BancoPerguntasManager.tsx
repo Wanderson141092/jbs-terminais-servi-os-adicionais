@@ -77,6 +77,8 @@ const BancoPerguntasManager = () => {
     placeholder: "",
     opcoes: "",
     largura: 100,
+    permitir_multiplos: false,
+    multiplos_max: "",
     // informativo config
     info_tipo: "texto" as "texto" | "imagem",
     info_conteudo: "",
@@ -144,6 +146,8 @@ const BancoPerguntasManager = () => {
         placeholder: pergunta.placeholder || "",
         opcoes: opcoesArr?.map((o) => o.label).join("\n") || "",
         largura: config?.largura ?? 100,
+        permitir_multiplos: config?.permitir_multiplos ?? false,
+        multiplos_max: config?.multiplos_max?.toString() || "",
         info_tipo: config?.conteudo_tipo || "texto",
         info_conteudo: config?.conteudo || "",
         info_exigir_aceite: config?.exigir_aceite || false,
@@ -200,6 +204,8 @@ const BancoPerguntasManager = () => {
         placeholder: "",
         opcoes: "",
         largura: 100,
+        permitir_multiplos: false,
+        multiplos_max: "",
         info_tipo: "texto",
         info_conteudo: "",
         info_exigir_aceite: false,
@@ -314,6 +320,13 @@ const BancoPerguntasManager = () => {
     // Always save largura if not 100
     if (formData.largura && formData.largura !== 100) {
       config.largura = formData.largura;
+    }
+    // Save permitir_multiplos
+    if (formData.permitir_multiplos) {
+      config.permitir_multiplos = true;
+      if (formData.multiplos_max) {
+        config.multiplos_max = parseInt(formData.multiplos_max);
+      }
     }
 
     const payload = {
@@ -505,6 +518,35 @@ const BancoPerguntasManager = () => {
                 <span className="text-xs text-muted-foreground">100%</span>
               </div>
             </div>
+
+            {!["informativo", "checkbox", "resposta_conjunta", "pergunta_condicional", "multipla_escolha", "anexo"].includes(formData.tipo) && (
+              <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Permitir múltiplas respostas</Label>
+                    <p className="text-xs text-muted-foreground">Adiciona botão + para o usuário incluir mais campos</p>
+                  </div>
+                  <Switch
+                    checked={formData.permitir_multiplos}
+                    onCheckedChange={(checked) => setFormData({ ...formData, permitir_multiplos: checked })}
+                  />
+                </div>
+                {formData.permitir_multiplos && (
+                  <div>
+                    <Label>Máximo de campos (deixe vazio para ilimitado)</Label>
+                    <Input
+                      type="number"
+                      min={2}
+                      max={50}
+                      value={formData.multiplos_max}
+                      onChange={(e) => setFormData({ ...formData, multiplos_max: e.target.value })}
+                      placeholder="Ilimitado"
+                      className="w-32 mt-1"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {(formData.tipo === "select" || formData.tipo === "multipla_escolha") && (
               <div className="space-y-4">

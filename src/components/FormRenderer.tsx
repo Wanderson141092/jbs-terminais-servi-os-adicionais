@@ -112,6 +112,14 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
           }
           continue;
         }
+        if (p.tipo === "resposta_conjunta") {
+          const obj = values[p.id] as Record<string, any> | undefined;
+          if (!obj || !obj.campo1 || !obj.campo2) {
+            toast.error(`Preencha ambos os campos de "${p.rotulo}"`);
+            return;
+          }
+          continue;
+        }
         const val = p.tipo === "anexo" ? files[p.id] : values[p.id];
         if (!val || (Array.isArray(val) && val.length === 0)) {
           toast.error(`O campo "${p.rotulo}" é obrigatório`);

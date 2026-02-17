@@ -68,6 +68,7 @@ const InternoDashboard = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
+  const [lancamentoRegistros, setLancamentoRegistros] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [tipoServicoFilter, setTipoServicoFilter] = useState("Todos");
@@ -153,18 +154,17 @@ const InternoDashboard = () => {
   const fetchSolicitacoes = useCallback(async () => {
     setLoading(true);
     
-    let query = supabase
-      .from("solicitacoes")
-      .select("*")
-      .order("created_at", { ascending: false });
-    
-    const { data, error } = await query.limit(500);
+    const [solRes, regRes] = await Promise.all([
+      supabase.from("solicitacoes").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("lancamento_cobranca_registros").select("*"),
+    ]);
 
-    if (error) {
+    if (solRes.error) {
       toast.error("Erro ao carregar solicitações.");
     } else {
-      setSolicitacoes(data || []);
+      setSolicitacoes(solRes.data || []);
     }
+    setLancamentoRegistros(regRes.data || []);
     setLoading(false);
   }, []);
 
@@ -275,9 +275,13 @@ const InternoDashboard = () => {
       } else {
         const needsLaunch = servico.status_confirmacao_lancamento.includes(s.status);
         if (lancamentoFilter === "pendente") {
-          matchesLancamento = needsLaunch && !s.lancamento_confirmado;
+          const solRegs = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
+          const isPending = solRegs.length > 0 ? solRegs.some((r: any) => !r.confirmado) : !s.lancamento_confirmado;
+          matchesLancamento = needsLaunch && isPending;
         } else if (lancamentoFilter === "confirmado") {
-          matchesLancamento = needsLaunch && s.lancamento_confirmado === true;
+          const solRegs = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
+          const isConf = solRegs.length > 0 ? solRegs.every((r: any) => r.confirmado === true) : s.lancamento_confirmado === true;
+          matchesLancamento = needsLaunch && isConf;
         }
       }
     }
@@ -367,14 +371,34 @@ const InternoDashboard = () => {
   };
 
   const lancamentoPendente = dashboardFiltered.filter(s => {
-    return matchesLaunchStatus(s) && !s.lancamento_confirmado;
+    if (!matchesLaunchStatus(s)) return false;
+    // Check individual registros first
+    const solRegistros = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
+    if (solRegistros.length > 0) {
+      return solRegistros.some((r: any) => !r.confirmado);
+    }
+    // Fallback to global field
+    return !s.lancamento_confirmado;
   }).length;
 
   const lancamentoConfirmado = dashboardFiltered.filter(s => {
-    return matchesLaunchStatus(s) && s.lancamento_confirmado === true;
+    if (!matchesLaunchStatus(s)) return false;
+    const solRegistros = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
+    if (solRegistros.length > 0) {
+      return solRegistros.every((r: any) => r.confirmado === true);
+    }
+    return s.lancamento_confirmado === true;
   }).length;
 
   const needsLaunchConfirmation = (s: any) => matchesLaunchStatus(s);
+
+  const isLancamentoAllConfirmed = (s: any) => {
+    const solRegistros = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
+    if (solRegistros.length > 0) {
+      return solRegistros.every((r: any) => r.confirmado === true);
+    }
+    return s.lancamento_confirmado === true;
+  };
 
   // Check if deferimento button should be active - uses service config
   const isDeferimentoActive = (s: any) => {
@@ -861,7 +885,7 @@ const InternoDashboard = () => {
                       </TableCell>
                       <TableCell>
                         {needsLaunchConfirmation(s) ? (
-                          s.lancamento_confirmado ? (
+                          isLancamentoAllConfirmed(s) ? (
                             <Check className="h-4 w-4 text-muted-foreground/50 mx-auto" />
                           ) : (
                             <Button

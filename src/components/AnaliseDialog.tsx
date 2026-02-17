@@ -81,11 +81,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [cancelJustificativa, setCancelJustificativa] = useState("");
   const [showConclusaoLancamentoDialog, setShowConclusaoLancamentoDialog] = useState(false);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
+  const [lancamentoRegistros, setLancamentoRegistros] = useState<any[]>([]);
 
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
@@ -95,6 +96,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         supabase.from("campos_analise_valores").select("campo_id, valor, campos_analise(nome)").eq("solicitacao_id", solicitacao.id),
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
+        supabase.from("lancamento_cobranca_registros").select("*").eq("solicitacao_id", solicitacao.id),
       ]);
 
       setAttachments(attachRes.data || []);
@@ -152,6 +154,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         ? allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0 || c.servico_ids.includes(currentServicoId))
         : allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0);
       setCobrancaConfigs(serviceCobrancaConfig);
+      setLancamentoRegistros(registrosRes.data || []);
 
       // Build dynamic fields display
       const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
@@ -507,20 +510,51 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (isLateCancel(selectedStatus)) {
       updatePayload.custo_posicionamento = custoposicionamento;
       if (custoposicionamento === true) {
-        // Mark lancamento as pending (same as financial launch flow)
         updatePayload.lancamento_confirmado = false;
       }
     }
     
-    // If lacre armador with cost, trigger lançamento
+    // If lacre armador with cost, create individual pendencia registro
     if (solicitarLacreArmador && custoLacreArmador === true) {
       updatePayload.lancamento_confirmado = false;
+      const pendenciaCfg = cobrancaConfigs.find((c: any) => c.tipo === "pendencia");
+      if (pendenciaCfg) {
+        await supabase.from("lancamento_cobranca_registros").upsert({
+          solicitacao_id: solicitacao.id,
+          cobranca_config_id: pendenciaCfg.id,
+          confirmado: false,
+        }, { onConflict: "solicitacao_id,cobranca_config_id" });
+      }
     }
 
-    // If completion status, set lancamento based on user confirmation
+    // If completion status, create individual servico registro and set lancamento based on user confirmation
     if (isCompletionStatus() && selectedStatus !== solicitacao.status) {
-      updatePayload.lancamento_confirmado = lancamentoConfirmado;
-      if (lancamentoConfirmado) {
+      const servicoCfg = cobrancaConfigs.find((c: any) => c.tipo === "servico");
+      if (servicoCfg) {
+        await supabase.from("lancamento_cobranca_registros").upsert({
+          solicitacao_id: solicitacao.id,
+          cobranca_config_id: servicoCfg.id,
+          confirmado: lancamentoConfirmado,
+          confirmado_por: lancamentoConfirmado ? userId : null,
+          confirmado_data: lancamentoConfirmado ? new Date().toISOString() : null,
+        }, { onConflict: "solicitacao_id,cobranca_config_id" });
+      }
+      // Check if ALL registros are confirmed for global field
+      const { data: allRegs } = await supabase
+        .from("lancamento_cobranca_registros")
+        .select("*")
+        .eq("solicitacao_id", solicitacao.id);
+      const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
+        if (cfg.tipo === "servico") return true;
+        if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true || (solicitarLacreArmador && custoLacreArmador === true);
+        return false;
+      });
+      const allConfirmed = applicableConfigs.every((cfg: any) => {
+        const reg = (allRegs || []).find((r: any) => r.cobranca_config_id === cfg.id);
+        return reg?.confirmado === true;
+      });
+      updatePayload.lancamento_confirmado = allConfirmed;
+      if (allConfirmed) {
         updatePayload.lancamento_confirmado_por = userId;
         updatePayload.lancamento_confirmado_data = new Date().toISOString();
       }
@@ -615,24 +649,78 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     });
   };
 
-  const handleConfirmarLancamento = async () => {
+  const handleConfirmarLancamento = async (configId?: string) => {
     setLoading(true);
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update({
-        lancamento_confirmado: true,
-        lancamento_confirmado_por: userId,
-        lancamento_confirmado_data: new Date().toISOString()
-      })
-      .eq("id", solicitacao.id);
+    
+    if (configId) {
+      // Confirm individual registro
+      const { error } = await supabase
+        .from("lancamento_cobranca_registros")
+        .upsert({
+          solicitacao_id: solicitacao.id,
+          cobranca_config_id: configId,
+          confirmado: true,
+          confirmado_por: userId,
+          confirmado_data: new Date().toISOString(),
+        }, { onConflict: "solicitacao_id,cobranca_config_id" });
 
-    if (error) {
-      toast.error("Erro ao confirmar lançamento");
-    } else {
-      await logAudit("lancamento_confirmado", `Lançamento do serviço confirmado. Protocolo: ${solicitacao.protocolo}. Serviço: ${solicitacao.tipo_operacao || "N/A"}. Cliente: ${solicitacao.cliente_nome}`);
-      toast.success("Lançamento confirmado!");
+      if (error) {
+        toast.error("Erro ao confirmar lançamento");
+        setLoading(false);
+        return;
+      }
+
+      // Refresh registros
+      const { data: updatedRegistros } = await supabase
+        .from("lancamento_cobranca_registros")
+        .select("*")
+        .eq("solicitacao_id", solicitacao.id);
+      setLancamentoRegistros(updatedRegistros || []);
+
+      // Check if ALL applicable registros are now confirmed
+      const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
+        if (cfg.tipo === "servico") return true;
+        if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true;
+        return false;
+      });
+      const allConfirmed = applicableConfigs.every((cfg: any) => {
+        const reg = (updatedRegistros || []).find((r: any) => r.cobranca_config_id === cfg.id);
+        return reg?.confirmado === true;
+      });
+
+      // Update global field for backward compatibility
+      if (allConfirmed) {
+        await supabase.from("solicitacoes").update({
+          lancamento_confirmado: true,
+          lancamento_confirmado_por: userId,
+          lancamento_confirmado_data: new Date().toISOString()
+        }).eq("id", solicitacao.id);
+      }
+
+      const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
+      await logAudit("lancamento_confirmado", `Lançamento confirmado: ${cfgLabel}. Protocolo: ${solicitacao.protocolo}.`);
+      toast.success(`Lançamento "${cfgLabel}" confirmado!`);
       setShowLancamentoDialog(false);
-      onClose();
+      if (allConfirmed) onClose();
+    } else {
+      // Legacy: confirm all via global field
+      const { error } = await supabase
+        .from("solicitacoes")
+        .update({
+          lancamento_confirmado: true,
+          lancamento_confirmado_por: userId,
+          lancamento_confirmado_data: new Date().toISOString()
+        })
+        .eq("id", solicitacao.id);
+
+      if (error) {
+        toast.error("Erro ao confirmar lançamento");
+      } else {
+        await logAudit("lancamento_confirmado", `Lançamento do serviço confirmado. Protocolo: ${solicitacao.protocolo}.`);
+        toast.success("Lançamento confirmado!");
+        setShowLancamentoDialog(false);
+        onClose();
+      }
     }
     setLoading(false);
   };
@@ -821,40 +909,44 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 const statusAtivacao = cfg.status_ativacao || [];
                 if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return null;
 
-                // "servico" type: shows based on lancamento_confirmado field
+                // "servico" type: check individual registro
                 if (cfg.tipo === "servico") {
-                  const isPending = !solicitacao.lancamento_confirmado;
+                  const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
+                  const isConfirmed = registro?.confirmado === true;
+                  // Only show if registro exists (was created) or global field indicates pending
+                  if (!registro && solicitacao.lancamento_confirmado !== false) return null;
                   return (
                     <Badge
                       key={cfg.id}
                       variant="outline"
                       className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
-                        !isPending
+                        isConfirmed
                           ? "border-green-500 text-green-700 bg-green-50"
                           : "border-red-500 text-red-700 bg-red-50"
                       }`}
                     >
                       <DollarSign className="h-3 w-3" />
-                      {cfg.rotulo_analise}: {isPending ? "Aguardando confirmação de lançamento do serviço" : "Confirmado"}
+                      {cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Aguardando confirmação de lançamento do serviço"}
                     </Badge>
                   );
                 }
                 // "pendencia" type: only shows if lacre_armador_aceite_custo === true
                 if (cfg.tipo === "pendencia") {
                   if (solicitacao.lacre_armador_aceite_custo !== true) return null;
-                  const isPending = !solicitacao.lancamento_confirmado;
+                  const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
+                  const isConfirmed = registro?.confirmado === true;
                   return (
                     <Badge
                       key={cfg.id}
                       variant="outline"
                       className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
-                        !isPending
+                        isConfirmed
                           ? "border-green-500 text-green-700 bg-green-50"
                           : "border-red-500 text-red-700 bg-red-50"
                       }`}
                     >
                       <DollarSign className="h-3 w-3" />
-                      {cfg.rotulo_analise}: {isPending ? "Lanç. Posic. Lacre Pendente" : "Confirmado"}
+                      {cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Lanç. Posic. Lacre Pendente"}
                     </Badge>
                   );
                 }
@@ -1194,39 +1286,60 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 
             {(() => {
-              // Find servico-type cobranca configs that match current status
-              const servicoCobrancas = cobrancaConfigs.filter((cfg: any) => {
-                if (cfg.tipo !== "servico") return false;
+              // Build list of pending cobranca configs (both servico and pendencia)
+              const pendingCobrancas = cobrancaConfigs.filter((cfg: any) => {
                 const statusAtivacao = cfg.status_ativacao || [];
                 if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
+                if (cfg.tipo === "pendencia" && solicitacao.lacre_armador_aceite_custo !== true) return false;
+                const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
+                if (registro?.confirmado === true) return false;
                 return true;
               });
-              // Also check legacy config
+
+              // Also check legacy: if no registros exist but global field is pending
               const svcConf = servicos.find(sv => sv.nome === (solicitacao.tipo_operacao || ""));
               const statusLanc = svcConf?.status_confirmacao_lancamento || [];
               const legacyMatch = statusLanc.includes(solicitacao.status);
               
-              if ((servicoCobrancas.length === 0 && !legacyMatch) || solicitacao.lancamento_confirmado) return null;
-              
-              const label = servicoCobrancas.length > 0 
-                ? servicoCobrancas.map((c: any) => c.rotulo_analise).join(" / ")
-                : "Aguardando confirmação de lançamento do serviço";
+              if (pendingCobrancas.length === 0 && !legacyMatch) return null;
+              if (pendingCobrancas.length === 0 && solicitacao.lancamento_confirmado) return null;
               
               return (
                 <>
                   <Separator />
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-red-600 mb-2">
-                      <DollarSign className="h-5 w-5" />
-                      <span className="font-semibold">{label}: Aguardando confirmação</span>
-                    </div>
-                    <Button 
-                      onClick={() => setShowLancamentoDialog(true)} 
-                      variant="outline" 
-                      className="border-red-300 text-red-600 hover:bg-red-50 w-full"
-                    >
-                      Confirmar Lançamento
-                    </Button>
+                  <div className="space-y-3">
+                    {pendingCobrancas.map((cfg: any) => (
+                      <div key={cfg.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 text-red-600 mb-2">
+                          <DollarSign className="h-5 w-5" />
+                          <span className="font-semibold">{cfg.rotulo_analise}: Aguardando confirmação</span>
+                        </div>
+                        <Button 
+                          onClick={() => handleConfirmarLancamento(cfg.id)} 
+                          variant="outline" 
+                          disabled={loading}
+                          className="border-red-300 text-red-600 hover:bg-red-50 w-full"
+                        >
+                          Confirmar Lançamento — {cfg.rotulo_analise}
+                        </Button>
+                      </div>
+                    ))}
+                    {pendingCobrancas.length === 0 && legacyMatch && !solicitacao.lancamento_confirmado && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 text-red-600 mb-2">
+                          <DollarSign className="h-5 w-5" />
+                          <span className="font-semibold">Aguardando confirmação de lançamento do serviço</span>
+                        </div>
+                        <Button 
+                          onClick={() => handleConfirmarLancamento()} 
+                          variant="outline" 
+                          disabled={loading}
+                          className="border-red-300 text-red-600 hover:bg-red-50 w-full"
+                        >
+                          Confirmar Lançamento
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </>
               );
@@ -1459,7 +1572,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowLancamentoDialog(false)}>Cancelar</Button>
-            <Button onClick={handleConfirmarLancamento} disabled={loading} className="jbs-btn-primary">
+            <Button onClick={() => handleConfirmarLancamento()} disabled={loading} className="jbs-btn-primary">
               <Check className="h-4 w-4 mr-2" />
               Confirmar Lançamento
             </Button>

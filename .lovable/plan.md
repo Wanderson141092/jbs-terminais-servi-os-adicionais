@@ -1,69 +1,50 @@
 
-# Plano: Registros de Lancamento Separados por Tipo de Cobranca
+# Plano: Status individual de cada cobranca na coluna $ e badge do servico principal na Analise
 
-## Problema
-Atualmente existe apenas UM campo booleano (`lancamento_confirmado`) na tabela `solicitacoes`. Quando o usuario confirma qualquer lancamento (servico principal ou lacre), esse unico campo muda para `true` e todos os badges mudam para "Confirmado" ao mesmo tempo.
+## Resumo
+Duas alteracoes principais:
+1. **AnaliseDialog**: Adicionar um badge de status para "Lanc. Posicionamento" (cobranca do servico principal), semelhante ao que ja existe para "Custo Posic. Lacre".
+2. **Dashboard (coluna $)**: Substituir o botao unico por icones de status individuais — um para cada tipo de cobranca aplicavel (servico e pendencia/lacre).
 
-## Solucao
-Criar uma tabela auxiliar `lancamento_cobranca_registros` que armazena a confirmacao individual de cada tipo de cobranca por solicitacao.
-
-## Alteracoes
-
-### 1. Nova Tabela: `lancamento_cobranca_registros`
-
-```text
-lancamento_cobranca_registros
-  - id (uuid, PK)
-  - solicitacao_id (uuid, FK -> solicitacoes.id)
-  - cobranca_config_id (uuid, FK -> lancamento_cobranca_config.id)
-  - confirmado (boolean, default false)
-  - confirmado_por (uuid, nullable)
-  - confirmado_data (timestamptz, nullable)
-  - created_at (timestamptz)
-  - updated_at (timestamptz)
-  UNIQUE(solicitacao_id, cobranca_config_id)
-```
-
-RLS: leitura para todos autenticados, escrita para admins.
-
-### 2. AnaliseDialog.tsx - Confirmacao Individual
-- Ao confirmar lancamento do servico principal, inserir/atualizar APENAS o registro com `cobranca_config_id` do tipo "servico"
-- Ao confirmar lancamento do lacre, inserir/atualizar APENAS o registro com `cobranca_config_id` do tipo "pendencia"
-- Buscar registros da tabela `lancamento_cobranca_registros` ao abrir o dialog
-- Os badges de status usarao o registro individual em vez do campo global
-- Manter retrocompatibilidade: o campo `lancamento_confirmado` na `solicitacoes` sera marcado como `true` somente quando TODOS os lancamentos aplicaveis estiverem confirmados
-
-### 3. AnaliseDialog.tsx - Badges de Status (linhas ~818-862)
-- Para cada `cobranca_config`, verificar o registro individual em `lancamento_cobranca_registros` em vez de `solicitacao.lancamento_confirmado`
-- Badge "servico": checar registro onde `cobranca_config_id` = config de servico
-- Badge "pendencia": checar registro onde `cobranca_config_id` = config de pendencia/lacre
-
-### 4. AnaliseDialog.tsx - Botao de Confirmacao (linhas ~1196-1230)
-- Exibir um botao de confirmacao separado para cada cobranca pendente
-- Cada botao confirma apenas seu respectivo registro
-
-### 5. AnaliseDialog.tsx - Salvamento (linhas ~506-527)
-- Ao ativar lacre com custo, criar registro pendente para a cobranca de pendencia
-- Ao atingir status de conclusao, criar registro pendente para a cobranca de servico
-- O campo global `lancamento_confirmado` so sera `true` quando todos os registros estiverem confirmados
-
-### 6. InternoDashboard.tsx - Indicador "$" na Tabela
-- Buscar `lancamento_cobranca_registros` junto com solicitacoes
-- O "$" vermelho aparece se qualquer registro de cobranca aplicavel nao estiver confirmado
-- O check cinza aparece somente quando TODOS os registros estiverem confirmados
-- Os contadores de "pendente" e "confirmado" usam a mesma logica
-
-### 7. ProcessChecklist.tsx
-- Atualizar o checklist para verificar registros individuais em vez do campo global
+---
 
 ## Detalhes Tecnicos
 
-Arquivos modificados:
-- **Migration SQL**: criar tabela `lancamento_cobranca_registros` com indice unico e RLS
-- **`src/components/AnaliseDialog.tsx`**: fetch dos registros, confirmacao individual, badges individuais, logica de salvamento
-- **`src/pages/InternoDashboard.tsx`**: fetch dos registros, logica do "$", contadores
-- **`src/components/ProcessChecklist.tsx`**: verificacao individual
+### 1. AnaliseDialog.tsx — Badge do servico principal
 
-Logica de retrocompatibilidade:
-- O campo `solicitacoes.lancamento_confirmado` sera mantido e atualizado como "todos confirmados" para nao quebrar filtros e relatorios existentes
-- Processos antigos que ja tem `lancamento_confirmado = true` continuarao funcionando normalmente
+Na area de status/cobrancas (proximo ao bloco do Lacre, linhas ~1284-1342), adicionar um badge visual para a cobranca do tipo "servico" quando o status estiver nos `status_ativacao` da config. O badge mostrara:
+- Verde com "Confirmado" quando `lancamentoRegistros` tiver registro confirmado
+- Vermelho com "Aguardando confirmacao" quando pendente
+- Botao "Confirmar Lancamento" embutido quando pendente
+
+Esse badge ficara visivel independentemente do bloco do lacre, sempre que a cobranca de servico estiver ativa para o status atual.
+
+### 2. InternoDashboard.tsx — Coluna $ com icones individuais
+
+Substituir o bloco atual (linhas ~886-907) que mostra um unico botao `<DollarSign>` ou `<Check>` por icones separados para cada cobranca aplicavel:
+
+- Para cada `cobrancaConfig` ativa para aquele processo:
+  - Verificar se existe registro em `lancamentoRegistros` para aquela solicitacao + config
+  - Se confirmado: icone `<Check>` cinza claro (pequeno)
+  - Se pendente: icone `<DollarSign>` vermelho (pequeno)
+- Os icones ficam lado a lado na celula, cada um com tooltip indicando o `rotulo_analise` e o status
+
+Logica:
+```text
+Para cada solicitacao na coluna $:
+  1. Encontrar o servico correspondente
+  2. Filtrar cobrancaConfigs aplicaveis (por servico_id e status_ativacao)
+  3. Para cada config aplicavel:
+     - Buscar registro em lancamentoRegistros
+     - Renderizar icone individual com tooltip
+```
+
+### Arquivos modificados:
+- **`src/components/AnaliseDialog.tsx`**: Adicionar badge de status para cobranca tipo "servico" na area de lancamentos
+- **`src/pages/InternoDashboard.tsx`**: Refatorar celula da coluna $ para exibir icones individuais por tipo de cobranca
+
+### Comportamento visual esperado na coluna $:
+- Processo com apenas cobranca de servico pendente: `[$]` (vermelho)
+- Processo com servico confirmado + lacre pendente: `[v][$]` (cinza + vermelho)
+- Processo com ambos confirmados: `[v][v]` (cinza + cinza)
+- Processo sem cobranca aplicavel: vazio

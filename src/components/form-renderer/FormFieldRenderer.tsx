@@ -10,7 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Info, Image as ImageIcon } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Info, Image as ImageIcon, ChevronDown } from "lucide-react";
 import type { PerguntaComCondicao } from "./types";
 
 interface FormFieldRendererProps {
@@ -29,13 +36,7 @@ const FormFieldRenderer = ({
   onFileChange,
 }: FormFieldRendererProps) => {
   const opcoes = pergunta.opcoes as { value: string; label: string }[] | null;
-  const config = pergunta.config as {
-    tipo_conteudo?: "texto" | "imagem";
-    conteudo?: string;
-    imagem_url?: string;
-    aceite?: boolean;
-    texto_aceite?: string;
-  } | null;
+  const config = pergunta.config as Record<string, any> | null;
 
   // Informativo (text/image block with optional accept)
   if (pergunta.tipo === "informativo") {
@@ -80,6 +81,156 @@ const FormFieldRenderer = ({
     );
   }
 
+  const renderNumeroField = () => {
+    const prefixo = config?.prefixo;
+    const sufixo = config?.sufixo;
+    const permitirNeg = config?.permitir_negativo ?? true;
+    const minVal = config?.min != null ? config.min : (permitirNeg ? undefined : 0);
+    const maxVal = config?.max != null ? config.max : undefined;
+
+    const input = (
+      <Input
+        type="number"
+        value={value || ""}
+        onChange={(e) => onValueChange(e.target.value)}
+        placeholder={pergunta.placeholder || ""}
+        min={minVal}
+        max={maxVal}
+        className={prefixo || sufixo ? "flex-1" : ""}
+      />
+    );
+
+    if (prefixo || sufixo) {
+      return (
+        <div className="flex items-center gap-2">
+          {prefixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{prefixo}</span>}
+          {input}
+          {sufixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{sufixo}</span>}
+        </div>
+      );
+    }
+    return input;
+  };
+
+  const renderSelectField = () => {
+    if (!opcoes) return null;
+    const modo = config?.modo_exibicao || "menu";
+
+    if (modo === "botoes") {
+      return (
+        <ToggleGroup type="single" value={value || ""} onValueChange={(v) => { if (v) onValueChange(v); }} className="flex flex-wrap gap-2 justify-start">
+          {opcoes.map((opt) => (
+            <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">
+              {opt.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      );
+    }
+
+    if (modo === "radio") {
+      return (
+        <RadioGroup value={value || ""} onValueChange={onValueChange} className="space-y-2">
+          {opcoes.map((opt) => (
+            <div key={opt.value} className="flex items-center gap-2">
+              <RadioGroupItem value={opt.label} id={`${pergunta.id}_${opt.value}`} />
+              <Label htmlFor={`${pergunta.id}_${opt.value}`} className="cursor-pointer font-normal">
+                {opt.label}
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
+      );
+    }
+
+    // default: menu (dropdown)
+    return (
+      <Select value={value || ""} onValueChange={onValueChange}>
+        <SelectTrigger>
+          <SelectValue placeholder={pergunta.placeholder || "Selecione..."} />
+        </SelectTrigger>
+        <SelectContent>
+          {opcoes.map((opt) => (
+            <SelectItem key={opt.value} value={opt.label}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  };
+
+  const renderMultiplaEscolhaField = () => {
+    if (!opcoes) return null;
+    const modo = config?.modo_exibicao || "check";
+    const currentValue: string[] = value || [];
+
+    if (modo === "botoes") {
+      return (
+        <ToggleGroup type="multiple" value={currentValue} onValueChange={onValueChange} className="flex flex-wrap gap-2 justify-start">
+          {opcoes.map((opt) => (
+            <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">
+              {opt.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      );
+    }
+
+    if (modo === "menu") {
+      return (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-full justify-between font-normal">
+              {currentValue.length > 0 ? `${currentValue.length} selecionado(s)` : (pergunta.placeholder || "Selecione...")}
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
+            <div className="space-y-1 max-h-48 overflow-auto">
+              {opcoes.map((opt) => (
+                <div key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer">
+                  <Checkbox
+                    id={`pop_${pergunta.id}_${opt.value}`}
+                    checked={currentValue.includes(opt.label)}
+                    onCheckedChange={(checked) => {
+                      if (checked) onValueChange([...currentValue, opt.label]);
+                      else onValueChange(currentValue.filter((v: string) => v !== opt.label));
+                    }}
+                  />
+                  <Label htmlFor={`pop_${pergunta.id}_${opt.value}`} className="cursor-pointer font-normal text-sm flex-1">
+                    {opt.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
+    // default: check (checkbox list)
+    return (
+      <div className="space-y-2">
+        {opcoes.map((opt) => (
+          <div key={opt.value} className="flex items-center gap-2">
+            <Checkbox
+              id={`${pergunta.id}_${opt.value}`}
+              checked={currentValue.includes(opt.label)}
+              onCheckedChange={(checked) => {
+                if (checked) onValueChange([...currentValue, opt.label]);
+                else onValueChange(currentValue.filter((v: string) => v !== opt.label));
+              }}
+            />
+            <Label htmlFor={`${pergunta.id}_${opt.value}`} className="cursor-pointer font-normal">
+              {opt.label}
+            </Label>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-2">
       <Label className="flex items-center gap-1">
@@ -107,14 +258,7 @@ const FormFieldRenderer = ({
         />
       )}
 
-      {pergunta.tipo === "numero" && (
-        <Input
-          type="number"
-          value={value || ""}
-          onChange={(e) => onValueChange(e.target.value)}
-          placeholder={pergunta.placeholder || ""}
-        />
-      )}
+      {pergunta.tipo === "numero" && renderNumeroField()}
 
       {pergunta.tipo === "email" && (
         <Input
@@ -141,20 +285,7 @@ const FormFieldRenderer = ({
         />
       )}
 
-      {pergunta.tipo === "select" && opcoes && (
-        <Select value={value || ""} onValueChange={onValueChange}>
-          <SelectTrigger>
-            <SelectValue placeholder={pergunta.placeholder || "Selecione..."} />
-          </SelectTrigger>
-          <SelectContent>
-            {opcoes.map((opt) => (
-              <SelectItem key={opt.value} value={opt.label}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      {pergunta.tipo === "select" && renderSelectField()}
 
       {pergunta.tipo === "selecao_unica" && opcoes && (
         <RadioGroup value={value || ""} onValueChange={onValueChange} className="space-y-2">
@@ -169,29 +300,7 @@ const FormFieldRenderer = ({
         </RadioGroup>
       )}
 
-      {pergunta.tipo === "multipla_escolha" && opcoes && (
-        <div className="space-y-2">
-          {opcoes.map((opt) => (
-            <div key={opt.value} className="flex items-center gap-2">
-              <Checkbox
-                id={`${pergunta.id}_${opt.value}`}
-                checked={(value || []).includes(opt.label)}
-                onCheckedChange={(checked) => {
-                  const current = value || [];
-                  if (checked) {
-                    onValueChange([...current, opt.label]);
-                  } else {
-                    onValueChange(current.filter((v: string) => v !== opt.label));
-                  }
-                }}
-              />
-              <Label htmlFor={`${pergunta.id}_${opt.value}`} className="cursor-pointer font-normal">
-                {opt.label}
-              </Label>
-            </div>
-          ))}
-        </div>
-      )}
+      {pergunta.tipo === "multipla_escolha" && renderMultiplaEscolhaField()}
 
       {pergunta.tipo === "checkbox" && (
         <div className="flex items-center gap-2">

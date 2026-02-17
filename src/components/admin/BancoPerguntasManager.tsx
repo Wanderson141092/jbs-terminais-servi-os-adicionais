@@ -453,8 +453,8 @@ const BancoPerguntasManager = () => {
             <DialogDescription>Configure os detalhes da pergunta que poderá ser usada em múltiplos formulários</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
+            <div className="flex gap-4">
+              <div className="w-[35%]">
                 <Label>Tipo de Pergunta</Label>
                 <Select value={formData.tipo} onValueChange={(v) => setFormData({ ...formData, tipo: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -465,7 +465,7 @@ const BancoPerguntasManager = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="flex-1">
                 <Label>Rótulo / Título</Label>
                 <Input value={formData.rotulo} onChange={(e) => setFormData({ ...formData, rotulo: e.target.value })} placeholder="Ex: Nome completo" />
               </div>

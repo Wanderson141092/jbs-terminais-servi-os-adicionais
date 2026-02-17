@@ -916,7 +916,14 @@ const InternoDashboard = () => {
                                   >
                                     {isConfirmed 
                                       ? <Check className="h-3.5 w-3.5 text-muted-foreground/50" />
-                                      : <DollarSign className="h-3.5 w-3.5 text-destructive" />
+                                      : cfg.tipo === "pendencia" ? (
+                                        <span className="relative inline-flex items-center text-destructive">
+                                          <DollarSign className="h-3.5 w-3.5" />
+                                          <Lock className="h-2.5 w-2.5 absolute -bottom-0.5 -right-1.5" />
+                                        </span>
+                                      ) : (
+                                        <DollarSign className="h-3.5 w-3.5 text-destructive" />
+                                      )
                                     }
                                   </button>
                                 );

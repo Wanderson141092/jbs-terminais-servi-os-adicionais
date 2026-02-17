@@ -210,6 +210,12 @@ const AdminFormularios = () => {
     return <div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Carregando...</p></div>;
   }
 
+  // Access guard: only admin or gestor
+  if (!loading && !isCurrentUserAdmin && !isGestor) {
+    navigate("/interno/dashboard");
+    return null;
+  }
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">

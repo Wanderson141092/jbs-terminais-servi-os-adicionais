@@ -14,15 +14,23 @@ export const useGestorCheck = (userId: string | null) => {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("email_setor, setor_emails(perfis)")
-        .eq("id", userId)
-        .maybeSingle();
+      // Check user_roles for 'gestor' role
+      const [rolesRes, profileRes] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .eq("role", "gestor")
+          .maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("email_setor")
+          .eq("id", userId)
+          .maybeSingle(),
+      ]);
 
-      const perfis = (profile as any)?.setor_emails?.perfis || [];
-      setIsGestor(perfis.includes("GESTOR"));
-      setGestorSetorEmail(profile?.email_setor || null);
+      setIsGestor(!!rolesRes.data);
+      setGestorSetorEmail(profileRes.data?.email_setor || null);
       setGestorLoading(false);
     };
 

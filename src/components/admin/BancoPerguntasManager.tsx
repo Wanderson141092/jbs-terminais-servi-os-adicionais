@@ -41,6 +41,7 @@ const SUBCAMPO_TYPES = [
   { value: "texto_formatado", label: "Texto Formatado" },
   { value: "numero", label: "Número" },
   { value: "select", label: "Seleção Única" },
+  { value: "multipla_escolha", label: "Múltipla Escolha" },
   { value: "email", label: "E-mail" },
   { value: "data", label: "Data" },
 ];
@@ -98,12 +99,14 @@ const BancoPerguntasManager = () => {
     conjunta_campo1_opcoes: "",
     conjunta_campo1_mascara: "",
     conjunta_campo1_max_chars: "",
+    conjunta_campo1_modo: "menu",
     conjunta_campo2_tipo: "texto",
     conjunta_campo2_rotulo: "",
     conjunta_campo2_placeholder: "",
     conjunta_campo2_opcoes: "",
     conjunta_campo2_mascara: "",
     conjunta_campo2_max_chars: "",
+    conjunta_campo2_modo: "menu",
   });
 
   useEffect(() => {
@@ -152,12 +155,14 @@ const BancoPerguntasManager = () => {
         conjunta_campo1_opcoes: config?.campos?.[0]?.opcoes?.join("\n") || "",
         conjunta_campo1_mascara: config?.campos?.[0]?.mascara || "",
         conjunta_campo1_max_chars: config?.campos?.[0]?.max_chars?.toString() || "",
+        conjunta_campo1_modo: config?.campos?.[0]?.modo_exibicao || "menu",
         conjunta_campo2_tipo: config?.campos?.[1]?.tipo || "texto",
         conjunta_campo2_rotulo: config?.campos?.[1]?.rotulo || "",
         conjunta_campo2_placeholder: config?.campos?.[1]?.placeholder || "",
         conjunta_campo2_opcoes: config?.campos?.[1]?.opcoes?.join("\n") || "",
         conjunta_campo2_mascara: config?.campos?.[1]?.mascara || "",
         conjunta_campo2_max_chars: config?.campos?.[1]?.max_chars?.toString() || "",
+        conjunta_campo2_modo: config?.campos?.[1]?.modo_exibicao || "menu",
       });
     } else {
       setEditing(null);
@@ -188,12 +193,14 @@ const BancoPerguntasManager = () => {
         conjunta_campo1_opcoes: "",
         conjunta_campo1_mascara: "",
         conjunta_campo1_max_chars: "",
+        conjunta_campo1_modo: "menu",
         conjunta_campo2_tipo: "texto",
         conjunta_campo2_rotulo: "",
         conjunta_campo2_placeholder: "",
         conjunta_campo2_opcoes: "",
         conjunta_campo2_mascara: "",
         conjunta_campo2_max_chars: "",
+        conjunta_campo2_modo: "menu",
       });
     }
     setShowDialog(true);
@@ -248,6 +255,7 @@ const BancoPerguntasManager = () => {
           opcoes: opcoes.length > 0 ? opcoes : null,
           mascara: formData[`${prefix}_mascara`] || null,
           max_chars: formData[`${prefix}_max_chars`] ? parseInt(formData[`${prefix}_max_chars`]) : null,
+          modo_exibicao: (tipo === "select" || tipo === "multipla_escolha") ? formData[`${prefix}_modo`] : null,
         };
       };
       config.campos = [buildCampo("conjunta_campo1"), buildCampo("conjunta_campo2")];
@@ -568,13 +576,16 @@ const BancoPerguntasManager = () => {
                   const opcoesKey = `${prefix}_opcoes` as keyof typeof formData;
                   const mascaraKey = `${prefix}_mascara` as keyof typeof formData;
                   const maxCharsKey = `${prefix}_max_chars` as keyof typeof formData;
+                  const modoKey = `${prefix}_modo` as keyof typeof formData;
+                  const tipoValue = formData[tipoKey] as string;
+                  const isSelecao = tipoValue === "select" || tipoValue === "multipla_escolha";
                   return (
                     <div key={num} className="border rounded-md p-3 space-y-3 bg-background">
                       <Label className="font-semibold">Subcampo {num}</Label>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>Tipo</Label>
-                          <Select value={formData[tipoKey] as string} onValueChange={(v) => setFormData({ ...formData, [tipoKey]: v })}>
+                          <Select value={tipoValue} onValueChange={(v) => setFormData({ ...formData, [tipoKey]: v })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {SUBCAMPO_TYPES.map((t) => (
@@ -592,13 +603,27 @@ const BancoPerguntasManager = () => {
                         <Label>Placeholder</Label>
                         <Input value={formData[placeholderKey] as string} onChange={(e) => setFormData({ ...formData, [placeholderKey]: e.target.value })} placeholder="Texto de ajuda" />
                       </div>
-                      {formData[tipoKey] === "select" && (
-                        <div>
-                          <Label>Opções (uma por linha)</Label>
-                          <Textarea value={formData[opcoesKey] as string} onChange={(e) => setFormData({ ...formData, [opcoesKey]: e.target.value })} placeholder={"Opção 1\nOpção 2"} rows={3} />
-                        </div>
+                      {isSelecao && (
+                        <>
+                          <div>
+                            <Label>Opções (uma por linha)</Label>
+                            <Textarea value={formData[opcoesKey] as string} onChange={(e) => setFormData({ ...formData, [opcoesKey]: e.target.value })} placeholder={"Opção 1\nOpção 2"} rows={3} />
+                          </div>
+                          <div>
+                            <Label>Modo de exibição</Label>
+                            <Select value={formData[modoKey] as string} onValueChange={(v) => setFormData({ ...formData, [modoKey]: v })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="menu">Menu (dropdown)</SelectItem>
+                                <SelectItem value="botoes">Botões</SelectItem>
+                                {tipoValue === "select" && <SelectItem value="radio">Radio</SelectItem>}
+                                {tipoValue === "multipla_escolha" && <SelectItem value="check">Checkbox</SelectItem>}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
                       )}
-                      {formData[tipoKey] === "texto_formatado" && (
+                      {tipoValue === "texto_formatado" && (
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label>Máscara</Label>

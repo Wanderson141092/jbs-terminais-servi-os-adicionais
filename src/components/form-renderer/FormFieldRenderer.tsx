@@ -504,14 +504,72 @@ const FormFieldRenderer = ({
                 {campo.tipo === "data" && (
                   <Input type="date" value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} />
                 )}
-                {campo.tipo === "select" && campo.opcoes && (
-                  <SearchableSelect
-                    options={campo.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }))}
-                    value={campoValue}
-                    onValueChange={handleCampoChange}
-                    placeholder={campo.placeholder || "Selecione..."}
-                  />
-                )}
+                {campo.tipo === "select" && campo.opcoes && (() => {
+                  const opts = campo.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));
+                  const modo = campo.modo_exibicao || "menu";
+
+                  if (modo === "botoes") {
+                    return (
+                      <ToggleGroup type="single" value={campoValue || ""} onValueChange={(v) => { if (v) handleCampoChange(v); }} className="flex flex-wrap gap-2 justify-start">
+                        {opts.map((opt: any) => (
+                          <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">{opt.label}</ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    );
+                  }
+                  if (modo === "radio") {
+                    return (
+                      <RadioGroup value={campoValue || ""} onValueChange={handleCampoChange} className="space-y-2">
+                        {opts.map((opt: any) => (
+                          <div key={opt.value} className="flex items-center gap-2">
+                            <RadioGroupItem value={opt.label} id={`${pergunta.id}_${campoKey}_${opt.value}`} />
+                            <Label htmlFor={`${pergunta.id}_${campoKey}_${opt.value}`} className="cursor-pointer font-normal">{opt.label}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    );
+                  }
+                  return (
+                    <SearchableSelect options={opts} value={campoValue} onValueChange={handleCampoChange} placeholder={campo.placeholder || "Selecione..."} />
+                  );
+                })()}
+                {campo.tipo === "multipla_escolha" && campo.opcoes && (() => {
+                  const opts = campo.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));
+                  const modo = campo.modo_exibicao || "check";
+                  const currentArr: string[] = campoValue || [];
+
+                  if (modo === "botoes") {
+                    return (
+                      <ToggleGroup type="multiple" value={currentArr} onValueChange={handleCampoChange} className="flex flex-wrap gap-2 justify-start">
+                        {opts.map((opt: any) => (
+                          <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">{opt.label}</ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    );
+                  }
+                  if (modo === "menu") {
+                    return (
+                      <SearchableMultiSelect options={opts} value={currentArr} onValueChange={handleCampoChange} placeholder={campo.placeholder || "Selecione..."} perguntaId={`${pergunta.id}_${campoKey}`} />
+                    );
+                  }
+                  return (
+                    <div className="space-y-2">
+                      {opts.map((opt: any) => (
+                        <div key={opt.value} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`${pergunta.id}_${campoKey}_${opt.value}`}
+                            checked={currentArr.includes(opt.label)}
+                            onCheckedChange={(checked) => {
+                              if (checked) handleCampoChange([...currentArr, opt.label]);
+                              else handleCampoChange(currentArr.filter((v: string) => v !== opt.label));
+                            }}
+                          />
+                          <Label htmlFor={`${pergunta.id}_${campoKey}_${opt.value}`} className="cursor-pointer font-normal">{opt.label}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

@@ -636,10 +636,12 @@ const AdminParametros = () => {
               </TabsTrigger>
             </>
           )}
-          <TabsTrigger value="regras" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Regras
-          </TabsTrigger>
+          {isCurrentUserAdmin && (
+            <TabsTrigger value="regras" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Regras
+            </TabsTrigger>
+          )}
           {isCurrentUserAdmin && (
             <>
               <TabsTrigger value="notificacoes" className="flex items-center gap-2">

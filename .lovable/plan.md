@@ -1,37 +1,44 @@
 
-# Correcao: Cores da Timeline usando tipo_resultado
+# Plano: Icones individuais na coluna $ com icone customizado para Lacre
 
-## Problema
-Na timeline de progresso, quando o status e "Vistoriado" (tipo_resultado = "conforme"), as etapas anteriores ("Solicitacao Recebida" e "Posicionamento Confirmado") ficam em **azul** (estado "current") ao inves de **verde** (estado "completed").
+## Resumo
+Substituir os icones genericos atuais na coluna `$` por dois botoes distintos e identificaveis:
+- **Lanc. Posicionamento** (servico principal): icone `DollarSign` padrao
+- **Custo Posic. Lacre** (pendencia): icone composto de `DollarSign` + `Lock` (cadeado) unidos
 
-Isso acontece porque o codigo usa `"current"` como fallback para etapas ja concluidas, independentemente do tipo_resultado do status atual.
+Cada botao respondera individualmente ao seu registro de cobranca, permitindo confirmar/visualizar o status de cada um separadamente.
 
-## Causa Raiz
-No arquivo `src/components/ProcessStageStepper.tsx`, a variavel `completedState` (linha 132) ja calcula corretamente o estado visual baseado no tipo_resultado:
-- "conforme" = `"completed"` (verde)
-- "nao_conforme" = `"error"` (vermelho)
-- "em_pendencia" = `"pending"` (cinza)
+## Detalhes Tecnicos
 
-Porem, nas linhas onde as etapas anteriores sao construidas, o codigo ignora essa variavel e usa `"current"` (azul) como fallback.
+### Arquivo: `src/pages/InternoDashboard.tsx` (linhas ~905-925)
 
-## Correcao
+Refatorar o bloco que renderiza os icones dentro do `.map(applicableConfigs)`:
 
-### Arquivo: `src/components/ProcessStageStepper.tsx`
+1. **Icone para tipo "pendencia" (Custo Posic. Lacre)**:
+   - Renderizar um icone composto: `DollarSign` e `Lock` sobrepostos/unidos num container pequeno
+   - Quando pendente: cor vermelha (`text-destructive`)
+   - Quando confirmado: `Check` cinza claro (mantido)
 
-**Linha 144** — Etapa "Solicitacao Recebida":
-- De: `state: isTerminal ? "error" : isEmPendencia ? "pending" : "current"`
-- Para: `state: isTerminal ? "error" : completedState`
+2. **Icone para tipo "servico" (Lanc. Posicionamento)**:
+   - Manter o `DollarSign` simples
+   - Quando pendente: cor vermelha
+   - Quando confirmado: `Check` cinza claro
 
-Isso faz com que etapas concluidas usem verde (conforme), cinza (em_pendencia), ou vermelho (nao_conforme).
+3. **Tooltips**: Cada botao mantem tooltip com `rotulo_analise` + status
 
-**Linha 175** — Etapa "Aguardando Confirmacao" (quando ja passou):
-- De: `state = isTerminal ? "error" : isEmPendencia ? "pending" : "current";`
-- Para: `state = isTerminal ? "error" : completedState;`
+### Implementacao do icone composto (DollarSign + Lock)
+Criar um componente inline ou span com posicionamento relativo:
+```text
+<span className="relative inline-flex items-center">
+  <DollarSign className="h-3.5 w-3.5" />
+  <Lock className="h-2.5 w-2.5 absolute -bottom-0.5 -right-1" />
+</span>
+```
 
-Essas sao as unicas duas linhas que precisam ser alteradas. Toda a logica downstream (ramos de Posicionamento, servico, vistoria) ja usa `completedState` corretamente.
+Isso cria visualmente um "$" com um pequeno cadeado no canto inferior direito, formando um icone unico e reconhecivel.
 
-## Resultado Esperado
-- Status "conforme" (Vistoriado, Servico Concluido): todas as etapas anteriores ficam **verdes**
-- Status "em_pendencia" (Vistoriado com Pendencia): etapas anteriores ficam **cinzas**
-- Status "nao_conforme" (Cancelado, Recusado, Nao Vistoriado): etapas anteriores ficam **vermelhas**
-- Status "neutro" (Aguardando Confirmacao, Aguardando Vistoria): etapa atual fica **azul** (mantido via logica separada)
+### Logica de clique
+Cada botao ao ser clicado abrira o dialog de analise (`setSelectedSolicitacao(s)`) onde o usuario pode confirmar o lancamento especifico. Nao muda a logica atual de abertura.
+
+### Arquivos modificados
+- **`src/pages/InternoDashboard.tsx`**: Adicionar import do `Lock`, refatorar renderizacao dos icones na coluna $ para diferenciar visualmente por `cfg.tipo`

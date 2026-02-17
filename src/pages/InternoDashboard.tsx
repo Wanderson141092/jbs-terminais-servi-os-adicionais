@@ -912,14 +912,14 @@ const InternoDashboard = () => {
                                     key={cfg.id}
                                     onClick={() => setSelectedSolicitacao(s)}
                                     title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : "Pendente"}`}
-                                    className="p-0.5 rounded hover:bg-muted/50 transition-colors"
+                                    className="p-0.5 rounded hover:bg-muted/50 transition-colors overflow-visible"
                                   >
                                     {isConfirmed 
                                       ? <Check className="h-3.5 w-3.5 text-muted-foreground/50" />
                                       : cfg.tipo === "pendencia" ? (
-                                        <span className="relative inline-flex items-center text-destructive">
+                                        <span className="relative inline-flex items-center text-destructive pr-2">
                                           <DollarSign className="h-3.5 w-3.5" />
-                                          <Lock className="h-2.5 w-2.5 absolute -bottom-0.5 -right-1.5" />
+                                          <Lock className="h-2 w-2 absolute -bottom-0.5 right-0" />
                                         </span>
                                       ) : (
                                         <DollarSign className="h-3.5 w-3.5 text-destructive" />

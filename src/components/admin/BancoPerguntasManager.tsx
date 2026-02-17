@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -844,11 +845,9 @@ const BancoPerguntasManager = () => {
                 <div>
                   <Label>{formData.info_tipo === "texto" ? "Conteúdo do Texto" : "URL da Imagem"}</Label>
                   {formData.info_tipo === "texto" ? (
-                    <Textarea
-                      value={formData.info_conteudo}
-                      onChange={(e) => setFormData({ ...formData, info_conteudo: e.target.value })}
-                      placeholder="Digite o texto informativo que será exibido..."
-                      rows={5}
+                    <RichTextEditor
+                      content={formData.info_conteudo}
+                      onChange={(html) => setFormData({ ...formData, info_conteudo: html })}
                     />
                   ) : (
                     <Input

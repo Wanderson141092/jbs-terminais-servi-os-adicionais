@@ -82,6 +82,12 @@ const AdminUsuarios = () => {
   const [passwordData, setPasswordData] = useState({ senhaAtual: "", novaSenha: "", confirmarSenha: "" });
   const [passwordLoading, setPasswordLoading] = useState(false);
   
+  // Alterar senha de outro usuário
+  const [showUserPasswordDialog, setShowUserPasswordDialog] = useState(false);
+  const [userPasswordTarget, setUserPasswordTarget] = useState<Profile | null>(null);
+  const [userPasswordData, setUserPasswordData] = useState({ novaSenha: "", confirmarSenha: "" });
+  const [userPasswordLoading, setUserPasswordLoading] = useState(false);
+  
   const currentUserIsMaster = useCurrentUserIsMaster();
   const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
   const { isGestor, gestorSetorEmail } = useGestorCheck(currentUserId);
@@ -365,6 +371,44 @@ const AdminUsuarios = () => {
     setPasswordLoading(false);
   };
 
+  // Alterar senha de outro usuário (via edge function)
+  const handleChangeUserPassword = async () => {
+    if (!userPasswordTarget) return;
+    if (userPasswordData.novaSenha !== userPasswordData.confirmarSenha) {
+      toast.error("As senhas não coincidem");
+      return;
+    }
+    if (userPasswordData.novaSenha.length < 6) {
+      toast.error("Nova senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+
+    setUserPasswordLoading(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await supabase.functions.invoke("admin-change-password", {
+      body: { user_id: userPasswordTarget.id, new_password: userPasswordData.novaSenha },
+    });
+
+    if (res.error || res.data?.error) {
+      toast.error(res.data?.error || "Erro ao alterar senha");
+      setUserPasswordLoading(false);
+      return;
+    }
+
+    toast.success(`Senha de ${userPasswordTarget.nome || userPasswordTarget.email} alterada com sucesso!`);
+    setShowUserPasswordDialog(false);
+    setUserPasswordTarget(null);
+    setUserPasswordData({ novaSenha: "", confirmarSenha: "" });
+    setUserPasswordLoading(false);
+  };
+
+  const openUserPasswordDialog = (profile: Profile) => {
+    setUserPasswordTarget(profile);
+    setUserPasswordData({ novaSenha: "", confirmarSenha: "" });
+    setShowUserPasswordDialog(true);
+  };
+
   const getSetorLabel = (setor: string | null) => {
     if (!setor) return "Não definido";
     const labels: Record<string, string> = {
@@ -547,6 +591,41 @@ const AdminUsuarios = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Alterar Senha de Usuário */}
+      <Dialog open={showUserPasswordDialog} onOpenChange={setShowUserPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Senha - {userPasswordTarget?.nome || userPasswordTarget?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Nova Senha</Label>
+              <Input
+                type="password"
+                value={userPasswordData.novaSenha}
+                onChange={(e) => setUserPasswordData(prev => ({ ...prev, novaSenha: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+            <div>
+              <Label>Confirmar Nova Senha</Label>
+              <Input
+                type="password"
+                value={userPasswordData.confirmarSenha}
+                onChange={(e) => setUserPasswordData(prev => ({ ...prev, confirmarSenha: e.target.value }))}
+                placeholder="Confirme a nova senha"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowUserPasswordDialog(false)}>Cancelar</Button>
+            <Button onClick={handleChangeUserPassword} disabled={userPasswordLoading}>
+              {userPasswordLoading ? "Alterando..." : "Alterar Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Usuários Cadastrados ({displayedProfiles.length})</CardTitle>
@@ -646,6 +725,10 @@ const AdminUsuarios = () => {
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleEditUser(profile)}>
                           <Edit className="h-4 w-4" />
+                        </Button>
+
+                        <Button variant="ghost" size="icon" onClick={() => openUserPasswordDialog(profile)} title="Alterar senha">
+                          <Key className="h-4 w-4" />
                         </Button>
 
                         {isCurrentUserAdmin && !isMaster && (

@@ -80,13 +80,19 @@ const GestorRegras = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/interno"); return; }
 
-    // Get user's setor_email to find linked services
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("email_setor")
-      .eq("id", user.id)
-      .single();
+    // Check gestor role in user_roles table
+    const [roleRes, profileRes] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "gestor").maybeSingle(),
+      supabase.from("profiles").select("email_setor").eq("id", user.id).single(),
+    ]);
 
+    if (!roleRes.data) {
+      toast.error("Você não tem permissão de Gestor");
+      navigate("/interno/dashboard");
+      return;
+    }
+
+    const profile = profileRes.data;
     if (!profile?.email_setor) {
       toast.error("Perfil sem setor vinculado");
       navigate("/interno/dashboard");
@@ -96,13 +102,13 @@ const GestorRegras = () => {
     // Get setor_email record
     const { data: setorEmail } = await supabase
       .from("setor_emails")
-      .select("id, perfis")
+      .select("id")
       .eq("email_setor", profile.email_setor)
       .eq("ativo", true)
       .single();
 
-    if (!setorEmail || !setorEmail.perfis?.includes("GESTOR")) {
-      toast.error("Você não tem permissão de Gestor");
+    if (!setorEmail) {
+      toast.error("Setor não encontrado");
       navigate("/interno/dashboard");
       return;
     }

@@ -29,19 +29,27 @@ const FormRendererBody = ({
   buttonClass,
 }: FormRendererBodyProps) => (
   <form onSubmit={onSubmit} className="space-y-6">
-    {perguntas.filter(isFieldVisible).map((pergunta) => (
-      <div key={pergunta.id} className={fieldClass}>
-        <FormFieldRenderer
-          pergunta={pergunta}
-          value={values[pergunta.id]}
-          fileData={files[pergunta.id]}
-          onValueChange={(val) => onValueChange(pergunta.id, val)}
-          onFileChange={(file) => onFileChange(pergunta.id, file)}
-          allValues={values}
-          allPerguntas={perguntas}
-        />
-      </div>
-    ))}
+    <div className="flex flex-wrap gap-x-4 gap-y-6">
+      {perguntas.filter(isFieldVisible).map((pergunta) => {
+        const widthPercent = pergunta.largura || 100;
+        const widthStyle = widthPercent < 100
+          ? { width: `calc(${widthPercent}% - ${widthPercent < 100 ? '0.5rem' : '0px'})` }
+          : { width: '100%' };
+        return (
+          <div key={pergunta.id} className={fieldClass} style={widthStyle}>
+            <FormFieldRenderer
+              pergunta={pergunta}
+              value={values[pergunta.id]}
+              fileData={files[pergunta.id]}
+              onValueChange={(val) => onValueChange(pergunta.id, val)}
+              onFileChange={(file) => onFileChange(pergunta.id, file)}
+              allValues={values}
+              allPerguntas={perguntas}
+            />
+          </div>
+        );
+      })}
+    </div>
 
     <Button type="submit" disabled={submitting} className={buttonClass}>
       <Send className="h-4 w-4 mr-2" />

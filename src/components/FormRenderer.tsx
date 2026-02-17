@@ -64,6 +64,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
               descricao: bp.descricao,
               obrigatorio: fp.obrigatorio,
               ordem: fp.ordem,
+              largura: (bp.config as any)?.largura || 100,
               condicao: condicao ? {
                 pergunta_pai_id: condicao.pergunta_pai_id,
                 valor_gatilho: condicao.valor_gatilho,

@@ -250,6 +250,12 @@ const AdminServicos = () => {
     );
   }
 
+  // Access guard: only admin or gestor
+  if (!loading && !isCurrentUserAdmin && !isGestor) {
+    navigate("/interno/dashboard");
+    return null;
+  }
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">

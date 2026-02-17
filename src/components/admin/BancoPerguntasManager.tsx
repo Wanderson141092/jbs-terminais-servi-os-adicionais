@@ -70,6 +70,15 @@ const BancoPerguntasManager = () => {
     formato_min_chars: "",
     formato_max_chars: "",
     formato_transformar_maiusculo: true,
+    // numero config
+    numero_prefixo: "",
+    numero_sufixo: "",
+    numero_permitir_negativo: true,
+    numero_min: "",
+    numero_max: "",
+    // select / multipla_escolha modo
+    selecao_modo: "menu" as "menu" | "botoes" | "radio",
+    multipla_modo: "check" as "check" | "menu" | "botoes",
   });
 
   useEffect(() => {
@@ -105,6 +114,13 @@ const BancoPerguntasManager = () => {
         formato_min_chars: config?.min_chars?.toString() || "",
         formato_max_chars: config?.max_chars?.toString() || "",
         formato_transformar_maiusculo: config?.transformar_maiusculo ?? true,
+        numero_prefixo: config?.prefixo || "",
+        numero_sufixo: config?.sufixo || "",
+        numero_permitir_negativo: config?.permitir_negativo ?? true,
+        numero_min: config?.min?.toString() || "",
+        numero_max: config?.max?.toString() || "",
+        selecao_modo: config?.modo_exibicao || "menu",
+        multipla_modo: config?.modo_exibicao || "check",
       });
     } else {
       setEditing(null);
@@ -122,6 +138,13 @@ const BancoPerguntasManager = () => {
         formato_min_chars: "",
         formato_max_chars: "",
         formato_transformar_maiusculo: true,
+        numero_prefixo: "",
+        numero_sufixo: "",
+        numero_permitir_negativo: true,
+        numero_min: "",
+        numero_max: "",
+        selecao_modo: "menu",
+        multipla_modo: "check",
       });
     }
     setShowDialog(true);
@@ -150,6 +173,19 @@ const BancoPerguntasManager = () => {
       config.min_chars = formData.formato_min_chars ? parseInt(formData.formato_min_chars) : null;
       config.max_chars = formData.formato_max_chars ? parseInt(formData.formato_max_chars) : null;
       config.transformar_maiusculo = formData.formato_transformar_maiusculo;
+    }
+    if (formData.tipo === "numero") {
+      config.prefixo = formData.numero_prefixo || null;
+      config.sufixo = formData.numero_sufixo || null;
+      config.permitir_negativo = formData.numero_permitir_negativo;
+      config.min = formData.numero_min ? parseFloat(formData.numero_min) : null;
+      config.max = formData.numero_max ? parseFloat(formData.numero_max) : null;
+    }
+    if (formData.tipo === "select") {
+      config.modo_exibicao = formData.selecao_modo;
+    }
+    if (formData.tipo === "multipla_escolha") {
+      config.modo_exibicao = formData.multipla_modo;
     }
 
     const payload = {
@@ -327,9 +363,71 @@ const BancoPerguntasManager = () => {
             )}
 
             {(formData.tipo === "select" || formData.tipo === "multipla_escolha") && (
-              <div>
-                <Label>Opções (uma por linha)</Label>
-                <Textarea value={formData.opcoes} onChange={(e) => setFormData({ ...formData, opcoes: e.target.value })} placeholder={"Opção 1\nOpção 2\nOpção 3"} rows={4} />
+              <div className="space-y-4">
+                <div>
+                  <Label>Opções (uma por linha)</Label>
+                  <Textarea value={formData.opcoes} onChange={(e) => setFormData({ ...formData, opcoes: e.target.value })} placeholder={"Opção 1\nOpção 2\nOpção 3"} rows={4} />
+                </div>
+                {formData.tipo === "select" && (
+                  <div>
+                    <Label>Modo de Exibição</Label>
+                    <Select value={formData.selecao_modo} onValueChange={(v) => setFormData({ ...formData, selecao_modo: v as any })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="menu">Menu (dropdown)</SelectItem>
+                        <SelectItem value="botoes">Botões</SelectItem>
+                        <SelectItem value="radio">Radio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {formData.tipo === "multipla_escolha" && (
+                  <div>
+                    <Label>Modo de Exibição</Label>
+                    <Select value={formData.multipla_modo} onValueChange={(v) => setFormData({ ...formData, multipla_modo: v as any })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="check">Check (checkbox)</SelectItem>
+                        <SelectItem value="menu">Menu (dropdown multi)</SelectItem>
+                        <SelectItem value="botoes">Botões</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {formData.tipo === "numero" && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold">Configuração do Campo Numérico</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Prefixo</Label>
+                    <Input value={formData.numero_prefixo} onChange={(e) => setFormData({ ...formData, numero_prefixo: e.target.value })} placeholder="Ex: R$, US$" />
+                  </div>
+                  <div>
+                    <Label>Sufixo</Label>
+                    <Input value={formData.numero_sufixo} onChange={(e) => setFormData({ ...formData, numero_sufixo: e.target.value })} placeholder="Ex: kg, un, %" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Número Mínimo</Label>
+                    <Input type="number" value={formData.numero_min} onChange={(e) => setFormData({ ...formData, numero_min: e.target.value })} placeholder="Ex: 0" />
+                  </div>
+                  <div>
+                    <Label>Número Máximo</Label>
+                    <Input type="number" value={formData.numero_max} onChange={(e) => setFormData({ ...formData, numero_max: e.target.value })} placeholder="Ex: 1000" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={formData.numero_permitir_negativo}
+                    onCheckedChange={(c) => setFormData({ ...formData, numero_permitir_negativo: !!c })}
+                    id="numero_negativo"
+                  />
+                  <Label htmlFor="numero_negativo" className="cursor-pointer">Permitir números negativos</Label>
+                </div>
               </div>
             )}
 

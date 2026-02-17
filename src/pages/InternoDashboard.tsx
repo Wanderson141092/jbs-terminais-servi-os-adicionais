@@ -903,7 +903,7 @@ const InternoDashboard = () => {
                               : <Button variant="ghost" size="sm" onClick={() => setSelectedSolicitacao(s)} className="text-destructive" title="Aguardando confirmação de lançamento"><DollarSign className="h-4 w-4" /></Button>;
                           }
                           return (
-                            <div className="flex items-center gap-0.5 justify-center">
+                            <div className="flex items-start gap-0.5 justify-center">
                               {applicableConfigs.map((cfg: any) => {
                                 const registro = lancamentoRegistros.find((r: any) => r.solicitacao_id === s.id && r.cobranca_config_id === cfg.id);
                                 const isConfirmed = registro?.confirmado === true;

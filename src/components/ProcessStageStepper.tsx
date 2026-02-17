@@ -141,7 +141,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
     key: "recebida",
     label: getTitle("recebida", "Solicitação Recebida"),
     icon: isTerminal ? <X className="h-4 w-4" /> : priorIcon || <Check className="h-4 w-4" />,
-    state: isTerminal ? "error" : isEmPendencia ? "pending" : "current",
+    state: isTerminal ? "error" : completedState,
   });
 
   // For Posicionamento cancellations, determine if it was early (before confirmation) or late (after confirmation)
@@ -172,7 +172,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       state = "current";
     } else if (currentOrder > 1) {
       // Past confirmation: always blue with ✓
-      state = isTerminal ? "error" : isEmPendencia ? "pending" : "current";
+      state = isTerminal ? "error" : completedState;
       icon = isTerminal ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />;
       if (isEmPendencia) {
         label = currentStatusLabel?.valor || "Em Pendência";

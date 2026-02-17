@@ -18,7 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Info, Image as ImageIcon, ChevronDown, Search, Check } from "lucide-react";
+import { Info, Image as ImageIcon, ChevronDown, Search, Check, Plus, Trash2 } from "lucide-react";
 import type { PerguntaComCondicao } from "./types";
 
 /** Aplica máscara caractere a caractere: A=letra, 9=número, X=ambos, outro=literal fixo */
@@ -176,6 +176,8 @@ const FormFieldRenderer = ({
 }: FormFieldRendererProps) => {
   const opcoes = pergunta.opcoes as { value: string; label: string }[] | null;
   const config = pergunta.config as Record<string, any> | null;
+  const permitirMultiplos = config?.permitir_multiplos === true;
+  const multiplosMax = config?.multiplos_max as number | undefined;
 
   // Informativo (text/image block with optional accept)
   if (pergunta.tipo === "informativo") {
@@ -346,6 +348,220 @@ const FormFieldRenderer = ({
     );
   };
 
+  const renderSingleField = (fieldValue: any, onFieldChange: (v: any) => void, idx?: number) => {
+    const idSuffix = idx !== undefined ? `_${idx}` : "";
+
+    return (
+      <>
+        {pergunta.tipo === "texto" && (
+          <Input
+            value={fieldValue || ""}
+            onChange={(e) => onFieldChange(e.target.value)}
+            placeholder={pergunta.placeholder || ""}
+          />
+        )}
+
+        {pergunta.tipo === "texto_longo" && (
+          <Textarea
+            value={fieldValue || ""}
+            onChange={(e) => onFieldChange(e.target.value)}
+            placeholder={pergunta.placeholder || ""}
+            rows={4}
+          />
+        )}
+
+        {pergunta.tipo === "numero" && (() => {
+          const prefixo = config?.prefixo;
+          const sufixo = config?.sufixo;
+          const permitirNeg = config?.permitir_negativo ?? true;
+          const minVal = config?.min != null ? config.min : (permitirNeg ? undefined : 0);
+          const maxVal = config?.max != null ? config.max : undefined;
+          const input = (
+            <Input
+              type="number"
+              value={fieldValue || ""}
+              onChange={(e) => onFieldChange(e.target.value)}
+              placeholder={pergunta.placeholder || ""}
+              min={minVal}
+              max={maxVal}
+              className={prefixo || sufixo ? "flex-1" : ""}
+            />
+          );
+          if (prefixo || sufixo) {
+            return (
+              <div className="flex items-center gap-2">
+                {prefixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{prefixo}</span>}
+                {input}
+                {sufixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{sufixo}</span>}
+              </div>
+            );
+          }
+          return input;
+        })()}
+
+        {pergunta.tipo === "email" && (
+          <Input
+            type="email"
+            value={fieldValue || ""}
+            onChange={(e) => onFieldChange(e.target.value)}
+            placeholder={pergunta.placeholder || "seu@email.com"}
+          />
+        )}
+
+        {pergunta.tipo === "data" && (
+          <Input
+            type="date"
+            value={fieldValue || ""}
+            onChange={(e) => onFieldChange(e.target.value)}
+          />
+        )}
+
+        {pergunta.tipo === "texto_formatado" && (() => {
+          const mascara = config?.mascara as string | undefined;
+          const maxChars = config?.max_chars as number | undefined;
+          return (
+            <Input
+              value={fieldValue || ""}
+              onChange={(e) => {
+                if (mascara) {
+                  onFieldChange(applyMask(e.target.value, mascara));
+                } else {
+                  let val = e.target.value.toUpperCase();
+                  if (maxChars) val = val.slice(0, maxChars);
+                  onFieldChange(val);
+                }
+              }}
+              placeholder={pergunta.placeholder || ""}
+              maxLength={mascara ? mascara.length : (maxChars || undefined)}
+              className="font-mono"
+            />
+          );
+        })()}
+
+        {pergunta.tipo === "data_hora" && (
+          <Input
+            type="datetime-local"
+            value={fieldValue || ""}
+            onChange={(e) => onFieldChange(e.target.value)}
+          />
+        )}
+
+        {pergunta.tipo === "select" && renderSelectField()}
+
+        {pergunta.tipo === "selecao_unica" && opcoes && (
+          <RadioGroup value={fieldValue || ""} onValueChange={onFieldChange} className="space-y-2">
+            {opcoes.map((opt) => (
+              <div key={opt.value} className="flex items-center gap-2">
+                <RadioGroupItem value={opt.label} id={`${pergunta.id}${idSuffix}_${opt.value}`} />
+                <Label htmlFor={`${pergunta.id}${idSuffix}_${opt.value}`} className="cursor-pointer font-normal">
+                  {opt.label}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        )}
+
+        {pergunta.tipo === "multipla_escolha" && renderMultiplaEscolhaField()}
+
+        {pergunta.tipo === "checkbox" && (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`${pergunta.id}${idSuffix}`}
+              checked={fieldValue === true}
+              onCheckedChange={(checked) => onFieldChange(!!checked)}
+            />
+            <Label htmlFor={`${pergunta.id}${idSuffix}`} className="cursor-pointer font-normal">
+              {pergunta.placeholder || "Sim"}
+            </Label>
+          </div>
+        )}
+
+        {pergunta.tipo === "anexo" && (
+          <div>
+            <Input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+            />
+            {fileData && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Arquivo selecionado: {fileData.file.name}
+              </p>
+            )}
+          </div>
+        )}
+      </>
+    );
+  };
+
+  // Types that support multi-value
+  const multiCapableTypes = ["texto", "texto_longo", "texto_formatado", "numero", "email", "data", "data_hora", "select"];
+
+  if (permitirMultiplos && multiCapableTypes.includes(pergunta.tipo)) {
+    const entries: any[] = Array.isArray(value) ? value : (value ? [value] : [""]);
+
+    const handleEntryChange = (idx: number, val: any) => {
+      const updated = [...entries];
+      updated[idx] = val;
+      onValueChange(updated);
+    };
+
+    const addEntry = () => {
+      onValueChange([...entries, ""]);
+    };
+
+    const removeEntry = (idx: number) => {
+      const updated = entries.filter((_, i) => i !== idx);
+      onValueChange(updated.length > 0 ? updated : [""]);
+    };
+
+    const canAdd = !multiplosMax || entries.length < multiplosMax;
+
+    return (
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1">
+          {pergunta.rotulo}
+          {pergunta.obrigatorio && <span className="text-destructive">*</span>}
+        </Label>
+        {pergunta.descricao && (
+          <p className="text-xs text-muted-foreground">{pergunta.descricao}</p>
+        )}
+        <div className="space-y-2">
+          {entries.map((entry, idx) => (
+            <div key={idx} className="flex items-start gap-2">
+              <div className="flex-1">
+                {renderSingleField(entry, (val) => handleEntryChange(idx, val), idx)}
+              </div>
+              {entries.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 shrink-0 text-destructive hover:text-destructive"
+                  onClick={() => removeEntry(idx)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+        {canAdd && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={addEntry}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Adicionar outro
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <Label className="flex items-center gap-1">
@@ -356,116 +572,7 @@ const FormFieldRenderer = ({
         <p className="text-xs text-muted-foreground">{pergunta.descricao}</p>
       )}
 
-      {pergunta.tipo === "texto" && (
-        <Input
-          value={value || ""}
-          onChange={(e) => onValueChange(e.target.value)}
-          placeholder={pergunta.placeholder || ""}
-        />
-      )}
-
-      {pergunta.tipo === "texto_longo" && (
-        <Textarea
-          value={value || ""}
-          onChange={(e) => onValueChange(e.target.value)}
-          placeholder={pergunta.placeholder || ""}
-          rows={4}
-        />
-      )}
-
-      {pergunta.tipo === "numero" && renderNumeroField()}
-
-      {pergunta.tipo === "email" && (
-        <Input
-          type="email"
-          value={value || ""}
-          onChange={(e) => onValueChange(e.target.value)}
-          placeholder={pergunta.placeholder || "seu@email.com"}
-        />
-      )}
-
-      {pergunta.tipo === "data" && (
-        <Input
-          type="date"
-          value={value || ""}
-          onChange={(e) => onValueChange(e.target.value)}
-        />
-      )}
-
-      {pergunta.tipo === "texto_formatado" && (() => {
-        const mascara = config?.mascara as string | undefined;
-        const maxChars = config?.max_chars as number | undefined;
-        return (
-          <Input
-            value={value || ""}
-            onChange={(e) => {
-              if (mascara) {
-                onValueChange(applyMask(e.target.value, mascara));
-              } else {
-                let val = e.target.value.toUpperCase();
-                if (maxChars) val = val.slice(0, maxChars);
-                onValueChange(val);
-              }
-            }}
-            placeholder={pergunta.placeholder || ""}
-            maxLength={mascara ? mascara.length : (maxChars || undefined)}
-            className="font-mono"
-          />
-        );
-      })()}
-
-      {pergunta.tipo === "data_hora" && (
-        <Input
-          type="datetime-local"
-          value={value || ""}
-          onChange={(e) => onValueChange(e.target.value)}
-        />
-      )}
-
-      {pergunta.tipo === "select" && renderSelectField()}
-
-      {pergunta.tipo === "selecao_unica" && opcoes && (
-        <RadioGroup value={value || ""} onValueChange={onValueChange} className="space-y-2">
-          {opcoes.map((opt) => (
-            <div key={opt.value} className="flex items-center gap-2">
-              <RadioGroupItem value={opt.label} id={`${pergunta.id}_${opt.value}`} />
-              <Label htmlFor={`${pergunta.id}_${opt.value}`} className="cursor-pointer font-normal">
-                {opt.label}
-              </Label>
-            </div>
-          ))}
-        </RadioGroup>
-      )}
-
-      {pergunta.tipo === "multipla_escolha" && renderMultiplaEscolhaField()}
-
-      {pergunta.tipo === "checkbox" && (
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id={pergunta.id}
-            checked={value === true}
-            onCheckedChange={(checked) => onValueChange(!!checked)}
-          />
-          <Label htmlFor={pergunta.id} className="cursor-pointer font-normal">
-            {pergunta.placeholder || "Sim"}
-          </Label>
-        </div>
-      )}
-
-      {pergunta.tipo === "anexo" && (
-        <div>
-          <Input
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            onChange={(e) => onFileChange(e.target.files?.[0] || null)}
-          />
-          {fileData && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Arquivo selecionado: {fileData.file.name}
-            </p>
-          )}
-        </div>
-      )}
+      {renderSingleField(value, onValueChange)}
 
       {pergunta.tipo === "resposta_conjunta" && config?.campos && (
         <div className="grid grid-cols-2 gap-4">
@@ -584,11 +691,9 @@ const FormFieldRenderer = ({
 
       {pergunta.tipo === "pergunta_condicional" && config?.subperguntas && allValues && allPerguntas && (() => {
         const subperguntas = config.subperguntas as any[];
-        // Find the first sub-question whose condition is met
         const activeSubpergunta = subperguntas.find((sp: any) => {
           if (!sp.condicao) return false;
           const { pergunta_rotulo, valor_gatilho, operador } = sp.condicao;
-          // Find the parent question by rotulo
           const parentPergunta = allPerguntas.find((p) => p.rotulo === pergunta_rotulo);
           if (!parentPergunta) return false;
           const parentValue = allValues[parentPergunta.id];
@@ -604,7 +709,6 @@ const FormFieldRenderer = ({
         if (!activeSubpergunta) return null;
 
         const sp = activeSubpergunta;
-        const spKey = `sub_${sp.rotulo}`;
 
         return (
           <div className="space-y-2">

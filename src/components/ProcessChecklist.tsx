@@ -34,6 +34,7 @@ interface ProcessChecklistProps {
   hideInternal?: boolean;
   serviceName?: string;
   etapasConfig?: EtapaConfigItem[];
+  lancamentoRegistros?: { cobranca_config_id: string; confirmado: boolean }[];
 }
 
 interface CheckItem {
@@ -159,10 +160,20 @@ const getCheckItems = (props: ProcessChecklistProps): CheckItem[] => {
     const vistoriaStatuses2 = ["vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"];
     const vistoriaConcluida2 = vistoriaStatuses2.includes(s.status);
     if (vistoriaConcluida2 || s.lancamento_confirmado !== null) {
-      items.push({
-        label: "Lançamento confirmado",
-        status: s.lancamento_confirmado === true ? "done" : "waiting",
-      });
+      // Use individual registros if available
+      const registros = props.lancamentoRegistros;
+      if (registros && registros.length > 0) {
+        const allConfirmed = registros.every(r => r.confirmado === true);
+        items.push({
+          label: "Lançamento confirmado",
+          status: allConfirmed ? "done" : "waiting",
+        });
+      } else {
+        items.push({
+          label: "Lançamento confirmado",
+          status: s.lancamento_confirmado === true ? "done" : "waiting",
+        });
+      }
     }
   }
 

@@ -867,6 +867,54 @@ export type Database = {
         }
         Relationships: []
       }
+      lancamento_cobranca_registros: {
+        Row: {
+          cobranca_config_id: string
+          confirmado: boolean
+          confirmado_data: string | null
+          confirmado_por: string | null
+          created_at: string
+          id: string
+          solicitacao_id: string
+          updated_at: string
+        }
+        Insert: {
+          cobranca_config_id: string
+          confirmado?: boolean
+          confirmado_data?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          id?: string
+          solicitacao_id: string
+          updated_at?: string
+        }
+        Update: {
+          cobranca_config_id?: string
+          confirmado?: boolean
+          confirmado_data?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          id?: string
+          solicitacao_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamento_cobranca_registros_cobranca_config_id_fkey"
+            columns: ["cobranca_config_id"]
+            isOneToOne: false
+            referencedRelation: "lancamento_cobranca_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamento_cobranca_registros_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modelo_relatorio_colunas: {
         Row: {
           campo_sistema: string | null

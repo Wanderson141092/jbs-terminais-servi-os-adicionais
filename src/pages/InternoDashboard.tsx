@@ -220,7 +220,7 @@ const InternoDashboard = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/interno");
+    navigate("/servicos-adicionais");
   };
 
   useEffect(() => {

@@ -140,6 +140,11 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
               <LogIn className="h-4 w-4 mr-2" />
               {loading ? "Aguarde..." : "Entrar"}
             </Button>
+            <div className="text-center mt-3">
+              <a href="/recuperar-senha" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Esqueci minha senha
+              </a>
+            </div>
           </form>
         </div>
       </DialogContent>

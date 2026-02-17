@@ -1286,7 +1286,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               const applicableCobrancas = cobrancaConfigs.filter((cfg: any) => {
                 const statusAtivacao = cfg.status_ativacao || [];
                 if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-                if (cfg.tipo === "pendencia" && solicitacao.lacre_armador_aceite_custo !== true) return false;
+                if (cfg.tipo === "pendencia") return false; // pendencia has its own dedicated UI above
                 return true;
               });
 

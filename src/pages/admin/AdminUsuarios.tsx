@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -497,8 +498,7 @@ const AdminUsuarios = () => {
             </div>
             <div>
               <Label>Senha Inicial</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={createFormData.senha}
                 onChange={(e) => setCreateFormData(prev => ({ ...prev, senha: e.target.value }))}
                 placeholder="Mínimo 6 caracteres"
@@ -527,8 +527,7 @@ const AdminUsuarios = () => {
           <div className="space-y-4 mt-4">
             <div>
               <Label>Nova Senha</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={passwordData.novaSenha}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, novaSenha: e.target.value }))}
                 placeholder="Nova senha"
@@ -536,8 +535,7 @@ const AdminUsuarios = () => {
             </div>
             <div>
               <Label>Confirmar Nova Senha</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={passwordData.confirmarSenha}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, confirmarSenha: e.target.value }))}
                 placeholder="Confirme a nova senha"
@@ -600,8 +598,7 @@ const AdminUsuarios = () => {
           <div className="space-y-4 mt-4">
             <div>
               <Label>Nova Senha</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={userPasswordData.novaSenha}
                 onChange={(e) => setUserPasswordData(prev => ({ ...prev, novaSenha: e.target.value }))}
                 placeholder="Mínimo 6 caracteres"
@@ -609,8 +606,7 @@ const AdminUsuarios = () => {
             </div>
             <div>
               <Label>Confirmar Nova Senha</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={userPasswordData.confirmarSenha}
                 onChange={(e) => setUserPasswordData(prev => ({ ...prev, confirmarSenha: e.target.value }))}
                 placeholder="Confirme a nova senha"

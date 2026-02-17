@@ -354,23 +354,27 @@ const InternoDashboard = () => {
     }
   };
 
-  const lancamentoPendente = dashboardFiltered.filter(s => {
+  const matchesLaunchStatus = (s: any) => {
     const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
-    if (!servico?.status_confirmacao_lancamento?.length) return false;
-    return servico.status_confirmacao_lancamento.includes(s.status) && !s.lancamento_confirmado;
+    if (servico?.status_confirmacao_lancamento?.length) {
+      return servico.status_confirmacao_lancamento.includes(s.status);
+    }
+    // Fallback: se tipo_operacao é nulo, verifica se algum serviço tem esse status configurado
+    if (!s.tipo_operacao) {
+      return servicos.some(sv => sv.status_confirmacao_lancamento?.includes(s.status));
+    }
+    return false;
+  };
+
+  const lancamentoPendente = dashboardFiltered.filter(s => {
+    return matchesLaunchStatus(s) && !s.lancamento_confirmado;
   }).length;
 
   const lancamentoConfirmado = dashboardFiltered.filter(s => {
-    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
-    if (!servico?.status_confirmacao_lancamento?.length) return false;
-    return servico.status_confirmacao_lancamento.includes(s.status) && s.lancamento_confirmado === true;
+    return matchesLaunchStatus(s) && s.lancamento_confirmado === true;
   }).length;
 
-  const needsLaunchConfirmation = (s: any) => {
-    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
-    if (!servico?.status_confirmacao_lancamento?.length) return false;
-    return servico.status_confirmacao_lancamento.includes(s.status);
-  };
+  const needsLaunchConfirmation = (s: any) => matchesLaunchStatus(s);
 
   // Check if deferimento button should be active - uses service config
   const isDeferimentoActive = (s: any) => {

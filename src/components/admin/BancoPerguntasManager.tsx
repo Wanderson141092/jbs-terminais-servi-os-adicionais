@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Save, Edit, Trash2, Search, Lock, Unlock, Image, FileText, ClipboardPaste } from "lucide-react";
+import { Plus, Save, Edit, Trash2, Search, Lock, Unlock, Image, FileText, ClipboardPaste, X, GitBranch } from "lucide-react";
 
 export const QUESTION_TYPES = [
   { value: "texto", label: "Texto Curto" },
@@ -34,6 +34,7 @@ export const QUESTION_TYPES = [
   { value: "arquivo", label: "Upload de Arquivo" },
   { value: "informativo", label: "Bloco Informativo" },
   { value: "resposta_conjunta", label: "Resposta Conjunta" },
+  { value: "pergunta_condicional", label: "Pergunta Condicional" },
 ];
 
 const SUBCAMPO_TYPES = [
@@ -107,6 +108,11 @@ const BancoPerguntasManager = () => {
     conjunta_campo2_mascara: "",
     conjunta_campo2_max_chars: "",
     conjunta_campo2_modo: "menu",
+    // pergunta_condicional config
+    condicional_subperguntas: [
+      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+    ] as Array<{ tipo: string; rotulo: string; placeholder: string; opcoes: string; mascara: string; max_chars: string; modo: string; condicao_pergunta_rotulo: string; condicao_valor: string; condicao_operador: string }>,
   });
 
   useEffect(() => {
@@ -163,6 +169,23 @@ const BancoPerguntasManager = () => {
         conjunta_campo2_mascara: config?.campos?.[1]?.mascara || "",
         conjunta_campo2_max_chars: config?.campos?.[1]?.max_chars?.toString() || "",
         conjunta_campo2_modo: config?.campos?.[1]?.modo_exibicao || "menu",
+        condicional_subperguntas: config?.subperguntas
+          ? (config.subperguntas as any[]).map((sp: any) => ({
+              tipo: sp.tipo || "texto",
+              rotulo: sp.rotulo || "",
+              placeholder: sp.placeholder || "",
+              opcoes: sp.opcoes?.join("\n") || "",
+              mascara: sp.mascara || "",
+              max_chars: sp.max_chars?.toString() || "",
+              modo: sp.modo_exibicao || "menu",
+              condicao_pergunta_rotulo: sp.condicao?.pergunta_rotulo || "",
+              condicao_valor: sp.condicao?.valor_gatilho || "",
+              condicao_operador: sp.condicao?.operador || "igual",
+            }))
+          : [
+              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+            ],
       });
     } else {
       setEditing(null);
@@ -201,6 +224,10 @@ const BancoPerguntasManager = () => {
         conjunta_campo2_mascara: "",
         conjunta_campo2_max_chars: "",
         conjunta_campo2_modo: "menu",
+        condicional_subperguntas: [
+          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+        ],
       });
     }
     setShowDialog(true);
@@ -259,6 +286,25 @@ const BancoPerguntasManager = () => {
         };
       };
       config.campos = [buildCampo("conjunta_campo1"), buildCampo("conjunta_campo2")];
+    }
+    if (formData.tipo === "pergunta_condicional") {
+      config.subperguntas = formData.condicional_subperguntas.map((sp) => {
+        const opcoes = sp.opcoes.split("\n").filter((o) => o.trim()).map((o) => o.trim());
+        return {
+          tipo: sp.tipo,
+          rotulo: sp.rotulo,
+          placeholder: sp.placeholder || null,
+          opcoes: opcoes.length > 0 ? opcoes : null,
+          mascara: sp.mascara || null,
+          max_chars: sp.max_chars ? parseInt(sp.max_chars) : null,
+          modo_exibicao: (sp.tipo === "select" || sp.tipo === "multipla_escolha") ? sp.modo : null,
+          condicao: {
+            pergunta_rotulo: sp.condicao_pergunta_rotulo,
+            valor_gatilho: sp.condicao_valor,
+            operador: sp.condicao_operador,
+          },
+        };
+      });
     }
 
     const payload = {
@@ -638,6 +684,143 @@ const BancoPerguntasManager = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {formData.tipo === "pergunta_condicional" && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <GitBranch className="h-4 w-4" />
+                  Sub-perguntas Condicionais
+                </Label>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Cada sub-pergunta será exibida apenas quando a condição for satisfeita. Informe o rótulo exato da pergunta-gatilho.
+                </p>
+                {formData.condicional_subperguntas.map((sp, idx) => {
+                  const updateSub = (field: string, val: any) => {
+                    const updated = [...formData.condicional_subperguntas];
+                    updated[idx] = { ...updated[idx], [field]: val };
+                    setFormData({ ...formData, condicional_subperguntas: updated });
+                  };
+                  const isSelecao = sp.tipo === "select" || sp.tipo === "multipla_escolha";
+                  return (
+                    <div key={idx} className="border rounded-md p-3 space-y-3 bg-background relative">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-semibold">Sub-pergunta {idx + 1}</Label>
+                        {formData.condicional_subperguntas.length > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              const updated = formData.condicional_subperguntas.filter((_, i) => i !== idx);
+                              setFormData({ ...formData, condicional_subperguntas: updated });
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {/* Condição */}
+                      <div className="border-l-4 border-primary/30 pl-3 space-y-2">
+                        <Label className="text-xs font-semibold text-primary">Condição (obrigatória)</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <Label className="text-xs">Pergunta-gatilho (rótulo)</Label>
+                            <Input value={sp.condicao_pergunta_rotulo} onChange={(e) => updateSub("condicao_pergunta_rotulo", e.target.value)} placeholder="Ex: Tipo de Operação" />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Operador</Label>
+                            <Select value={sp.condicao_operador} onValueChange={(v) => updateSub("condicao_operador", v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="igual">Igual</SelectItem>
+                                <SelectItem value="diferente">Diferente</SelectItem>
+                                <SelectItem value="contem">Contém</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Valor gatilho</Label>
+                            <Input value={sp.condicao_valor} onChange={(e) => updateSub("condicao_valor", e.target.value)} placeholder="Ex: Importação" />
+                          </div>
+                        </div>
+                      </div>
+                      {/* Pergunta */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Tipo</Label>
+                          <Select value={sp.tipo} onValueChange={(v) => updateSub("tipo", v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {SUBCAMPO_TYPES.map((t) => (
+                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Rótulo</Label>
+                          <Input value={sp.rotulo} onChange={(e) => updateSub("rotulo", e.target.value)} placeholder="Ex: Número do Container" />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Placeholder</Label>
+                        <Input value={sp.placeholder} onChange={(e) => updateSub("placeholder", e.target.value)} placeholder="Texto de ajuda" />
+                      </div>
+                      {isSelecao && (
+                        <>
+                          <div>
+                            <Label>Opções (uma por linha)</Label>
+                            <Textarea value={sp.opcoes} onChange={(e) => updateSub("opcoes", e.target.value)} placeholder={"Opção 1\nOpção 2"} rows={3} />
+                          </div>
+                          <div>
+                            <Label>Modo de exibição</Label>
+                            <Select value={sp.modo} onValueChange={(v) => updateSub("modo", v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="menu">Menu (dropdown)</SelectItem>
+                                <SelectItem value="botoes">Botões</SelectItem>
+                                {sp.tipo === "select" && <SelectItem value="radio">Radio</SelectItem>}
+                                {sp.tipo === "multipla_escolha" && <SelectItem value="check">Checkbox</SelectItem>}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
+                      {sp.tipo === "texto_formatado" && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Máscara</Label>
+                            <Input value={sp.mascara} onChange={(e) => updateSub("mascara", e.target.value.toUpperCase())} placeholder="Ex: AAAU9999999" className="font-mono" />
+                          </div>
+                          <div>
+                            <Label>Máx. caracteres</Label>
+                            <Input type="number" value={sp.max_chars} onChange={(e) => updateSub("max_chars", e.target.value)} placeholder="Ex: 11" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      condicional_subperguntas: [
+                        ...formData.condicional_subperguntas,
+                        { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+                      ],
+                    });
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar Sub-pergunta
+                </Button>
               </div>
             )}
 

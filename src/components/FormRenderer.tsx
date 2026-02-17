@@ -120,6 +120,33 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
           }
           continue;
         }
+        if (p.tipo === "pergunta_condicional") {
+          const cfg = p.config as any;
+          if (cfg?.subperguntas) {
+            // Check if any sub-question is active
+            const activeSub = (cfg.subperguntas as any[]).find((sp: any) => {
+              if (!sp.condicao) return false;
+              const parentPergunta = visiblePerguntas.find((pp) => pp.rotulo === sp.condicao.pergunta_rotulo);
+              if (!parentPergunta) return false;
+              const parentValue = values[parentPergunta.id];
+              if (parentValue === undefined || parentValue === null || parentValue === "") return false;
+              switch (sp.condicao.operador) {
+                case "igual": return String(parentValue) === sp.condicao.valor_gatilho;
+                case "diferente": return String(parentValue) !== sp.condicao.valor_gatilho;
+                case "contem": return String(parentValue).toLowerCase().includes(sp.condicao.valor_gatilho.toLowerCase());
+                default: return false;
+              }
+            });
+            if (activeSub) {
+              const val = values[p.id];
+              if (!val || (Array.isArray(val) && val.length === 0)) {
+                toast.error(`O campo "${activeSub.rotulo || p.rotulo}" é obrigatório`);
+                return;
+              }
+            }
+          }
+          continue;
+        }
         const val = p.tipo === "anexo" ? files[p.id] : values[p.id];
         if (!val || (Array.isArray(val) && val.length === 0)) {
           toast.error(`O campo "${p.rotulo}" é obrigatório`);

@@ -37,6 +37,8 @@ const FormRendererBody = ({
           fileData={files[pergunta.id]}
           onValueChange={(val) => onValueChange(pergunta.id, val)}
           onFileChange={(file) => onFileChange(pergunta.id, file)}
+          allValues={values}
+          allPerguntas={perguntas}
         />
       </div>
     ))}

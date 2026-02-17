@@ -55,6 +55,8 @@ interface FormFieldRendererProps {
   fileData?: { file: File; url: string };
   onValueChange: (value: any) => void;
   onFileChange: (file: File | null) => void;
+  allValues?: Record<string, any>;
+  allPerguntas?: PerguntaComCondicao[];
 }
 
 const SearchableSelect = ({ options, value, onValueChange, placeholder }: {
@@ -169,6 +171,8 @@ const FormFieldRenderer = ({
   fileData,
   onValueChange,
   onFileChange,
+  allValues,
+  allPerguntas,
 }: FormFieldRendererProps) => {
   const opcoes = pergunta.opcoes as { value: string; label: string }[] | null;
   const config = pergunta.config as Record<string, any> | null;
@@ -575,6 +579,126 @@ const FormFieldRenderer = ({
           })}
         </div>
       )}
+
+      {pergunta.tipo === "pergunta_condicional" && config?.subperguntas && allValues && allPerguntas && (() => {
+        const subperguntas = config.subperguntas as any[];
+        // Find the first sub-question whose condition is met
+        const activeSubpergunta = subperguntas.find((sp: any) => {
+          if (!sp.condicao) return false;
+          const { pergunta_rotulo, valor_gatilho, operador } = sp.condicao;
+          // Find the parent question by rotulo
+          const parentPergunta = allPerguntas.find((p) => p.rotulo === pergunta_rotulo);
+          if (!parentPergunta) return false;
+          const parentValue = allValues[parentPergunta.id];
+          if (parentValue === undefined || parentValue === null || parentValue === "") return false;
+          switch (operador) {
+            case "igual": return String(parentValue) === valor_gatilho;
+            case "diferente": return String(parentValue) !== valor_gatilho;
+            case "contem": return String(parentValue).toLowerCase().includes(valor_gatilho.toLowerCase());
+            default: return false;
+          }
+        });
+
+        if (!activeSubpergunta) return null;
+
+        const sp = activeSubpergunta;
+        const spKey = `sub_${sp.rotulo}`;
+
+        return (
+          <div className="space-y-2">
+            {sp.rotulo && <Label className="text-sm">{sp.rotulo}</Label>}
+            {sp.tipo === "texto" && (
+              <Input value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} />
+            )}
+            {sp.tipo === "texto_formatado" && (
+              <Input
+                value={value || ""}
+                onChange={(e) => {
+                  if (sp.mascara) {
+                    onValueChange(applyMask(e.target.value, sp.mascara));
+                  } else {
+                    let val = e.target.value.toUpperCase();
+                    if (sp.max_chars) val = val.slice(0, sp.max_chars);
+                    onValueChange(val);
+                  }
+                }}
+                placeholder={sp.placeholder || ""}
+                maxLength={sp.mascara ? sp.mascara.length : (sp.max_chars || undefined)}
+                className="font-mono"
+              />
+            )}
+            {sp.tipo === "numero" && (
+              <Input type="number" value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} />
+            )}
+            {sp.tipo === "email" && (
+              <Input type="email" value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} />
+            )}
+            {sp.tipo === "data" && (
+              <Input type="date" value={value || ""} onChange={(e) => onValueChange(e.target.value)} />
+            )}
+            {sp.tipo === "select" && sp.opcoes && (() => {
+              const opts = sp.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));
+              const modo = sp.modo_exibicao || "menu";
+              if (modo === "botoes") {
+                return (
+                  <ToggleGroup type="single" value={value || ""} onValueChange={(v) => { if (v) onValueChange(v); }} className="flex flex-wrap gap-2 justify-start">
+                    {opts.map((opt: any) => (
+                      <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">{opt.label}</ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                );
+              }
+              if (modo === "radio") {
+                return (
+                  <RadioGroup value={value || ""} onValueChange={onValueChange} className="space-y-2">
+                    {opts.map((opt: any) => (
+                      <div key={opt.value} className="flex items-center gap-2">
+                        <RadioGroupItem value={opt.label} id={`${pergunta.id}_cond_${opt.value}`} />
+                        <Label htmlFor={`${pergunta.id}_cond_${opt.value}`} className="cursor-pointer font-normal">{opt.label}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                );
+              }
+              return <SearchableSelect options={opts} value={value || ""} onValueChange={onValueChange} placeholder={sp.placeholder || "Selecione..."} />;
+            })()}
+            {sp.tipo === "multipla_escolha" && sp.opcoes && (() => {
+              const opts = sp.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));
+              const modo = sp.modo_exibicao || "check";
+              const currentArr: string[] = value || [];
+              if (modo === "botoes") {
+                return (
+                  <ToggleGroup type="multiple" value={currentArr} onValueChange={onValueChange} className="flex flex-wrap gap-2 justify-start">
+                    {opts.map((opt: any) => (
+                      <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">{opt.label}</ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                );
+              }
+              if (modo === "menu") {
+                return <SearchableMultiSelect options={opts} value={currentArr} onValueChange={onValueChange} placeholder={sp.placeholder || "Selecione..."} perguntaId={`${pergunta.id}_cond`} />;
+              }
+              return (
+                <div className="space-y-2">
+                  {opts.map((opt: any) => (
+                    <div key={opt.value} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`${pergunta.id}_cond_${opt.value}`}
+                        checked={currentArr.includes(opt.label)}
+                        onCheckedChange={(checked) => {
+                          if (checked) onValueChange([...currentArr, opt.label]);
+                          else onValueChange(currentArr.filter((v: string) => v !== opt.label));
+                        }}
+                      />
+                      <Label htmlFor={`${pergunta.id}_cond_${opt.value}`} className="cursor-pointer font-normal">{opt.label}</Label>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        );
+      })()}
     </div>
   );
 };

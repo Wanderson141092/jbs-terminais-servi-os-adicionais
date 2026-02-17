@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -354,8 +355,7 @@ const AdminIntegracoes = () => {
                     </div>
                     <div>
                       <Label>API Key (opcional)</Label>
-                      <Input
-                        type="password"
+                      <PasswordInput
                         value={formData.api_key}
                         onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
                         placeholder={editingIntegracao ? "Deixe vazio para manter a chave atual" : "Chave de API"}

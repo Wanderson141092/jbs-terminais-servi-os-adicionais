@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KeyRound, ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -108,9 +109,8 @@ const RecuperarSenha = () => {
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div>
                 <Label htmlFor="novaSenha">Nova Senha</Label>
-                <Input
+                <PasswordInput
                   id="novaSenha"
-                  type="password"
                   value={novaSenha}
                   onChange={(e) => setNovaSenha(e.target.value)}
                   placeholder="Mínimo 6 caracteres"
@@ -118,9 +118,8 @@ const RecuperarSenha = () => {
               </div>
               <div>
                 <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
-                <Input
+                <PasswordInput
                   id="confirmarSenha"
-                  type="password"
                   value={confirmarSenha}
                   onChange={(e) => setConfirmarSenha(e.target.value)}
                   placeholder="Confirme a senha"

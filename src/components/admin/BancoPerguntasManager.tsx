@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Save, Edit, Trash2, Search, Lock, Unlock, Image, FileText } from "lucide-react";
+import { Plus, Save, Edit, Trash2, Search, Lock, Unlock, Image, FileText, ClipboardPaste } from "lucide-react";
 
 export const QUESTION_TYPES = [
   { value: "texto", label: "Texto Curto" },
@@ -54,6 +54,8 @@ const BancoPerguntasManager = () => {
   const [search, setSearch] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<BancoPergunta | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importText, setImportText] = useState("");
   const [formData, setFormData] = useState({
     tipo: "texto",
     rotulo: "",
@@ -365,7 +367,18 @@ const BancoPerguntasManager = () => {
             {(formData.tipo === "select" || formData.tipo === "multipla_escolha") && (
               <div className="space-y-4">
                 <div>
-                  <Label>Opções (uma por linha)</Label>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label>Opções (uma por linha)</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setImportText(""); setShowImportDialog(true); }}
+                    >
+                      <ClipboardPaste className="h-4 w-4 mr-1" />
+                      Importar
+                    </Button>
+                  </div>
                   <Textarea value={formData.opcoes} onChange={(e) => setFormData({ ...formData, opcoes: e.target.value })} placeholder={"Opção 1\nOpção 2\nOpção 3"} rows={4} />
                 </div>
                 {formData.tipo === "select" && (
@@ -542,6 +555,60 @@ const BancoPerguntasManager = () => {
             <Button onClick={save}>
               <Save className="h-4 w-4 mr-2" />
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Importação de Opções */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar Opções</DialogTitle>
+            <DialogDescription>
+              Cole as opções abaixo (uma por linha ou separadas por ponto-e-vírgula). Você pode editar antes de importar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={"Cole aqui as opções...\nOpção A\nOpção B\nOu separadas por ; Ex: Opção A;Opção B;Opção C"}
+              rows={10}
+            />
+            <p className="text-sm text-muted-foreground">
+              {(() => {
+                const count = importText
+                  .split(/[\n;]/)
+                  .map((l) => l.trim())
+                  .filter((l) => l.length > 0).length;
+                return count > 0 ? `${count} opção(ões) detectada(s)` : "Nenhuma opção detectada";
+              })()}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                const lines = importText
+                  .split(/[\n;]/)
+                  .map((l) => l.trim())
+                  .filter((l) => l.length > 0);
+                if (lines.length === 0) {
+                  toast.error("Nenhuma opção para importar");
+                  return;
+                }
+                const current = formData.opcoes.trim();
+                const allLines = current ? current.split("\n").concat(lines) : lines;
+                const unique = [...new Set(allLines.map((l) => l.trim()).filter((l) => l.length > 0))];
+                setFormData({ ...formData, opcoes: unique.join("\n") });
+                setShowImportDialog(false);
+                toast.success(`${lines.length} opção(ões) importada(s)`);
+              }}
+              disabled={importText.split(/[\n;]/).map((l) => l.trim()).filter((l) => l.length > 0).length === 0}
+            >
+              <ClipboardPaste className="h-4 w-4 mr-1" />
+              Importar ({importText.split(/[\n;]/).map((l) => l.trim()).filter((l) => l.length > 0).length})
             </Button>
           </DialogFooter>
         </DialogContent>

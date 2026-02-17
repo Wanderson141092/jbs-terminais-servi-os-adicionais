@@ -15,6 +15,7 @@ export interface PerguntaComCondicao {
   descricao: string | null;
   obrigatorio: boolean;
   ordem: number;
+  largura?: number;
   condicao: {
     pergunta_pai_id: string;
     valor_gatilho: string;

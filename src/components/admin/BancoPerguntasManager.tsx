@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Save, Edit, Trash2, Search, Lock, Unlock, Image, FileText, ClipboardPaste, X, GitBranch } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 
 export const QUESTION_TYPES = [
   { value: "texto", label: "Texto Curto" },
@@ -75,6 +76,7 @@ const BancoPerguntasManager = () => {
     descricao: "",
     placeholder: "",
     opcoes: "",
+    largura: 100,
     // informativo config
     info_tipo: "texto" as "texto" | "imagem",
     info_conteudo: "",
@@ -141,6 +143,7 @@ const BancoPerguntasManager = () => {
         descricao: pergunta.descricao || "",
         placeholder: pergunta.placeholder || "",
         opcoes: opcoesArr?.map((o) => o.label).join("\n") || "",
+        largura: config?.largura ?? 100,
         info_tipo: config?.conteudo_tipo || "texto",
         info_conteudo: config?.conteudo || "",
         info_exigir_aceite: config?.exigir_aceite || false,
@@ -196,6 +199,7 @@ const BancoPerguntasManager = () => {
         descricao: "",
         placeholder: "",
         opcoes: "",
+        largura: 100,
         info_tipo: "texto",
         info_conteudo: "",
         info_exigir_aceite: false,
@@ -306,6 +310,10 @@ const BancoPerguntasManager = () => {
           },
         };
       });
+    }
+    // Always save largura if not 100
+    if (formData.largura && formData.largura !== 100) {
+      config.largura = formData.largura;
     }
 
     const payload = {
@@ -481,6 +489,22 @@ const BancoPerguntasManager = () => {
                 <Input value={formData.placeholder} onChange={(e) => setFormData({ ...formData, placeholder: e.target.value })} placeholder="Texto de ajuda no campo" />
               </div>
             )}
+
+            <div>
+              <Label>Largura no Formulário: {formData.largura}%</Label>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-xs text-muted-foreground">25%</span>
+                <Slider
+                  value={[formData.largura]}
+                  onValueChange={(v) => setFormData({ ...formData, largura: v[0] })}
+                  min={25}
+                  max={100}
+                  step={5}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground">100%</span>
+              </div>
+            </div>
 
             {(formData.tipo === "select" || formData.tipo === "multipla_escolha") && (
               <div className="space-y-4">

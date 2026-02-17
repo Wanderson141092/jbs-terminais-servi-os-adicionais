@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Info, Image as ImageIcon, ChevronDown } from "lucide-react";
+import { Info, Image as ImageIcon, ChevronDown, Search, Check } from "lucide-react";
 import type { PerguntaComCondicao } from "./types";
 
 interface FormFieldRendererProps {
@@ -27,6 +28,112 @@ interface FormFieldRendererProps {
   onValueChange: (value: any) => void;
   onFileChange: (file: File | null) => void;
 }
+
+const SearchableSelect = ({ options, value, onValueChange, placeholder }: {
+  options: { value: string; label: string }[];
+  value: string;
+  onValueChange: (v: string) => void;
+  placeholder: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const filtered = options.filter((opt) =>
+    opt.label.toLowerCase().includes(search.toLowerCase())
+  );
+  const selectedLabel = options.find((opt) => opt.label === value)?.label;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
+          {selectedLabel || placeholder}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <div className="flex items-center border-b px-3 py-2">
+          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <input
+            className="flex h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            placeholder="Buscar..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="max-h-48 overflow-auto p-1">
+          {filtered.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma opção encontrada</p>
+          )}
+          {filtered.map((opt) => (
+            <div
+              key={opt.value}
+              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+              onClick={() => { onValueChange(opt.label); setOpen(false); setSearch(""); }}
+            >
+              <Check className={`mr-2 h-4 w-4 ${value === opt.label ? "opacity-100" : "opacity-0"}`} />
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+const SearchableMultiSelect = ({ options, value, onValueChange, placeholder, perguntaId }: {
+  options: { value: string; label: string }[];
+  value: string[];
+  onValueChange: (v: string[]) => void;
+  placeholder: string;
+  perguntaId: string;
+}) => {
+  const [search, setSearch] = useState("");
+  const filtered = options.filter((opt) =>
+    opt.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-between font-normal">
+          {value.length > 0 ? `${value.length} selecionado(s)` : placeholder}
+          <ChevronDown className="h-4 w-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <div className="flex items-center border-b px-3 py-2">
+          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <input
+            className="flex h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            placeholder="Buscar..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1 max-h-48 overflow-auto p-2">
+          {filtered.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma opção encontrada</p>
+          )}
+          {filtered.map((opt) => (
+            <div key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer">
+              <Checkbox
+                id={`pop_${perguntaId}_${opt.value}`}
+                checked={value.includes(opt.label)}
+                onCheckedChange={(checked) => {
+                  if (checked) onValueChange([...value, opt.label]);
+                  else onValueChange(value.filter((v: string) => v !== opt.label));
+                }}
+              />
+              <Label htmlFor={`pop_${perguntaId}_${opt.value}`} className="cursor-pointer font-normal text-sm flex-1">
+                {opt.label}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const FormFieldRenderer = ({
   pergunta,
@@ -143,20 +250,14 @@ const FormFieldRenderer = ({
       );
     }
 
-    // default: menu (dropdown)
+    // default: menu (dropdown) with search
     return (
-      <Select value={value || ""} onValueChange={onValueChange}>
-        <SelectTrigger>
-          <SelectValue placeholder={pergunta.placeholder || "Selecione..."} />
-        </SelectTrigger>
-        <SelectContent>
-          {opcoes.map((opt) => (
-            <SelectItem key={opt.value} value={opt.label}>
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <SearchableSelect
+        options={opcoes}
+        value={value || ""}
+        onValueChange={onValueChange}
+        placeholder={pergunta.placeholder || "Selecione..."}
+      />
     );
   };
 
@@ -179,33 +280,13 @@ const FormFieldRenderer = ({
 
     if (modo === "menu") {
       return (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full justify-between font-normal">
-              {currentValue.length > 0 ? `${currentValue.length} selecionado(s)` : (pergunta.placeholder || "Selecione...")}
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
-            <div className="space-y-1 max-h-48 overflow-auto">
-              {opcoes.map((opt) => (
-                <div key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer">
-                  <Checkbox
-                    id={`pop_${pergunta.id}_${opt.value}`}
-                    checked={currentValue.includes(opt.label)}
-                    onCheckedChange={(checked) => {
-                      if (checked) onValueChange([...currentValue, opt.label]);
-                      else onValueChange(currentValue.filter((v: string) => v !== opt.label));
-                    }}
-                  />
-                  <Label htmlFor={`pop_${pergunta.id}_${opt.value}`} className="cursor-pointer font-normal text-sm flex-1">
-                    {opt.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+        <SearchableMultiSelect
+          options={opcoes}
+          value={currentValue}
+          onValueChange={onValueChange}
+          placeholder={pergunta.placeholder || "Selecione..."}
+          perguntaId={pergunta.id}
+        />
       );
     }
 

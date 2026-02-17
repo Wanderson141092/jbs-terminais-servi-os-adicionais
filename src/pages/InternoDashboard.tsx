@@ -39,6 +39,7 @@ import jbsLogo from "@/assets/jbs-terminais-logo.png";
 import { startOfWeek, addDays, format, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useGestorCheck } from "@/hooks/useGestorCheck";
 import useNotifications from "@/hooks/useNotifications";
 import DeferimentoDialog from "@/components/DeferimentoDialog";
 import LacreArmadorDialog from "@/components/LacreArmadorDialog";
@@ -99,6 +100,7 @@ const InternoDashboard = () => {
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   
   const { isAdmin } = useAdminCheck(user?.id || null);
+  const { isGestor } = useGestorCheck(user?.id || null);
   const { statusOptions, statusLabels } = useStatusProcesso();
   
   useNotifications(user?.id || null);
@@ -442,7 +444,7 @@ const InternoDashboard = () => {
             <div className="min-w-0">
               <h1 className="text-xs sm:text-sm font-bold truncate">Serviços Adicionais</h1>
               <p className="text-[10px] sm:text-xs text-primary-foreground/70 truncate">
-                {profile?.nome} · {isAdmin ? "Admin" : getSetorLabel(profile?.setor)}
+                {profile?.nome} · {isAdmin ? "Admin" : isGestor ? "Gestor" : getSetorLabel(profile?.setor)}
               </p>
             </div>
           </div>
@@ -493,13 +495,47 @@ const InternoDashboard = () => {
               </DropdownMenu>
             )}
             
-            {!isAdmin && (
+            {!isAdmin && !isGestor && (
               <Button variant="ghost" size="sm" onClick={() => navigate("/interno/admin/logs")} className="text-primary-foreground hover:bg-primary-foreground/10">
                 <FileText className="h-4 w-4" />
               </Button>
             )}
 
-            {userPerfis.includes("GESTOR") && (
+            {isGestor && !isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/10">
+                    <Menu className="h-4 w-4 mr-1" />
+                    Gestor
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 z-[100] bg-popover" sideOffset={8}>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/usuarios")}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Usuários
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/servicos")}>
+                    <ClipboardList className="h-4 w-4 mr-2" />
+                    Serviços
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/formularios")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Formulários
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/interno/admin/parametros")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Parâmetros
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interno/gestor/regras")}>
+                    <Shield className="h-4 w-4 mr-2" />
+                    Regras de Serviço
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {userPerfis.includes("GESTOR") && isAdmin && (
               <Button variant="ghost" size="sm" onClick={() => navigate("/interno/gestor/regras")} className="text-primary-foreground hover:bg-primary-foreground/10" title="Regras de Serviço">
                 <Shield className="h-4 w-4" />
               </Button>

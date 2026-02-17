@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useGestorCheck } from "@/hooks/useGestorCheck";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,6 +107,15 @@ const AdminParametros = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
+  const { isGestor } = useGestorCheck(currentUserId);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id || null);
+    });
+  }, []);
 
   // Regras de Serviço
   const [regras, setRegras] = useState<RegraServico[]>([]);
@@ -571,6 +582,11 @@ const AdminParametros = () => {
       </div>
     );
   }
+  // Access guard
+  if (!loading && !isCurrentUserAdmin && !isGestor) {
+    navigate("/interno/dashboard");
+    return null;
+  }
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -596,38 +612,46 @@ const AdminParametros = () => {
             <Globe className="h-4 w-4" />
             Pág. Externa
           </TabsTrigger>
-          <TabsTrigger value="pagina-interna" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            Pág. Interna
-          </TabsTrigger>
-          <TabsTrigger value="campos-respostas" className="flex items-center gap-2">
-            <List className="h-4 w-4" />
-            Campos
-          </TabsTrigger>
-          <TabsTrigger value="campos-fixos" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Campos Fixos
-          </TabsTrigger>
-          <TabsTrigger value="consulta-etapas" className="flex items-center gap-2">
-            <GitBranch className="h-4 w-4" />
-            Consulta
-          </TabsTrigger>
-          <TabsTrigger value="cancelamento-recusa" className="flex items-center gap-2">
-            <Ban className="h-4 w-4" />
-            Cancel./Recusa
-          </TabsTrigger>
+          {isCurrentUserAdmin && (
+            <>
+              <TabsTrigger value="pagina-interna" className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Pág. Interna
+              </TabsTrigger>
+              <TabsTrigger value="campos-respostas" className="flex items-center gap-2">
+                <List className="h-4 w-4" />
+                Campos
+              </TabsTrigger>
+              <TabsTrigger value="campos-fixos" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Campos Fixos
+              </TabsTrigger>
+              <TabsTrigger value="consulta-etapas" className="flex items-center gap-2">
+                <GitBranch className="h-4 w-4" />
+                Consulta
+              </TabsTrigger>
+              <TabsTrigger value="cancelamento-recusa" className="flex items-center gap-2">
+                <Ban className="h-4 w-4" />
+                Cancel./Recusa
+              </TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="regras" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Regras
           </TabsTrigger>
-          <TabsTrigger value="notificacoes" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notificações
-          </TabsTrigger>
-          <TabsTrigger value="protocolo" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Protocolo
-          </TabsTrigger>
+          {isCurrentUserAdmin && (
+            <>
+              <TabsTrigger value="notificacoes" className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Notificações
+              </TabsTrigger>
+              <TabsTrigger value="protocolo" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Protocolo
+              </TabsTrigger>
+            </>
+          )}
         </TabsList>
 
         {/* ============= PÁGINA EXTERNA ============= */}

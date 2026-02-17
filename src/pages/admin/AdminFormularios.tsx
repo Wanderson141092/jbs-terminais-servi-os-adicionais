@@ -22,6 +22,8 @@ import {
   ArrowLeft, Plus, Save, Edit, Trash2, FileText, Eye, Download, Database, Settings2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useGestorCheck } from "@/hooks/useGestorCheck";
 import BancoPerguntasManager from "@/components/admin/BancoPerguntasManager";
 import FormularioBuilder from "@/components/admin/FormularioBuilder";
 import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";
@@ -67,6 +69,16 @@ interface FormStyle {
 
 const AdminFormularios = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
+  const { isGestor } = useGestorCheck(currentUserId);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id || null);
+    });
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [formularios, setFormularios] = useState<Formulario[]>([]);
   const [campos, setCampos] = useState<Campo[]>([]);

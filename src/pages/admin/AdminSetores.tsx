@@ -32,6 +32,7 @@ interface Servico {
 const PERFIS_DISPONIVEIS = [
   { value: "ADMINISTRATIVO", label: "Administrativo" },
   { value: "OPERACIONAL", label: "Operacional" },
+  { value: "GESTOR", label: "Gestor" },
 ];
 
 const AdminSetores = () => {
@@ -271,7 +272,12 @@ const AdminSetores = () => {
       if (setor.setor === "ARMAZEM") return ["Operacional"];
       return [setor.setor];
     }
-    return perfis.map(p => p === "ADMINISTRATIVO" ? "Administrativo" : "Operacional");
+    return perfis.map(p => {
+      if (p === "ADMINISTRATIVO") return "Administrativo";
+      if (p === "OPERACIONAL") return "Operacional";
+      if (p === "GESTOR") return "Gestor";
+      return p;
+    });
   };
 
   if (loading) {

@@ -197,7 +197,9 @@ const FormFieldRenderer = ({
               <div>
                 <p className="font-medium text-foreground">{pergunta.rotulo}</p>
                 {config?.conteudo && (
-                  <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{config.conteudo}</p>
+                  /<[a-z][\s\S]*>/i.test(config.conteudo)
+                    ? <div className="prose-content text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: config.conteudo }} />
+                    : <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{config.conteudo}</p>
                 )}
               </div>
             </div>

@@ -535,7 +535,7 @@ const InternoDashboard = () => {
               </DropdownMenu>
             )}
 
-            {userPerfis.includes("GESTOR") && isAdmin && (
+            {isGestor && isAdmin && (
               <Button variant="ghost" size="sm" onClick={() => navigate("/interno/gestor/regras")} className="text-primary-foreground hover:bg-primary-foreground/10" title="Regras de Serviço">
                 <Shield className="h-4 w-4" />
               </Button>

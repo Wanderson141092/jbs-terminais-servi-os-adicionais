@@ -98,6 +98,7 @@ const InternoDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
+  const [userAllowedServiceNames, setUserAllowedServiceNames] = useState<string[] | null>(null); // null = all allowed (admin)
   
   const { isAdmin } = useAdminCheck(user?.id || null);
   const { isGestor } = useGestorCheck(user?.id || null);
@@ -125,13 +126,34 @@ const InternoDashboard = () => {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("*, setor_emails(perfis, descricao)")
+      .select("*, setor_emails(id, perfis, descricao)")
       .eq("id", user.id)
       .maybeSingle();
     setProfile(data);
     
     if (data?.setor_emails?.perfis) {
       setUserPerfis(data.setor_emails.perfis);
+    }
+
+    // Fetch allowed services for user's sector
+    if (data?.setor_emails?.id) {
+      const { data: setorServicos } = await supabase
+        .from("setor_servicos")
+        .select("servico_id, servicos(nome)")
+        .eq("setor_email_id", data.setor_emails.id);
+      
+      if (setorServicos && setorServicos.length > 0) {
+        const names = setorServicos
+          .map((ss: any) => ss.servicos?.nome)
+          .filter(Boolean);
+        setUserAllowedServiceNames(names);
+      } else {
+        // No services configured = no access to specific services
+        setUserAllowedServiceNames([]);
+      }
+    } else {
+      // No sector = no restriction info
+      setUserAllowedServiceNames(null);
     }
   }, [user]);
 
@@ -334,6 +356,14 @@ const InternoDashboard = () => {
   };
 
   const hasOperacionalProfile = userPerfis.includes("OPERACIONAL") || profile?.setor === "ARMAZEM" || isAdmin;
+
+  // Check if user has access to a specific process based on sector services
+  const canAccessProcess = (s: any) => {
+    if (isAdmin) return true;
+    if (userAllowedServiceNames === null) return true; // no sector = show all (shouldn't happen for non-admin)
+    if (!s.tipo_operacao) return true; // fallback: allow if no service type
+    return userAllowedServiceNames.includes(s.tipo_operacao);
+  };
 
   const selectedForBatchApproval = filtered.filter(s => 
     selectedIds.includes(s.id) && 
@@ -850,7 +880,7 @@ const InternoDashboard = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {(s.comex_aprovado !== null || s.armazem_aprovado !== null) && (
+                          {canAccessProcess(s) && (s.comex_aprovado !== null || s.armazem_aprovado !== null) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -861,7 +891,7 @@ const InternoDashboard = () => {
                             </Button>
                           )}
                           {/* Reativação button - only for recusado, NOT client-cancelled */}
-                          {s.status === "recusado" && !s.cancelamento_solicitado && (
+                          {canAccessProcess(s) && s.status === "recusado" && !s.cancelamento_solicitado && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -873,7 +903,7 @@ const InternoDashboard = () => {
                             </Button>
                           )}
                           {/* Deferimento button - only for Posicionamento from aguardando_vistoria onwards */}
-                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
+                          {canAccessProcess(s) && (s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -886,7 +916,7 @@ const InternoDashboard = () => {
                             </Button>
                           )}
                           {/* Lacre Armador button - only for Posicionamento from aguardando_vistoria onwards */}
-                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
+                          {canAccessProcess(s) && (s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -898,7 +928,7 @@ const InternoDashboard = () => {
                               <Lock className="h-4 w-4" />
                             </Button>
                           )}
-                          {s.status !== "recusado" && (
+                          {canAccessProcess(s) && s.status !== "recusado" && (
                           <Button
                             variant="ghost"
                             size="sm"

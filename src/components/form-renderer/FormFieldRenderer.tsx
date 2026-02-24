@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -399,14 +400,30 @@ const FormFieldRenderer = ({
           return input;
         })()}
 
-        {pergunta.tipo === "email" && (
-          <Input
-            type="email"
-            value={fieldValue || ""}
-            onChange={(e) => onFieldChange(e.target.value)}
-            placeholder={pergunta.placeholder || "seu@email.com"}
-          />
-        )}
+        {pergunta.tipo === "email" && (() => {
+          const bloquearDominio = config?.bloquear_dominio;
+          const dominioBloqueado = config?.dominio_bloqueado || "@jbsterminais.com.br";
+          return (
+            <Input
+              type="email"
+              value={fieldValue || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (bloquearDominio && val.toLowerCase().endsWith(dominioBloqueado.toLowerCase())) {
+                  // Don't update - will show validation on blur
+                }
+                onFieldChange(val);
+              }}
+              onBlur={(e) => {
+                if (bloquearDominio && e.target.value.toLowerCase().endsWith(dominioBloqueado.toLowerCase())) {
+                  onFieldChange("");
+                  toast.error(`E-mails com domínio ${dominioBloqueado} não são permitidos`);
+                }
+              }}
+              placeholder={pergunta.placeholder || "seu@email.com"}
+            />
+          );
+        })()}
 
         {pergunta.tipo === "data" && (
           <Input

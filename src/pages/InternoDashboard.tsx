@@ -875,8 +875,10 @@ const InternoDashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setSelectedSolicitacao(s)}
+                            onClick={() => canAccessProcess(s) || isAdmin ? setSelectedSolicitacao(s) : null}
                             title="Visualizar / Analisar"
+                            disabled={!canAccessProcess(s) && !isAdmin}
+                            className={!canAccessProcess(s) && !isAdmin ? "text-muted-foreground/40" : ""}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

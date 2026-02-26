@@ -136,9 +136,9 @@ const BancoPerguntasManager = () => {
     email_dominio_bloqueado: "@jbsterminais.com.br",
     // pergunta_condicional config
     condicional_subperguntas: [
-      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-    ] as Array<{ tipo: string; rotulo: string; placeholder: string; opcoes: string; mascara: string; max_chars: string; modo: string; condicao_pergunta_rotulo: string; condicao_valor: string; condicao_operador: string }>,
+      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
+      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
+    ] as Array<{ tipo: string; rotulo: string; placeholder: string; opcoes: string; mascara: string; max_chars: string; modo: string; condicao_pergunta_rotulo: string; condicao_valor: string; condicao_operador: string; info_tipo: "texto" | "imagem"; info_conteudo: string; info_exigir_aceite: boolean; info_texto_aceite: string }>,
   });
 
   useEffect(() => {
@@ -214,10 +214,14 @@ const BancoPerguntasManager = () => {
               condicao_pergunta_rotulo: sp.condicao?.pergunta_rotulo || "",
               condicao_valor: sp.condicao?.valor_gatilho || "",
               condicao_operador: sp.condicao?.operador || "igual",
+              info_tipo: sp.conteudo_tipo || "texto",
+              info_conteudo: sp.conteudo || "",
+              info_exigir_aceite: sp.exigir_aceite || false,
+              info_texto_aceite: sp.texto_aceite || "Li e aceito os termos acima",
             }))
           : [
-              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
+              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
             ],
       });
     } else {
@@ -265,8 +269,8 @@ const BancoPerguntasManager = () => {
         email_bloquear_dominio: false,
         email_dominio_bloqueado: "@jbsterminais.com.br",
         condicional_subperguntas: [
-          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
+          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
         ],
       });
     }
@@ -337,7 +341,7 @@ const BancoPerguntasManager = () => {
     if (formData.tipo === "pergunta_condicional") {
       config.subperguntas = formData.condicional_subperguntas.map((sp) => {
         const opcoes = sp.opcoes.split("\n").filter((o) => o.trim()).map((o) => o.trim());
-        return {
+        const sub: Record<string, any> = {
           tipo: sp.tipo,
           rotulo: sp.rotulo,
           placeholder: sp.placeholder || null,
@@ -351,6 +355,13 @@ const BancoPerguntasManager = () => {
             operador: sp.condicao_operador,
           },
         };
+        if (sp.tipo === "informativo") {
+          sub.conteudo_tipo = sp.info_tipo;
+          sub.conteudo = sp.info_conteudo;
+          sub.exigir_aceite = sp.info_exigir_aceite;
+          sub.texto_aceite = sp.info_texto_aceite;
+        }
+        return sub;
       });
     }
     // Always save largura if not 100
@@ -947,6 +958,58 @@ const BancoPerguntasManager = () => {
                           </div>
                         </div>
                       )}
+                      {sp.tipo === "informativo" && (
+                        <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+                          <Label className="text-sm font-semibold">Configuração do Bloco Informativo</Label>
+                          <div>
+                            <Label className="text-xs">Tipo de Conteúdo</Label>
+                            <Select value={sp.info_tipo} onValueChange={(v) => updateSub("info_tipo", v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="texto">
+                                  <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Texto</span>
+                                </SelectItem>
+                                <SelectItem value="imagem">
+                                  <span className="flex items-center gap-2"><Image className="h-4 w-4" /> Imagem (URL)</span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">{sp.info_tipo === "texto" ? "Conteúdo do Texto" : "URL da Imagem"}</Label>
+                            {sp.info_tipo === "texto" ? (
+                              <RichTextEditor
+                                content={sp.info_conteudo}
+                                onChange={(html) => updateSub("info_conteudo", html)}
+                              />
+                            ) : (
+                              <Input
+                                value={sp.info_conteudo}
+                                onChange={(e) => updateSub("info_conteudo", e.target.value)}
+                                placeholder="https://exemplo.com/imagem.png"
+                              />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={sp.info_exigir_aceite}
+                              onCheckedChange={(c) => updateSub("info_exigir_aceite", !!c)}
+                              id={`info_aceite_sub_${idx}`}
+                            />
+                            <Label htmlFor={`info_aceite_sub_${idx}`} className="cursor-pointer text-sm">Exigir campo de aceite</Label>
+                          </div>
+                          {sp.info_exigir_aceite && (
+                            <div>
+                              <Label className="text-xs">Texto do Aceite</Label>
+                              <Input
+                                value={sp.info_texto_aceite}
+                                onChange={(e) => updateSub("info_texto_aceite", e.target.value)}
+                                placeholder="Li e aceito os termos acima"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -959,7 +1022,7 @@ const BancoPerguntasManager = () => {
                       ...formData,
                       condicional_subperguntas: [
                         ...formData.condicional_subperguntas,
-                        { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+                        { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
                       ],
                     });
                   }}

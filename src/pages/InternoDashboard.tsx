@@ -359,9 +359,9 @@ const InternoDashboard = () => {
 
   // Check if user has access to a specific process based on sector services
   const canAccessProcess = (s: any) => {
-    if (isAdmin) return true;
-    if (userAllowedServiceNames === null) return true; // no sector = show all (shouldn't happen for non-admin)
-    if (!s.tipo_operacao) return true; // fallback: allow if no service type
+    if (isAdmin || isGestor) return true;
+    if (userAllowedServiceNames === null) return true;
+    if (!s.tipo_operacao) return true;
     return userAllowedServiceNames.includes(s.tipo_operacao);
   };
 
@@ -875,10 +875,10 @@ const InternoDashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => canAccessProcess(s) || isAdmin ? setSelectedSolicitacao(s) : null}
+                            onClick={() => canAccessProcess(s) || isAdmin || isGestor ? setSelectedSolicitacao(s) : null}
                             title="Visualizar / Analisar"
-                            disabled={!canAccessProcess(s) && !isAdmin}
-                            className={!canAccessProcess(s) && !isAdmin ? "text-muted-foreground/40" : ""}
+                            disabled={!canAccessProcess(s) && !isAdmin && !isGestor}
+                            className={!canAccessProcess(s) && !isAdmin && !isGestor ? "text-muted-foreground/40" : ""}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

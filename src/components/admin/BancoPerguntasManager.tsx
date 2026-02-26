@@ -49,22 +49,6 @@ const SUBCAMPO_TYPES = [
   { value: "data", label: "Data" },
 ];
 
-const CONDICIONAL_SUB_TYPES = [
-  { value: "texto", label: "Texto Curto" },
-  { value: "texto_longo", label: "Texto Longo" },
-  { value: "texto_formatado", label: "Texto Formatado (Máscara)" },
-  { value: "numero", label: "Número" },
-  { value: "email", label: "E-mail" },
-  { value: "data", label: "Data" },
-  { value: "data_hora", label: "Data e Hora" },
-  { value: "select", label: "Seleção Única" },
-  { value: "multipla_escolha", label: "Múltipla Escolha" },
-  { value: "checkbox", label: "Checkbox" },
-  { value: "arquivo", label: "Upload de Arquivo" },
-  { value: "informativo", label: "Bloco Informativo" },
-  { value: "resposta_conjunta", label: "Resposta Conjunta" },
-];
-
 export interface BancoPergunta {
   id: string;
   tipo: string;
@@ -122,7 +106,6 @@ const BancoPerguntasManager = () => {
     conjunta_campo1_mascara: "",
     conjunta_campo1_max_chars: "",
     conjunta_campo1_modo: "menu",
-    conjunta_campo1_permitir_multiplos: false,
     conjunta_campo2_tipo: "texto",
     conjunta_campo2_rotulo: "",
     conjunta_campo2_placeholder: "",
@@ -130,15 +113,11 @@ const BancoPerguntasManager = () => {
     conjunta_campo2_mascara: "",
     conjunta_campo2_max_chars: "",
     conjunta_campo2_modo: "menu",
-    conjunta_campo2_permitir_multiplos: false,
-    // email config
-    email_bloquear_dominio: false,
-    email_dominio_bloqueado: "@jbsterminais.com.br",
     // pergunta_condicional config
     condicional_subperguntas: [
-      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
-      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
-    ] as Array<{ tipo: string; rotulo: string; placeholder: string; opcoes: string; mascara: string; max_chars: string; modo: string; condicao_pergunta_rotulo: string; condicao_valor: string; condicao_operador: string; info_tipo: "texto" | "imagem"; info_conteudo: string; info_exigir_aceite: boolean; info_texto_aceite: string }>,
+      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+    ] as Array<{ tipo: string; rotulo: string; placeholder: string; opcoes: string; mascara: string; max_chars: string; modo: string; condicao_pergunta_rotulo: string; condicao_valor: string; condicao_operador: string }>,
   });
 
   useEffect(() => {
@@ -191,7 +170,6 @@ const BancoPerguntasManager = () => {
         conjunta_campo1_mascara: config?.campos?.[0]?.mascara || "",
         conjunta_campo1_max_chars: config?.campos?.[0]?.max_chars?.toString() || "",
         conjunta_campo1_modo: config?.campos?.[0]?.modo_exibicao || "menu",
-        conjunta_campo1_permitir_multiplos: config?.campos?.[0]?.permitir_multiplos ?? false,
         conjunta_campo2_tipo: config?.campos?.[1]?.tipo || "texto",
         conjunta_campo2_rotulo: config?.campos?.[1]?.rotulo || "",
         conjunta_campo2_placeholder: config?.campos?.[1]?.placeholder || "",
@@ -199,9 +177,6 @@ const BancoPerguntasManager = () => {
         conjunta_campo2_mascara: config?.campos?.[1]?.mascara || "",
         conjunta_campo2_max_chars: config?.campos?.[1]?.max_chars?.toString() || "",
         conjunta_campo2_modo: config?.campos?.[1]?.modo_exibicao || "menu",
-        conjunta_campo2_permitir_multiplos: config?.campos?.[1]?.permitir_multiplos ?? false,
-        email_bloquear_dominio: config?.bloquear_dominio ?? false,
-        email_dominio_bloqueado: config?.dominio_bloqueado || "@jbsterminais.com.br",
         condicional_subperguntas: config?.subperguntas
           ? (config.subperguntas as any[]).map((sp: any) => ({
               tipo: sp.tipo || "texto",
@@ -214,14 +189,10 @@ const BancoPerguntasManager = () => {
               condicao_pergunta_rotulo: sp.condicao?.pergunta_rotulo || "",
               condicao_valor: sp.condicao?.valor_gatilho || "",
               condicao_operador: sp.condicao?.operador || "igual",
-              info_tipo: sp.conteudo_tipo || "texto",
-              info_conteudo: sp.conteudo || "",
-              info_exigir_aceite: sp.exigir_aceite || false,
-              info_texto_aceite: sp.texto_aceite || "Li e aceito os termos acima",
             }))
           : [
-              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
-              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
+              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
             ],
       });
     } else {
@@ -257,7 +228,6 @@ const BancoPerguntasManager = () => {
         conjunta_campo1_mascara: "",
         conjunta_campo1_max_chars: "",
         conjunta_campo1_modo: "menu",
-        conjunta_campo1_permitir_multiplos: false,
         conjunta_campo2_tipo: "texto",
         conjunta_campo2_rotulo: "",
         conjunta_campo2_placeholder: "",
@@ -265,12 +235,9 @@ const BancoPerguntasManager = () => {
         conjunta_campo2_mascara: "",
         conjunta_campo2_max_chars: "",
         conjunta_campo2_modo: "menu",
-        conjunta_campo2_permitir_multiplos: false,
-        email_bloquear_dominio: false,
-        email_dominio_bloqueado: "@jbsterminais.com.br",
         condicional_subperguntas: [
-          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
-          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
+          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
         ],
       });
     }
@@ -311,12 +278,6 @@ const BancoPerguntasManager = () => {
     if (formData.tipo === "select") {
       config.modo_exibicao = formData.selecao_modo;
     }
-    if (formData.tipo === "email") {
-      if (formData.email_bloquear_dominio) {
-        config.bloquear_dominio = true;
-        config.dominio_bloqueado = formData.email_dominio_bloqueado;
-      }
-    }
     if (formData.tipo === "multipla_escolha") {
       config.modo_exibicao = formData.multipla_modo;
     }
@@ -333,7 +294,6 @@ const BancoPerguntasManager = () => {
           mascara: formData[`${prefix}_mascara`] || null,
           max_chars: formData[`${prefix}_max_chars`] ? parseInt(formData[`${prefix}_max_chars`]) : null,
           modo_exibicao: (tipo === "select" || tipo === "multipla_escolha") ? formData[`${prefix}_modo`] : null,
-          permitir_multiplos: formData[`${prefix}_permitir_multiplos` as keyof typeof formData] ?? false,
         };
       };
       config.campos = [buildCampo("conjunta_campo1"), buildCampo("conjunta_campo2")];
@@ -341,7 +301,7 @@ const BancoPerguntasManager = () => {
     if (formData.tipo === "pergunta_condicional") {
       config.subperguntas = formData.condicional_subperguntas.map((sp) => {
         const opcoes = sp.opcoes.split("\n").filter((o) => o.trim()).map((o) => o.trim());
-        const sub: Record<string, any> = {
+        return {
           tipo: sp.tipo,
           rotulo: sp.rotulo,
           placeholder: sp.placeholder || null,
@@ -355,13 +315,6 @@ const BancoPerguntasManager = () => {
             operador: sp.condicao_operador,
           },
         };
-        if (sp.tipo === "informativo") {
-          sub.conteudo_tipo = sp.info_tipo;
-          sub.conteudo = sp.info_conteudo;
-          sub.exigir_aceite = sp.info_exigir_aceite;
-          sub.texto_aceite = sp.info_texto_aceite;
-        }
-        return sub;
       });
     }
     // Always save largura if not 100
@@ -595,32 +548,6 @@ const BancoPerguntasManager = () => {
               </div>
             )}
 
-            {formData.tipo === "email" && (
-              <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={formData.email_bloquear_dominio}
-                    onCheckedChange={(c) => setFormData({ ...formData, email_bloquear_dominio: !!c })}
-                    id="email_bloquear_dominio"
-                  />
-                  <Label htmlFor="email_bloquear_dominio" className="cursor-pointer">
-                    Bloquear domínio de e-mail específico
-                  </Label>
-                </div>
-                {formData.email_bloquear_dominio && (
-                  <div>
-                    <Label>Domínio bloqueado</Label>
-                    <Input
-                      value={formData.email_dominio_bloqueado}
-                      onChange={(e) => setFormData({ ...formData, email_dominio_bloqueado: e.target.value })}
-                      placeholder="@jbsterminais.com.br"
-                      className="w-64 mt-1"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
             {(formData.tipo === "select" || formData.tipo === "multipla_escolha") && (
               <div className="space-y-4">
                 <div>
@@ -821,16 +748,6 @@ const BancoPerguntasManager = () => {
                           </div>
                         </div>
                       )}
-                      <div className="flex items-center gap-2 pt-1">
-                        <Checkbox
-                          checked={formData[`${prefix}_permitir_multiplos` as keyof typeof formData] as boolean}
-                          onCheckedChange={(c) => setFormData({ ...formData, [`${prefix}_permitir_multiplos`]: !!c })}
-                          id={`${prefix}_permitir_multiplos`}
-                        />
-                        <Label htmlFor={`${prefix}_permitir_multiplos`} className="cursor-pointer text-sm">
-                          Permitir múltiplas respostas
-                        </Label>
-                      </div>
                     </div>
                   );
                 })}
@@ -878,14 +795,7 @@ const BancoPerguntasManager = () => {
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <Label className="text-xs">Pergunta-gatilho (rótulo)</Label>
-                            <Select value={sp.condicao_pergunta_rotulo} onValueChange={(v) => updateSub("condicao_pergunta_rotulo", v)}>
-                              <SelectTrigger><SelectValue placeholder="Selecione a pergunta..." /></SelectTrigger>
-                              <SelectContent>
-                                {perguntas.filter(p => p.ativo && p.tipo !== "pergunta_condicional").map(p => (
-                                  <SelectItem key={p.id} value={p.rotulo}>{p.rotulo}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Input value={sp.condicao_pergunta_rotulo} onChange={(e) => updateSub("condicao_pergunta_rotulo", e.target.value)} placeholder="Ex: Tipo de Operação" />
                           </div>
                           <div>
                             <Label className="text-xs">Operador</Label>
@@ -911,7 +821,7 @@ const BancoPerguntasManager = () => {
                           <Select value={sp.tipo} onValueChange={(v) => updateSub("tipo", v)}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {CONDICIONAL_SUB_TYPES.map((t) => (
+                              {SUBCAMPO_TYPES.map((t) => (
                                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                               ))}
                             </SelectContent>
@@ -958,58 +868,6 @@ const BancoPerguntasManager = () => {
                           </div>
                         </div>
                       )}
-                      {sp.tipo === "informativo" && (
-                        <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                          <Label className="text-sm font-semibold">Configuração do Bloco Informativo</Label>
-                          <div>
-                            <Label className="text-xs">Tipo de Conteúdo</Label>
-                            <Select value={sp.info_tipo} onValueChange={(v) => updateSub("info_tipo", v)}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="texto">
-                                  <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Texto</span>
-                                </SelectItem>
-                                <SelectItem value="imagem">
-                                  <span className="flex items-center gap-2"><Image className="h-4 w-4" /> Imagem (URL)</span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label className="text-xs">{sp.info_tipo === "texto" ? "Conteúdo do Texto" : "URL da Imagem"}</Label>
-                            {sp.info_tipo === "texto" ? (
-                              <RichTextEditor
-                                content={sp.info_conteudo}
-                                onChange={(html) => updateSub("info_conteudo", html)}
-                              />
-                            ) : (
-                              <Input
-                                value={sp.info_conteudo}
-                                onChange={(e) => updateSub("info_conteudo", e.target.value)}
-                                placeholder="https://exemplo.com/imagem.png"
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              checked={sp.info_exigir_aceite}
-                              onCheckedChange={(c) => updateSub("info_exigir_aceite", !!c)}
-                              id={`info_aceite_sub_${idx}`}
-                            />
-                            <Label htmlFor={`info_aceite_sub_${idx}`} className="cursor-pointer text-sm">Exigir campo de aceite</Label>
-                          </div>
-                          {sp.info_exigir_aceite && (
-                            <div>
-                              <Label className="text-xs">Texto do Aceite</Label>
-                              <Input
-                                value={sp.info_texto_aceite}
-                                onChange={(e) => updateSub("info_texto_aceite", e.target.value)}
-                                placeholder="Li e aceito os termos acima"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -1022,7 +880,7 @@ const BancoPerguntasManager = () => {
                       ...formData,
                       condicional_subperguntas: [
                         ...formData.condicional_subperguntas,
-                        { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual", info_tipo: "texto" as "texto" | "imagem", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima" },
+                        { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
                       ],
                     });
                   }}

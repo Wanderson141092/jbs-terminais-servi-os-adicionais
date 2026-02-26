@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -400,30 +399,14 @@ const FormFieldRenderer = ({
           return input;
         })()}
 
-        {pergunta.tipo === "email" && (() => {
-          const bloquearDominio = config?.bloquear_dominio;
-          const dominioBloqueado = config?.dominio_bloqueado || "@jbsterminais.com.br";
-          return (
-            <Input
-              type="email"
-              value={fieldValue || ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (bloquearDominio && val.toLowerCase().endsWith(dominioBloqueado.toLowerCase())) {
-                  // Don't update - will show validation on blur
-                }
-                onFieldChange(val);
-              }}
-              onBlur={(e) => {
-                if (bloquearDominio && e.target.value.toLowerCase().endsWith(dominioBloqueado.toLowerCase())) {
-                  onFieldChange("");
-                  toast.error("Domínio não permitido para envio.");
-                }
-              }}
-              placeholder={pergunta.placeholder || "seu@email.com"}
-            />
-          );
-        })()}
+        {pergunta.tipo === "email" && (
+          <Input
+            type="email"
+            value={fieldValue || ""}
+            onChange={(e) => onFieldChange(e.target.value)}
+            placeholder={pergunta.placeholder || "seu@email.com"}
+          />
+        )}
 
         {pergunta.tipo === "data" && (
           <Input
@@ -727,53 +710,11 @@ const FormFieldRenderer = ({
 
         const sp = activeSubpergunta;
 
-        if (sp.tipo === "informativo") {
-          return (
-            <div className="space-y-3">
-              <div className="bg-muted/40 rounded-lg p-4 border border-muted">
-                {sp.conteudo_tipo === "imagem" && sp.conteudo ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                    <img src={sp.conteudo} alt={sp.rotulo || "Imagem"} className="max-w-full rounded-lg max-h-64 object-contain" />
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                    <div>
-                      {sp.rotulo && <p className="font-medium text-foreground">{sp.rotulo}</p>}
-                      {sp.conteudo && (
-                        /<[a-z][\s\S]*>/i.test(sp.conteudo)
-                          ? <div className="prose-content text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: sp.conteudo }} />
-                          : <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{sp.conteudo}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              {sp.exigir_aceite && (
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={`aceite_cond_${pergunta.id}`}
-                    checked={value === true}
-                    onCheckedChange={(checked) => onValueChange(!!checked)}
-                  />
-                  <Label htmlFor={`aceite_cond_${pergunta.id}`} className="cursor-pointer font-normal text-sm">
-                    {sp.texto_aceite || "Li e aceito as informações acima"}
-                  </Label>
-                </div>
-              )}
-            </div>
-          );
-        }
-
         return (
           <div className="space-y-2">
             {sp.rotulo && <Label className="text-sm">{sp.rotulo}</Label>}
             {sp.tipo === "texto" && (
               <Input value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} />
-            )}
-            {sp.tipo === "texto_longo" && (
-              <Textarea value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} rows={4} />
             )}
             {sp.tipo === "texto_formatado" && (
               <Input
@@ -800,18 +741,6 @@ const FormFieldRenderer = ({
             )}
             {sp.tipo === "data" && (
               <Input type="date" value={value || ""} onChange={(e) => onValueChange(e.target.value)} />
-            )}
-            {sp.tipo === "data_hora" && (
-              <Input type="datetime-local" value={value || ""} onChange={(e) => onValueChange(e.target.value)} />
-            )}
-            {sp.tipo === "checkbox" && (
-              <div className="flex items-center gap-2">
-                <Checkbox id={`${pergunta.id}_cond_cb`} checked={value === true} onCheckedChange={(checked) => onValueChange(!!checked)} />
-                <Label htmlFor={`${pergunta.id}_cond_cb`} className="cursor-pointer font-normal">{sp.placeholder || "Sim"}</Label>
-              </div>
-            )}
-            {sp.tipo === "arquivo" && (
-              <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
             )}
             {sp.tipo === "select" && sp.opcoes && (() => {
               const opts = sp.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));

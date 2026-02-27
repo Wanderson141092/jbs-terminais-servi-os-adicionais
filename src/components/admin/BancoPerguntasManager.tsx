@@ -47,6 +47,10 @@ const SUBCAMPO_TYPES = [
   { value: "multipla_escolha", label: "Múltipla Escolha" },
   { value: "email", label: "E-mail" },
   { value: "data", label: "Data" },
+  { value: "checkbox", label: "Checkbox" },
+  { value: "arquivo", label: "Upload de Arquivo" },
+  { value: "informativo", label: "Bloco Informativo" },
+  { value: "resposta_conjunta", label: "Resposta Conjunta" },
 ];
 
 export interface BancoPergunta {
@@ -70,6 +74,14 @@ const BancoPerguntasManager = () => {
   const [editing, setEditing] = useState<BancoPergunta | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importText, setImportText] = useState("");
+  const defaultSubpergunta = () => ({
+    tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu",
+    condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual",
+    info_tipo: "texto", info_conteudo: "", info_exigir_aceite: false, info_texto_aceite: "Li e aceito os termos acima",
+    numero_prefixo: "", numero_sufixo: "", numero_min: "", numero_max: "", numero_permitir_negativo: true,
+    conjunta_campos: null as any,
+  });
+
   const [formData, setFormData] = useState({
     tipo: "texto",
     rotulo: "",
@@ -79,6 +91,9 @@ const BancoPerguntasManager = () => {
     largura: 100,
     permitir_multiplos: false,
     multiplos_max: "",
+    // email config
+    email_bloquear_dominio: false,
+    email_dominio_bloqueado: "@jbsterminais.com.br",
     // informativo config
     info_tipo: "texto" as "texto" | "imagem",
     info_conteudo: "",
@@ -106,6 +121,8 @@ const BancoPerguntasManager = () => {
     conjunta_campo1_mascara: "",
     conjunta_campo1_max_chars: "",
     conjunta_campo1_modo: "menu",
+    conjunta_campo1_permitir_multiplos: false,
+    conjunta_campo1_multiplos_max: "",
     conjunta_campo2_tipo: "texto",
     conjunta_campo2_rotulo: "",
     conjunta_campo2_placeholder: "",
@@ -113,11 +130,10 @@ const BancoPerguntasManager = () => {
     conjunta_campo2_mascara: "",
     conjunta_campo2_max_chars: "",
     conjunta_campo2_modo: "menu",
+    conjunta_campo2_permitir_multiplos: false,
+    conjunta_campo2_multiplos_max: "",
     // pergunta_condicional config
-    condicional_subperguntas: [
-      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-      { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-    ] as Array<{ tipo: string; rotulo: string; placeholder: string; opcoes: string; mascara: string; max_chars: string; modo: string; condicao_pergunta_rotulo: string; condicao_valor: string; condicao_operador: string }>,
+    condicional_subperguntas: [defaultSubpergunta(), defaultSubpergunta()] as Array<ReturnType<typeof defaultSubpergunta>>,
   });
 
   useEffect(() => {
@@ -148,6 +164,8 @@ const BancoPerguntasManager = () => {
         largura: config?.largura ?? 100,
         permitir_multiplos: config?.permitir_multiplos ?? false,
         multiplos_max: config?.multiplos_max?.toString() || "",
+        email_bloquear_dominio: config?.bloquear_dominio ?? false,
+        email_dominio_bloqueado: config?.dominio_bloqueado || "@jbsterminais.com.br",
         info_tipo: config?.conteudo_tipo || "texto",
         info_conteudo: config?.conteudo || "",
         info_exigir_aceite: config?.exigir_aceite || false,
@@ -170,6 +188,8 @@ const BancoPerguntasManager = () => {
         conjunta_campo1_mascara: config?.campos?.[0]?.mascara || "",
         conjunta_campo1_max_chars: config?.campos?.[0]?.max_chars?.toString() || "",
         conjunta_campo1_modo: config?.campos?.[0]?.modo_exibicao || "menu",
+        conjunta_campo1_permitir_multiplos: config?.campos?.[0]?.permitir_multiplos ?? false,
+        conjunta_campo1_multiplos_max: config?.campos?.[0]?.multiplos_max?.toString() || "",
         conjunta_campo2_tipo: config?.campos?.[1]?.tipo || "texto",
         conjunta_campo2_rotulo: config?.campos?.[1]?.rotulo || "",
         conjunta_campo2_placeholder: config?.campos?.[1]?.placeholder || "",
@@ -177,6 +197,8 @@ const BancoPerguntasManager = () => {
         conjunta_campo2_mascara: config?.campos?.[1]?.mascara || "",
         conjunta_campo2_max_chars: config?.campos?.[1]?.max_chars?.toString() || "",
         conjunta_campo2_modo: config?.campos?.[1]?.modo_exibicao || "menu",
+        conjunta_campo2_permitir_multiplos: config?.campos?.[1]?.permitir_multiplos ?? false,
+        conjunta_campo2_multiplos_max: config?.campos?.[1]?.multiplos_max?.toString() || "",
         condicional_subperguntas: config?.subperguntas
           ? (config.subperguntas as any[]).map((sp: any) => ({
               tipo: sp.tipo || "texto",
@@ -189,11 +211,18 @@ const BancoPerguntasManager = () => {
               condicao_pergunta_rotulo: sp.condicao?.pergunta_rotulo || "",
               condicao_valor: sp.condicao?.valor_gatilho || "",
               condicao_operador: sp.condicao?.operador || "igual",
+              info_tipo: sp.info_tipo || "texto",
+              info_conteudo: sp.info_conteudo || "",
+              info_exigir_aceite: sp.info_exigir_aceite || false,
+              info_texto_aceite: sp.info_texto_aceite || "Li e aceito os termos acima",
+              numero_prefixo: sp.numero_prefixo || "",
+              numero_sufixo: sp.numero_sufixo || "",
+              numero_min: sp.numero_min?.toString() || "",
+              numero_max: sp.numero_max?.toString() || "",
+              numero_permitir_negativo: sp.numero_permitir_negativo ?? true,
+              conjunta_campos: sp.conjunta_campos || null,
             }))
-          : [
-              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-              { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-            ],
+          : [defaultSubpergunta(), defaultSubpergunta()],
       });
     } else {
       setEditing(null);
@@ -206,6 +235,8 @@ const BancoPerguntasManager = () => {
         largura: 100,
         permitir_multiplos: false,
         multiplos_max: "",
+        email_bloquear_dominio: false,
+        email_dominio_bloqueado: "@jbsterminais.com.br",
         info_tipo: "texto",
         info_conteudo: "",
         info_exigir_aceite: false,
@@ -228,6 +259,8 @@ const BancoPerguntasManager = () => {
         conjunta_campo1_mascara: "",
         conjunta_campo1_max_chars: "",
         conjunta_campo1_modo: "menu",
+        conjunta_campo1_permitir_multiplos: false,
+        conjunta_campo1_multiplos_max: "",
         conjunta_campo2_tipo: "texto",
         conjunta_campo2_rotulo: "",
         conjunta_campo2_placeholder: "",
@@ -235,10 +268,9 @@ const BancoPerguntasManager = () => {
         conjunta_campo2_mascara: "",
         conjunta_campo2_max_chars: "",
         conjunta_campo2_modo: "menu",
-        condicional_subperguntas: [
-          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-          { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
-        ],
+        conjunta_campo2_permitir_multiplos: false,
+        conjunta_campo2_multiplos_max: "",
+        condicional_subperguntas: [defaultSubpergunta(), defaultSubpergunta()],
       });
     }
     setShowDialog(true);
@@ -275,6 +307,12 @@ const BancoPerguntasManager = () => {
       config.min = formData.numero_min ? parseFloat(formData.numero_min) : null;
       config.max = formData.numero_max ? parseFloat(formData.numero_max) : null;
     }
+    if (formData.tipo === "email") {
+      if (formData.email_bloquear_dominio) {
+        config.bloquear_dominio = true;
+        config.dominio_bloqueado = formData.email_dominio_bloqueado || "@jbsterminais.com.br";
+      }
+    }
     if (formData.tipo === "select") {
       config.modo_exibicao = formData.selecao_modo;
     }
@@ -286,7 +324,7 @@ const BancoPerguntasManager = () => {
         const tipo = formData[`${prefix}_tipo`];
         const opcoes = formData[`${prefix}_opcoes`]
           .split("\n").filter((o: string) => o.trim()).map((o: string) => o.trim());
-        return {
+        const campo: Record<string, any> = {
           tipo,
           rotulo: formData[`${prefix}_rotulo`],
           placeholder: formData[`${prefix}_placeholder`],
@@ -295,13 +333,20 @@ const BancoPerguntasManager = () => {
           max_chars: formData[`${prefix}_max_chars`] ? parseInt(formData[`${prefix}_max_chars`]) : null,
           modo_exibicao: (tipo === "select" || tipo === "multipla_escolha") ? formData[`${prefix}_modo`] : null,
         };
+        const permitirKey = `${prefix}_permitir_multiplos` as keyof typeof formData;
+        const maxKey = `${prefix}_multiplos_max` as keyof typeof formData;
+        if (formData[permitirKey]) {
+          campo.permitir_multiplos = true;
+          if (formData[maxKey]) campo.multiplos_max = parseInt(formData[maxKey] as string);
+        }
+        return campo;
       };
       config.campos = [buildCampo("conjunta_campo1"), buildCampo("conjunta_campo2")];
     }
     if (formData.tipo === "pergunta_condicional") {
       config.subperguntas = formData.condicional_subperguntas.map((sp) => {
         const opcoes = sp.opcoes.split("\n").filter((o) => o.trim()).map((o) => o.trim());
-        return {
+        const sub: Record<string, any> = {
           tipo: sp.tipo,
           rotulo: sp.rotulo,
           placeholder: sp.placeholder || null,
@@ -315,6 +360,23 @@ const BancoPerguntasManager = () => {
             operador: sp.condicao_operador,
           },
         };
+        if (sp.tipo === "informativo") {
+          sub.info_tipo = sp.info_tipo;
+          sub.info_conteudo = sp.info_conteudo;
+          sub.info_exigir_aceite = sp.info_exigir_aceite;
+          sub.info_texto_aceite = sp.info_texto_aceite;
+        }
+        if (sp.tipo === "numero") {
+          sub.numero_prefixo = sp.numero_prefixo || null;
+          sub.numero_sufixo = sp.numero_sufixo || null;
+          sub.numero_min = sp.numero_min ? parseFloat(sp.numero_min) : null;
+          sub.numero_max = sp.numero_max ? parseFloat(sp.numero_max) : null;
+          sub.numero_permitir_negativo = sp.numero_permitir_negativo;
+        }
+        if (sp.tipo === "resposta_conjunta" && sp.conjunta_campos) {
+          sub.conjunta_campos = sp.conjunta_campos;
+        }
+        return sub;
       });
     }
     // Always save largura if not 100
@@ -628,6 +690,31 @@ const BancoPerguntasManager = () => {
               </div>
             )}
 
+            {formData.tipo === "email" && (
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold">Configuração do E-mail</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={formData.email_bloquear_dominio}
+                    onCheckedChange={(c) => setFormData({ ...formData, email_bloquear_dominio: !!c })}
+                    id="email_bloquear_dominio"
+                  />
+                  <Label htmlFor="email_bloquear_dominio" className="cursor-pointer">Bloquear domínio de e-mail específico</Label>
+                </div>
+                {formData.email_bloquear_dominio && (
+                  <div>
+                    <Label>Domínio bloqueado</Label>
+                    <Input
+                      value={formData.email_dominio_bloqueado}
+                      onChange={(e) => setFormData({ ...formData, email_dominio_bloqueado: e.target.value })}
+                      placeholder="@jbsterminais.com.br"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">E-mails com este domínio serão bloqueados ao preencher o formulário.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {formData.tipo === "texto_formatado" && (
               <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
                 <Label className="text-base font-semibold">Configuração de Formato</Label>
@@ -690,6 +777,8 @@ const BancoPerguntasManager = () => {
                   const mascaraKey = `${prefix}_mascara` as keyof typeof formData;
                   const maxCharsKey = `${prefix}_max_chars` as keyof typeof formData;
                   const modoKey = `${prefix}_modo` as keyof typeof formData;
+                  const permitirMultKey = `${prefix}_permitir_multiplos` as keyof typeof formData;
+                  const multiplosMaxKey = `${prefix}_multiplos_max` as keyof typeof formData;
                   const tipoValue = formData[tipoKey] as string;
                   const isSelecao = tipoValue === "select" || tipoValue === "multipla_escolha";
                   return (
@@ -748,6 +837,31 @@ const BancoPerguntasManager = () => {
                           </div>
                         </div>
                       )}
+                      {/* Permitir múltiplas respostas per subcampo */}
+                      <div className="space-y-2 border-t pt-2 mt-2">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={formData[permitirMultKey] as boolean}
+                            onCheckedChange={(c) => setFormData({ ...formData, [permitirMultKey]: !!c })}
+                            id={`${prefix}_permitir_mult`}
+                          />
+                          <Label htmlFor={`${prefix}_permitir_mult`} className="cursor-pointer text-sm">Permitir múltiplas respostas</Label>
+                        </div>
+                        {formData[permitirMultKey] && (
+                          <div>
+                            <Label className="text-xs">Máximo (vazio = ilimitado)</Label>
+                            <Input
+                              type="number"
+                              min={2}
+                              max={50}
+                              value={formData[multiplosMaxKey] as string}
+                              onChange={(e) => setFormData({ ...formData, [multiplosMaxKey]: e.target.value })}
+                              placeholder="Ilimitado"
+                              className="w-32 mt-1"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -794,8 +908,17 @@ const BancoPerguntasManager = () => {
                         <Label className="text-xs font-semibold text-primary">Condição (obrigatória)</Label>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <Label className="text-xs">Pergunta-gatilho (rótulo)</Label>
-                            <Input value={sp.condicao_pergunta_rotulo} onChange={(e) => updateSub("condicao_pergunta_rotulo", e.target.value)} placeholder="Ex: Tipo de Operação" />
+                            <Label className="text-xs">Pergunta-gatilho</Label>
+                            <Select value={sp.condicao_pergunta_rotulo} onValueChange={(v) => updateSub("condicao_pergunta_rotulo", v)}>
+                              <SelectTrigger><SelectValue placeholder="Selecione a pergunta" /></SelectTrigger>
+                              <SelectContent>
+                                {perguntas
+                                  .filter((p) => p.ativo && p.rotulo !== formData.rotulo)
+                                  .map((p) => (
+                                    <SelectItem key={p.id} value={p.rotulo}>{p.rotulo}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
                             <Label className="text-xs">Operador</Label>
@@ -832,10 +955,12 @@ const BancoPerguntasManager = () => {
                           <Input value={sp.rotulo} onChange={(e) => updateSub("rotulo", e.target.value)} placeholder="Ex: Número do Container" />
                         </div>
                       </div>
-                      <div>
-                        <Label>Placeholder</Label>
-                        <Input value={sp.placeholder} onChange={(e) => updateSub("placeholder", e.target.value)} placeholder="Texto de ajuda" />
-                      </div>
+                      {!["informativo", "checkbox"].includes(sp.tipo) && (
+                        <div>
+                          <Label>Placeholder</Label>
+                          <Input value={sp.placeholder} onChange={(e) => updateSub("placeholder", e.target.value)} placeholder="Texto de ajuda" />
+                        </div>
+                      )}
                       {isSelecao && (
                         <>
                           <div>
@@ -868,6 +993,113 @@ const BancoPerguntasManager = () => {
                           </div>
                         </div>
                       )}
+                      {sp.tipo === "numero" && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>Prefixo</Label>
+                              <Input value={sp.numero_prefixo} onChange={(e) => updateSub("numero_prefixo", e.target.value)} placeholder="Ex: R$" />
+                            </div>
+                            <div>
+                              <Label>Sufixo</Label>
+                              <Input value={sp.numero_sufixo} onChange={(e) => updateSub("numero_sufixo", e.target.value)} placeholder="Ex: kg" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>Mínimo</Label>
+                              <Input type="number" value={sp.numero_min} onChange={(e) => updateSub("numero_min", e.target.value)} placeholder="0" />
+                            </div>
+                            <div>
+                              <Label>Máximo</Label>
+                              <Input type="number" value={sp.numero_max} onChange={(e) => updateSub("numero_max", e.target.value)} placeholder="1000" />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={sp.numero_permitir_negativo} onCheckedChange={(c) => updateSub("numero_permitir_negativo", !!c)} id={`sp_neg_${idx}`} />
+                            <Label htmlFor={`sp_neg_${idx}`} className="cursor-pointer text-sm">Permitir negativos</Label>
+                          </div>
+                        </div>
+                      )}
+                      {sp.tipo === "informativo" && (
+                        <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
+                          <Label className="text-sm font-semibold">Configuração do Bloco Informativo</Label>
+                          <div>
+                            <Label className="text-xs">Tipo de Conteúdo</Label>
+                            <Select value={sp.info_tipo} onValueChange={(v) => updateSub("info_tipo", v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="texto"><span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Texto</span></SelectItem>
+                                <SelectItem value="imagem"><span className="flex items-center gap-2"><Image className="h-4 w-4" /> Imagem (URL)</span></SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">{sp.info_tipo === "texto" ? "Conteúdo do Texto" : "URL da Imagem"}</Label>
+                            {sp.info_tipo === "texto" ? (
+                              <RichTextEditor content={sp.info_conteudo} onChange={(html) => updateSub("info_conteudo", html)} />
+                            ) : (
+                              <Input value={sp.info_conteudo} onChange={(e) => updateSub("info_conteudo", e.target.value)} placeholder="https://exemplo.com/imagem.png" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={sp.info_exigir_aceite} onCheckedChange={(c) => updateSub("info_exigir_aceite", !!c)} id={`sp_aceite_${idx}`} />
+                            <Label htmlFor={`sp_aceite_${idx}`} className="cursor-pointer text-sm">Exigir campo de aceite</Label>
+                          </div>
+                          {sp.info_exigir_aceite && (
+                            <div>
+                              <Label className="text-xs">Texto do Aceite</Label>
+                              <Input value={sp.info_texto_aceite} onChange={(e) => updateSub("info_texto_aceite", e.target.value)} placeholder="Li e aceito os termos acima" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {sp.tipo === "resposta_conjunta" && (
+                        <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
+                          <Label className="text-sm font-semibold">Configuração da Resposta Conjunta</Label>
+                          {[0, 1].map((ci) => {
+                            const campos = sp.conjunta_campos || [{}, {}];
+                            const campo = campos[ci] || {};
+                            const updateCampo = (field: string, val: any) => {
+                              const newCampos = [...(sp.conjunta_campos || [{}, {}])];
+                              newCampos[ci] = { ...newCampos[ci], [field]: val };
+                              updateSub("conjunta_campos", newCampos);
+                            };
+                            return (
+                              <div key={ci} className="border rounded-md p-2 space-y-2 bg-background">
+                                <Label className="text-xs font-semibold">Campo {ci + 1}</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <Label className="text-xs">Tipo</Label>
+                                    <Select value={campo.tipo || "texto"} onValueChange={(v) => updateCampo("tipo", v)}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {SUBCAMPO_TYPES.filter(t => t.value !== "resposta_conjunta" && t.value !== "informativo" && t.value !== "arquivo" && t.value !== "checkbox").map((t) => (
+                                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Rótulo</Label>
+                                    <Input value={campo.rotulo || ""} onChange={(e) => updateCampo("rotulo", e.target.value)} placeholder="Rótulo" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Placeholder</Label>
+                                  <Input value={campo.placeholder || ""} onChange={(e) => updateCampo("placeholder", e.target.value)} placeholder="Placeholder" />
+                                </div>
+                                {(campo.tipo === "select" || campo.tipo === "multipla_escolha") && (
+                                  <div>
+                                    <Label className="text-xs">Opções (uma por linha)</Label>
+                                    <Textarea value={campo.opcoes?.join?.("\n") || ""} onChange={(e) => updateCampo("opcoes", e.target.value.split("\n").filter((o: string) => o.trim()))} rows={2} />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -880,7 +1112,7 @@ const BancoPerguntasManager = () => {
                       ...formData,
                       condicional_subperguntas: [
                         ...formData.condicional_subperguntas,
-                        { tipo: "texto", rotulo: "", placeholder: "", opcoes: "", mascara: "", max_chars: "", modo: "menu", condicao_pergunta_rotulo: "", condicao_valor: "", condicao_operador: "igual" },
+                        defaultSubpergunta(),
                       ],
                     });
                   }}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -404,6 +405,15 @@ const FormFieldRenderer = ({
             type="email"
             value={fieldValue || ""}
             onChange={(e) => onFieldChange(e.target.value)}
+            onBlur={(e) => {
+              const emailVal = e.target.value;
+              if (emailVal && config?.bloquear_dominio && config?.dominio_bloqueado) {
+                if (emailVal.toLowerCase().endsWith(config.dominio_bloqueado.toLowerCase())) {
+                  onFieldChange("");
+                  toast.error("Domínio de e-mail não permitido para envio.");
+                }
+              }
+            }}
             placeholder={pergunta.placeholder || "seu@email.com"}
           />
         )}
@@ -580,27 +590,28 @@ const FormFieldRenderer = ({
             const campoKey = idx === 0 ? "campo1" : "campo2";
             const currentObj = (value as Record<string, any>) || {};
             const campoValue = currentObj[campoKey] || "";
+            const campoPermitirMultiplos = campo.permitir_multiplos === true;
+            const campoMultiplosMax = campo.multiplos_max as number | undefined;
 
             const handleCampoChange = (v: any) => {
               onValueChange({ ...currentObj, [campoKey]: v });
             };
 
-            return (
-              <div key={idx} className="space-y-1">
-                {campo.rotulo && <Label className="text-sm">{campo.rotulo}</Label>}
+            const renderCampoField = (fieldVal: any, onFieldValChange: (v: any) => void) => (
+              <>
                 {campo.tipo === "texto" && (
-                  <Input value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} placeholder={campo.placeholder || ""} />
+                  <Input value={fieldVal || ""} onChange={(e) => onFieldValChange(e.target.value)} placeholder={campo.placeholder || ""} />
                 )}
                 {campo.tipo === "texto_formatado" && (
                   <Input
-                    value={campoValue}
+                    value={fieldVal || ""}
                     onChange={(e) => {
                       if (campo.mascara) {
-                        handleCampoChange(applyMask(e.target.value, campo.mascara));
+                        onFieldValChange(applyMask(e.target.value, campo.mascara));
                       } else {
                         let val = e.target.value.toUpperCase();
                         if (campo.max_chars) val = val.slice(0, campo.max_chars);
-                        handleCampoChange(val);
+                        onFieldValChange(val);
                       }
                     }}
                     placeholder={campo.placeholder || ""}
@@ -609,21 +620,20 @@ const FormFieldRenderer = ({
                   />
                 )}
                 {campo.tipo === "numero" && (
-                  <Input type="number" value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} placeholder={campo.placeholder || ""} />
+                  <Input type="number" value={fieldVal || ""} onChange={(e) => onFieldValChange(e.target.value)} placeholder={campo.placeholder || ""} />
                 )}
                 {campo.tipo === "email" && (
-                  <Input type="email" value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} placeholder={campo.placeholder || ""} />
+                  <Input type="email" value={fieldVal || ""} onChange={(e) => onFieldValChange(e.target.value)} placeholder={campo.placeholder || ""} />
                 )}
                 {campo.tipo === "data" && (
-                  <Input type="date" value={campoValue} onChange={(e) => handleCampoChange(e.target.value)} />
+                  <Input type="date" value={fieldVal || ""} onChange={(e) => onFieldValChange(e.target.value)} />
                 )}
                 {campo.tipo === "select" && campo.opcoes && (() => {
                   const opts = campo.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));
                   const modo = campo.modo_exibicao || "menu";
-
                   if (modo === "botoes") {
                     return (
-                      <ToggleGroup type="single" value={campoValue || ""} onValueChange={(v) => { if (v) handleCampoChange(v); }} className="flex flex-wrap gap-2 justify-start">
+                      <ToggleGroup type="single" value={fieldVal || ""} onValueChange={(v) => { if (v) onFieldValChange(v); }} className="flex flex-wrap gap-2 justify-start">
                         {opts.map((opt: any) => (
                           <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">{opt.label}</ToggleGroupItem>
                         ))}
@@ -632,7 +642,7 @@ const FormFieldRenderer = ({
                   }
                   if (modo === "radio") {
                     return (
-                      <RadioGroup value={campoValue || ""} onValueChange={handleCampoChange} className="space-y-2">
+                      <RadioGroup value={fieldVal || ""} onValueChange={onFieldValChange} className="space-y-2">
                         {opts.map((opt: any) => (
                           <div key={opt.value} className="flex items-center gap-2">
                             <RadioGroupItem value={opt.label} id={`${pergunta.id}_${campoKey}_${opt.value}`} />
@@ -643,17 +653,16 @@ const FormFieldRenderer = ({
                     );
                   }
                   return (
-                    <SearchableSelect options={opts} value={campoValue} onValueChange={handleCampoChange} placeholder={campo.placeholder || "Selecione..."} />
+                    <SearchableSelect options={opts} value={fieldVal} onValueChange={onFieldValChange} placeholder={campo.placeholder || "Selecione..."} />
                   );
                 })()}
                 {campo.tipo === "multipla_escolha" && campo.opcoes && (() => {
                   const opts = campo.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));
                   const modo = campo.modo_exibicao || "check";
-                  const currentArr: string[] = campoValue || [];
-
+                  const currentArr: string[] = fieldVal || [];
                   if (modo === "botoes") {
                     return (
-                      <ToggleGroup type="multiple" value={currentArr} onValueChange={handleCampoChange} className="flex flex-wrap gap-2 justify-start">
+                      <ToggleGroup type="multiple" value={currentArr} onValueChange={onFieldValChange} className="flex flex-wrap gap-2 justify-start">
                         {opts.map((opt: any) => (
                           <ToggleGroupItem key={opt.value} value={opt.label} className="border px-3 py-1.5 rounded-md text-sm">{opt.label}</ToggleGroupItem>
                         ))}
@@ -662,7 +671,7 @@ const FormFieldRenderer = ({
                   }
                   if (modo === "menu") {
                     return (
-                      <SearchableMultiSelect options={opts} value={currentArr} onValueChange={handleCampoChange} placeholder={campo.placeholder || "Selecione..."} perguntaId={`${pergunta.id}_${campoKey}`} />
+                      <SearchableMultiSelect options={opts} value={currentArr} onValueChange={onFieldValChange} placeholder={campo.placeholder || "Selecione..."} perguntaId={`${pergunta.id}_${campoKey}`} />
                     );
                   }
                   return (
@@ -673,8 +682,8 @@ const FormFieldRenderer = ({
                             id={`${pergunta.id}_${campoKey}_${opt.value}`}
                             checked={currentArr.includes(opt.label)}
                             onCheckedChange={(checked) => {
-                              if (checked) handleCampoChange([...currentArr, opt.label]);
-                              else handleCampoChange(currentArr.filter((v: string) => v !== opt.label));
+                              if (checked) onFieldValChange([...currentArr, opt.label]);
+                              else onFieldValChange(currentArr.filter((v: string) => v !== opt.label));
                             }}
                           />
                           <Label htmlFor={`${pergunta.id}_${campoKey}_${opt.value}`} className="cursor-pointer font-normal">{opt.label}</Label>
@@ -683,6 +692,49 @@ const FormFieldRenderer = ({
                     </div>
                   );
                 })()}
+              </>
+            );
+
+            if (campoPermitirMultiplos) {
+              const entries: any[] = Array.isArray(campoValue) ? campoValue : (campoValue ? [campoValue] : [""]);
+              const canAdd = !campoMultiplosMax || entries.length < campoMultiplosMax;
+              return (
+                <div key={idx} className="space-y-1">
+                  {campo.rotulo && <Label className="text-sm">{campo.rotulo}</Label>}
+                  <div className="space-y-2">
+                    {entries.map((entry: any, entryIdx: number) => (
+                      <div key={entryIdx} className="flex items-start gap-1">
+                        <div className="flex-1">
+                          {renderCampoField(entry, (v) => {
+                            const updated = [...entries];
+                            updated[entryIdx] = v;
+                            handleCampoChange(updated);
+                          })}
+                        </div>
+                        {entries.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0 text-destructive" onClick={() => {
+                            const updated = entries.filter((_, i) => i !== entryIdx);
+                            handleCampoChange(updated.length > 0 ? updated : [""]);
+                          }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {canAdd && (
+                    <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => handleCampoChange([...entries, ""])}>
+                      <Plus className="h-3.5 w-3.5" /> Adicionar
+                    </Button>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div key={idx} className="space-y-1">
+                {campo.rotulo && <Label className="text-sm">{campo.rotulo}</Label>}
+                {renderCampoField(campoValue, handleCampoChange)}
               </div>
             );
           })}
@@ -707,7 +759,6 @@ const FormFieldRenderer = ({
         });
 
         if (!activeSubpergunta) return null;
-
         const sp = activeSubpergunta;
 
         return (
@@ -733,14 +784,95 @@ const FormFieldRenderer = ({
                 className="font-mono"
               />
             )}
-            {sp.tipo === "numero" && (
-              <Input type="number" value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} />
-            )}
+            {sp.tipo === "numero" && (() => {
+              const prefixo = sp.numero_prefixo;
+              const sufixo = sp.numero_sufixo;
+              const input = (
+                <Input type="number" value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""}
+                  min={sp.numero_min != null ? sp.numero_min : undefined}
+                  max={sp.numero_max != null ? sp.numero_max : undefined}
+                  className={prefixo || sufixo ? "flex-1" : ""}
+                />
+              );
+              if (prefixo || sufixo) {
+                return (
+                  <div className="flex items-center gap-2">
+                    {prefixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{prefixo}</span>}
+                    {input}
+                    {sufixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{sufixo}</span>}
+                  </div>
+                );
+              }
+              return input;
+            })()}
             {sp.tipo === "email" && (
               <Input type="email" value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} />
             )}
             {sp.tipo === "data" && (
               <Input type="date" value={value || ""} onChange={(e) => onValueChange(e.target.value)} />
+            )}
+            {sp.tipo === "checkbox" && (
+              <div className="flex items-center gap-2">
+                <Checkbox id={`${pergunta.id}_cond_check`} checked={value === true} onCheckedChange={(checked) => onValueChange(!!checked)} />
+                <Label htmlFor={`${pergunta.id}_cond_check`} className="cursor-pointer font-normal">{sp.placeholder || "Sim"}</Label>
+              </div>
+            )}
+            {sp.tipo === "arquivo" && (
+              <div>
+                <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
+                {fileData && <p className="text-xs text-muted-foreground mt-1">Arquivo: {fileData.file.name}</p>}
+              </div>
+            )}
+            {sp.tipo === "informativo" && (
+              <div className="space-y-3">
+                <div className="bg-muted/40 rounded-lg p-4 border border-muted">
+                  {sp.info_tipo === "imagem" && sp.info_conteudo ? (
+                    <img src={sp.info_conteudo} alt={sp.rotulo} className="max-w-full rounded-lg max-h-64 object-contain" />
+                  ) : (
+                    <div className="flex gap-2">
+                      <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-foreground">{sp.rotulo}</p>
+                        {sp.info_conteudo && (
+                          /<[a-z][\s\S]*>/i.test(sp.info_conteudo)
+                            ? <div className="prose-content text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: sp.info_conteudo }} />
+                            : <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{sp.info_conteudo}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {sp.info_exigir_aceite && (
+                  <div className="flex items-center gap-2">
+                    <Checkbox id={`aceite_cond_${pergunta.id}`} checked={value === true} onCheckedChange={(checked) => onValueChange(!!checked)} />
+                    <Label htmlFor={`aceite_cond_${pergunta.id}`} className="cursor-pointer font-normal text-sm">
+                      {sp.info_texto_aceite || "Li e aceito as informações acima"}
+                    </Label>
+                  </div>
+                )}
+              </div>
+            )}
+            {sp.tipo === "resposta_conjunta" && sp.conjunta_campos && (
+              <div className="grid grid-cols-2 gap-4">
+                {(sp.conjunta_campos as any[]).map((campo: any, ci: number) => {
+                  const ck = ci === 0 ? "campo1" : "campo2";
+                  const obj = (value as Record<string, any>) || {};
+                  const cv = obj[ck] || "";
+                  const handleCv = (v: any) => onValueChange({ ...obj, [ck]: v });
+                  return (
+                    <div key={ci} className="space-y-1">
+                      {campo.rotulo && <Label className="text-sm">{campo.rotulo}</Label>}
+                      {campo.tipo === "texto" && <Input value={cv} onChange={(e) => handleCv(e.target.value)} placeholder={campo.placeholder || ""} />}
+                      {campo.tipo === "numero" && <Input type="number" value={cv} onChange={(e) => handleCv(e.target.value)} placeholder={campo.placeholder || ""} />}
+                      {campo.tipo === "email" && <Input type="email" value={cv} onChange={(e) => handleCv(e.target.value)} placeholder={campo.placeholder || ""} />}
+                      {campo.tipo === "data" && <Input type="date" value={cv} onChange={(e) => handleCv(e.target.value)} />}
+                      {campo.tipo === "select" && campo.opcoes && (
+                        <SearchableSelect options={campo.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }))} value={cv} onValueChange={handleCv} placeholder={campo.placeholder || "Selecione..."} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
             {sp.tipo === "select" && sp.opcoes && (() => {
               const opts = sp.opcoes.map((o: string, i: number) => ({ value: `opt_${i}`, label: o }));

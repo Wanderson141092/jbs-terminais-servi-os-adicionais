@@ -97,6 +97,7 @@ const InternoDashboard = () => {
   const [showModelosExcel, setShowModelosExcel] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
+  const [userAuthorizedServiceNames, setUserAuthorizedServiceNames] = useState<string[]>([]);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   
   const { isAdmin } = useAdminCheck(user?.id || null);
@@ -125,13 +126,26 @@ const InternoDashboard = () => {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("*, setor_emails(perfis, descricao)")
+      .select("*, setor_emails(id, perfis, descricao)")
       .eq("id", user.id)
       .maybeSingle();
     setProfile(data);
     
     if (data?.setor_emails?.perfis) {
       setUserPerfis(data.setor_emails.perfis);
+    }
+
+    // Load authorized services for this sector
+    if (data?.setor_emails?.id) {
+      const { data: setorServicos } = await supabase
+        .from("setor_servicos")
+        .select("servico_id, servicos(nome)")
+        .eq("setor_email_id", data.setor_emails.id);
+      if (setorServicos) {
+        setUserAuthorizedServiceNames(
+          setorServicos.map((ss: any) => ss.servicos?.nome).filter(Boolean)
+        );
+      }
     }
   }, [user]);
 
@@ -431,6 +445,13 @@ const InternoDashboard = () => {
 
   // Count pending cancellations
   const cancelamentoPendenteCount = dashboardFiltered.filter(s => s.cancelamento_solicitado === true).length;
+
+  const canAccessProcess = (s: any) => {
+    if (isAdmin || isGestor) return true;
+    if (!s.tipo_operacao) return true;
+    if (userAuthorizedServiceNames.length === 0) return true;
+    return userAuthorizedServiceNames.includes(s.tipo_operacao);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -845,8 +866,10 @@ const InternoDashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setSelectedSolicitacao(s)}
-                            title="Visualizar / Analisar"
+                            onClick={() => canAccessProcess(s) && setSelectedSolicitacao(s)}
+                            title={canAccessProcess(s) ? "Visualizar / Analisar" : "Sem acesso a este serviço"}
+                            disabled={!canAccessProcess(s)}
+                            className={!canAccessProcess(s) ? "text-muted-foreground/40" : ""}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

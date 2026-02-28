@@ -1,60 +1,97 @@
 
 
-## Plan: 4 Enhancements to the Form System and Dashboard
+## Root Cause
 
-### 1. Resposta Conjunta: Individual "Permitir multiplas respostas" per subcampo
+The network requests reveal **"infinite recursion detected in policy for relation 'profiles'"** (HTTP 500). The Gestor RLS policies added to `profiles` contain a subquery that references the `profiles` table itself:
 
-**Files:** `src/components/admin/BancoPerguntasManager.tsx`, `src/components/form-renderer/FormFieldRenderer.tsx`
+```sql
+email_setor = (SELECT p.email_setor FROM profiles p WHERE p.id = auth.uid())
+```
 
-- Add `conjunta_campo1_permitir_multiplos`, `conjunta_campo1_multiplos_max`, `conjunta_campo2_permitir_multiplos`, `conjunta_campo2_multiplos_max` to `formData` state.
-- In the Resposta Conjunta admin config section (lines 681-754), add a checkbox "Permitir multiplas respostas" and max input inside each subcampo block.
-- In `save()`, persist `permitir_multiplos` and `multiplos_max` per campo in `config.campos[].permitir_multiplos`.
-- In `openDialog()`, load these values from existing config.
-- In `FormFieldRenderer.tsx` resposta_conjunta rendering (lines 577-690), implement the multi-value logic (add/remove entries) per subcampo when `campo.permitir_multiplos` is true.
+This triggers the same RLS policies recursively, breaking ALL profile reads for ALL users. Since `profile` is null, `isAdmin`/`isGestor` hooks also fail (they depend on profile data indirectly via `useGestorCheck`), and the sector display is blank. The eye button is disabled because `canAccessProcess` can't determine the user's role.
 
-### 2. E-mail: Domain blocking config + validation
+## Fix Plan
 
-**Files:** `src/components/admin/BancoPerguntasManager.tsx`, `src/components/form-renderer/FormFieldRenderer.tsx`
+### 1. Database migration: Create security definer function + fix RLS policies
 
-- Add `email_bloquear_dominio` (boolean) and `email_dominio_bloqueado` (string, default `@jbsterminais.com.br`) to `formData`.
-- In admin dialog, when `tipo === "email"`, show a new config section with checkbox "Bloquear dominio de e-mail especifico" and input for the domain.
-- Save as `config.bloquear_dominio` and `config.dominio_bloqueado` in the question config.
-- In `FormFieldRenderer.tsx`, for email fields, add `onBlur` validation: if the entered email ends with the blocked domain, clear the field and show toast "Dominio de e-mail nao permitido para envio."
+Create a `get_user_email_setor` security definer function (bypasses RLS) and replace the recursive policies:
 
-### 3. Pergunta Condicional: Full type support + dropdown for trigger question
+```sql
+-- Security definer function to get user's email_setor without triggering RLS
+CREATE OR REPLACE FUNCTION public.get_user_email_setor(_user_id uuid)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT email_setor FROM public.profiles WHERE id = _user_id;
+$$;
 
-**Files:** `src/components/admin/BancoPerguntasManager.tsx`, `src/components/form-renderer/FormFieldRenderer.tsx`
+-- Drop the recursive policies
+DROP POLICY IF EXISTS "Gestors can view same sector profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Gestors can update same sector profiles" ON public.profiles;
 
-**Admin (BancoPerguntasManager):**
-- Expand `SUBCAMPO_TYPES` (used for conditional sub-questions) to include: `checkbox`, `arquivo`, `informativo`, `resposta_conjunta` (all types except `pergunta_condicional`).
-- Replace the text input for "Pergunta-gatilho (rotulo)" (line 798) with a `Select` dropdown populated from `perguntas` (active questions from `banco_perguntas`).
-- For each sub-question type, render the full configuration matching the main question type:
-  - `informativo`: Show the "Configuracao do Bloco Informativo" section (content type, RichTextEditor, exigir aceite, texto aceite).
-  - `checkbox`: No extra config needed.
-  - `arquivo`: No extra config needed.
-  - `resposta_conjunta`: Show the full 2-subcampo config block (same as the main resposta_conjunta config).
-  - Existing types (texto_formatado, numero, select, multipla_escolha) already partially work -- ensure numero shows prefix/suffix/min/max config.
-- Extend the sub-pergunta data model to store `info_tipo`, `info_conteudo`, `info_exigir_aceite`, `info_texto_aceite`, and `conjunta_campos` for resposta_conjunta sub-questions.
-- In `save()`, serialize these new fields into `config.subperguntas[]`.
+-- Recreate with security definer function (no recursion)
+CREATE POLICY "Gestors can view same sector profiles"
+ON public.profiles FOR SELECT TO authenticated
+USING (
+  is_gestor(auth.uid())
+  AND email_setor IS NOT NULL
+  AND email_setor = get_user_email_setor(auth.uid())
+);
 
-**Renderer (FormFieldRenderer):**
-- In the `pergunta_condicional` rendering section (lines 692-807), add support for rendering `checkbox`, `arquivo`, `informativo`, and `resposta_conjunta` sub-question types with their full configurations.
+CREATE POLICY "Gestors can update same sector profiles"
+ON public.profiles FOR UPDATE TO authenticated
+USING (
+  is_gestor(auth.uid())
+  AND email_setor IS NOT NULL
+  AND email_setor = get_user_email_setor(auth.uid())
+);
+```
 
-### 4. Eye button: Restrict by sector service access
+Similarly fix `user_roles` gestor policies that also reference `profiles` with a subquery:
 
-**Files:** `src/pages/InternoDashboard.tsx`
+```sql
+DROP POLICY IF EXISTS "Gestors can insert user_roles for sector users" ON public.user_roles;
+DROP POLICY IF EXISTS "Gestors can delete user_roles for sector users" ON public.user_roles;
 
-- Currently the Eye (Visualizar/Analisar) button has no service-based access restriction -- it opens `AnaliseDialog` for any process.
-- Add logic to check if the user's sector is authorized for the process's `tipo_operacao`:
-  - Fetch `setor_servicos` linked to the user's `email_setor` (already available as `userPerfis` pattern).
-  - Load the user's sector's authorized service IDs.
-  - For the Eye button, if the user is **not** admin and **not** gestor, check if their sector has access to the service matching `s.tipo_operacao`. If not, disable the button.
-  - Admin and Gestor profiles retain full unrestricted access to all processes.
+CREATE POLICY "Gestors can insert user_roles for sector users"
+ON public.user_roles FOR INSERT TO authenticated
+WITH CHECK (
+  is_gestor(auth.uid())
+  AND role IN ('user'::app_role, 'gestor'::app_role)
+  AND EXISTS (
+    SELECT 1 FROM public.profiles target
+    WHERE target.id = user_roles.user_id
+      AND target.email_setor = get_user_email_setor(auth.uid())
+      AND get_user_email_setor(auth.uid()) IS NOT NULL
+  )
+);
 
-### Technical Details
+CREATE POLICY "Gestors can delete user_roles for sector users"
+ON public.user_roles FOR DELETE TO authenticated
+USING (
+  is_gestor(auth.uid())
+  AND role IN ('user'::app_role, 'gestor'::app_role)
+  AND EXISTS (
+    SELECT 1 FROM public.profiles target
+    WHERE target.id = user_roles.user_id
+      AND target.email_setor = get_user_email_setor(auth.uid())
+      AND get_user_email_setor(auth.uid()) IS NOT NULL
+  )
+);
+```
 
-- No database migrations required -- all changes are in config JSON stored in `banco_perguntas.config`.
-- Sub-question types for pergunta_condicional will use the same `SUBCAMPO_TYPES` array, expanded to include the new types.
-- The trigger question dropdown will use the existing `perguntas` state (active banco_perguntas), filtered to exclude the current question being edited.
-- Email domain validation uses `onBlur` event with `toast.error("Dominio de e-mail nao permitido para envio.")` and field clearing.
+### 2. Update sector display in InternoDashboard (line 467-469)
+
+Show meaningful sector info for all roles, pulling from `setor_emails.descricao` when available:
+
+```typescript
+{profile?.nome} · {isAdmin ? "Administrador" : isGestor ? `Gestor${profile?.setor_emails?.descricao ? ` · ${profile.setor_emails.descricao}` : ""}` : (profile?.setor_emails?.descricao || getSetorLabel(profile?.setor) || "—")}
+```
+
+### No other file changes needed
+
+Once the RLS recursion is fixed, the existing `canAccessProcess` logic (which already returns `true` for admin/gestor) will work correctly because `isAdmin` and `isGestor` hooks will successfully query `user_roles`, and `fetchProfile` will return profile data.
 

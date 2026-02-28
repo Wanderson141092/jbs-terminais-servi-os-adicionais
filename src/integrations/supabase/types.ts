@@ -1842,6 +1842,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_user_email_setor: { Args: { _user_id: string }; Returns: string }
       get_user_sector: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["setor_tipo"]

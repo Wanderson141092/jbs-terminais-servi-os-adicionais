@@ -465,7 +465,7 @@ const InternoDashboard = () => {
             <div className="min-w-0">
               <h1 className="text-xs sm:text-sm font-bold truncate">Serviços Adicionais</h1>
               <p className="text-[10px] sm:text-xs text-primary-foreground/70 truncate">
-                {profile?.nome} · {isAdmin ? "Admin" : isGestor ? "Gestor" : getSetorLabel(profile?.setor)}
+                {profile?.nome} · {isAdmin ? "Administrador" : isGestor ? `Gestor${profile?.setor_emails?.descricao ? ` · ${profile.setor_emails.descricao}` : ""}` : (profile?.setor_emails?.descricao || getSetorLabel(profile?.setor) || "—")}
               </p>
             </div>
           </div>

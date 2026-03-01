@@ -1,9 +1,36 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LogOut, Bell, ClipboardList, CheckCircle2, XCircle, Clock, Check,
-  Eye, Filter, Search, ChevronLeft, ChevronRight, Settings, Users,
-  Building2, FileText, Link2, Menu, RefreshCw, DollarSign, SquareCheck, Download, FileSpreadsheet, ShieldCheck, Shield, Lock, Ship, BarChart3, RotateCcw, X
+  LogOut,
+  Bell,
+  ClipboardList,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Check,
+  Eye,
+  Filter,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  Users,
+  Building2,
+  FileText,
+  Link2,
+  Menu,
+  RefreshCw,
+  DollarSign,
+  SquareCheck,
+  Download,
+  FileSpreadsheet,
+  ShieldCheck,
+  Shield,
+  Lock,
+  Ship,
+  BarChart3,
+  RotateCcw,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ExcelExportDialog from "@/components/ExcelExportDialog";
@@ -99,15 +126,17 @@ const InternoDashboard = () => {
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   const [userAuthorizedServiceNames, setUserAuthorizedServiceNames] = useState<string[]>([]);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
-  
+
   const { isAdmin } = useAdminCheck(user?.id || null);
   const { isGestor } = useGestorCheck(user?.id || null);
   const { statusOptions, statusLabels } = useStatusProcesso();
-  
+
   useNotifications(user?.id || null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (!session) navigate("/interno");
@@ -130,7 +159,7 @@ const InternoDashboard = () => {
       .select("*")
       .eq("id", user.id)
       .maybeSingle() as any);
-    
+
     // Separately fetch setor_emails (view doesn't support FK joins)
     let setorEmailsData = null;
     if (profileData?.email_setor) {
@@ -145,7 +174,7 @@ const InternoDashboard = () => {
 
     const data = profileData ? { ...profileData, setor_emails: setorEmailsData } : null;
     setProfile(data);
-    
+
     if (data?.setor_emails?.perfis) {
       setUserPerfis(data.setor_emails.perfis);
     }
@@ -157,19 +186,13 @@ const InternoDashboard = () => {
         .select("servico_id, servicos(nome)")
         .eq("setor_email_id", data.setor_emails.id);
       if (setorServicos) {
-        setUserAuthorizedServiceNames(
-          setorServicos.map((ss: any) => ss.servicos?.nome).filter(Boolean)
-        );
+        setUserAuthorizedServiceNames(setorServicos.map((ss: any) => ss.servicos?.nome).filter(Boolean));
       }
     }
   }, [user]);
 
   const fetchServicos = useCallback(async () => {
-    const { data } = await supabase
-      .from("servicos")
-      .select("*")
-      .eq("ativo", true)
-      .order("nome");
+    const { data } = await supabase.from("servicos").select("*").eq("ativo", true).order("nome");
     setServicos((data || []) as Servico[]);
   }, []);
 
@@ -184,9 +207,13 @@ const InternoDashboard = () => {
 
   const fetchSolicitacoes = useCallback(async () => {
     setLoading(true);
-    
+
     const [solRes, regRes] = await Promise.all([
-      supabase.from("solicitacoes_v" as any).select("*").order("created_at", { ascending: false }).limit(500),
+      supabase
+        .from("solicitacoes_v" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500),
       supabase.from("lancamento_cobranca_registros").select("*"),
     ]);
 
@@ -208,22 +235,22 @@ const InternoDashboard = () => {
       .from("solicitacoes")
       .select("id")
       .eq("solicitar_deferimento", true);
-    
+
     if (!posSolicitacoes || posSolicitacoes.length === 0) {
       setDeferimentoCounts({ pendente: 0 });
       return;
     }
 
-    const posIds = posSolicitacoes.map(s => s.id);
-    
+    const posIds = posSolicitacoes.map((s) => s.id);
+
     const { data: docs } = await supabase
       .from("deferimento_documents")
       .select("status, solicitacao_id")
       .eq("document_type", "deferimento")
       .in("solicitacao_id", posIds);
-    
+
     if (docs) {
-      const pendente = docs.filter(d => !d.status || d.status === "pendente").length;
+      const pendente = docs.filter((d) => !d.status || d.status === "pendente").length;
       setDeferimentoCounts({ pendente });
     }
   }, []);
@@ -260,7 +287,7 @@ const InternoDashboard = () => {
       setShowSetorSelector(false);
       return;
     }
-    
+
     if (profile && !profile.setor && !profile.email_setor && profile.email?.endsWith("@jbsterminais.com.br")) {
       setShowSetorSelector(true);
     } else {
@@ -270,12 +297,12 @@ const InternoDashboard = () => {
 
   if (showSetorSelector && user) {
     return (
-      <SetorSelector 
-        userId={user.id} 
+      <SetorSelector
+        userId={user.id}
         onComplete={() => {
           setShowSetorSelector(false);
           fetchProfile();
-        }} 
+        }}
       />
     );
   }
@@ -297,10 +324,10 @@ const InternoDashboard = () => {
       (s.lpco && s.lpco.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (s.numero_conteiner && s.numero_conteiner.toLowerCase().includes(searchTerm.toLowerCase())) ||
       s.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     let matchesLancamento = true;
     if (lancamentoFilter !== "all") {
-      const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+      const servico = servicos.find((sv) => sv.nome === s.tipo_operacao);
       if (!servico?.status_confirmacao_lancamento?.length) {
         matchesLancamento = false;
       } else {
@@ -311,7 +338,8 @@ const InternoDashboard = () => {
           matchesLancamento = needsLaunch && isPending;
         } else if (lancamentoFilter === "confirmado") {
           const solRegs = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
-          const isConf = solRegs.length > 0 ? solRegs.every((r: any) => r.confirmado === true) : s.lancamento_confirmado === true;
+          const isConf =
+            solRegs.length > 0 ? solRegs.every((r: any) => r.confirmado === true) : s.lancamento_confirmado === true;
           matchesLancamento = needsLaunch && isConf;
         }
       }
@@ -327,7 +355,7 @@ const InternoDashboard = () => {
         matchesAprovacao = s.comex_aprovado === false || s.armazem_aprovado === false;
       }
     }
-    
+
     return matchesStatus && matchesTipo && matchesSearch && matchesLancamento && matchesAprovacao;
   });
 
@@ -341,67 +369,64 @@ const InternoDashboard = () => {
 
   const getCountForDay = (day: Date, status?: string) => {
     const dayStr = format(day, "yyyy-MM-dd");
-    return dashboardFiltered.filter(s => {
+    return dashboardFiltered.filter((s) => {
       const matches = s.data_posicionamento === dayStr;
       if (status) return matches && s.status === status;
       return matches;
     }).length;
   };
 
-  const tipoServicosOptions = ["Todos", ...servicos.map(s => s.nome)];
+  const tipoServicosOptions = ["Todos", ...servicos.map((s) => s.nome)];
 
   const getSetorLabel = (setor: string | null) => {
     if (!setor) return "—";
     const labels: Record<string, string> = {
-      "COMEX": "Administrativo",
-      "ARMAZEM": "Operacional",
-      "ADMINISTRATIVO": "Administrativo",
-      "OPERACIONAL": "Operacional",
-      "MASTER": "Master"
+      COMEX: "Administrativo",
+      ARMAZEM: "Operacional",
+      ADMINISTRATIVO: "Administrativo",
+      OPERACIONAL: "Operacional",
+      MASTER: "Master",
     };
     return labels[setor] || setor;
   };
 
   const hasOperacionalProfile = userPerfis.includes("OPERACIONAL") || profile?.setor === "ARMAZEM" || isAdmin;
 
-  const selectedForBatchApproval = filtered.filter(s => 
-    selectedIds.includes(s.id) && 
-    s.status === "aguardando_confirmacao" && 
-    s.armazem_aprovado === null
+  const selectedForBatchApproval = filtered.filter(
+    (s) => selectedIds.includes(s.id) && s.status === "aguardando_confirmacao" && s.armazem_aprovado === null,
   );
 
-  const selectedForBatchStatus = filtered.filter(s => 
-    selectedIds.includes(s.id) && 
-    (s.status === "confirmado_aguardando_vistoria" || s.comex_aprovado || s.armazem_aprovado)
+  const selectedForBatchStatus = filtered.filter(
+    (s) =>
+      selectedIds.includes(s.id) &&
+      (s.status === "confirmado_aguardando_vistoria" || s.comex_aprovado || s.armazem_aprovado),
   );
 
   const toggleSelection = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   const toggleSelectAll = () => {
     if (selectedIds.length === paginatedFiltered.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(paginatedFiltered.map(s => s.id));
+      setSelectedIds(paginatedFiltered.map((s) => s.id));
     }
   };
 
   const matchesLaunchStatus = (s: any) => {
-    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    const servico = servicos.find((sv) => sv.nome === s.tipo_operacao);
     if (servico?.status_confirmacao_lancamento?.length) {
       return servico.status_confirmacao_lancamento.includes(s.status);
     }
     // Fallback: se tipo_operacao é nulo, verifica se algum serviço tem esse status configurado
     if (!s.tipo_operacao) {
-      return servicos.some(sv => sv.status_confirmacao_lancamento?.includes(s.status));
+      return servicos.some((sv) => sv.status_confirmacao_lancamento?.includes(s.status));
     }
     return false;
   };
 
-  const lancamentoPendente = dashboardFiltered.filter(s => {
+  const lancamentoPendente = dashboardFiltered.filter((s) => {
     if (!matchesLaunchStatus(s)) return false;
     // Check individual registros first
     const solRegistros = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
@@ -412,7 +437,7 @@ const InternoDashboard = () => {
     return !s.lancamento_confirmado;
   }).length;
 
-  const lancamentoConfirmado = dashboardFiltered.filter(s => {
+  const lancamentoConfirmado = dashboardFiltered.filter((s) => {
     if (!matchesLaunchStatus(s)) return false;
     const solRegistros = lancamentoRegistros.filter((r: any) => r.solicitacao_id === s.id);
     if (solRegistros.length > 0) {
@@ -433,7 +458,7 @@ const InternoDashboard = () => {
 
   // Check if deferimento button should be active - uses service config
   const isDeferimentoActive = (s: any) => {
-    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    const servico = servicos.find((sv) => sv.nome === s.tipo_operacao);
     if (!servico?.deferimento_status_ativacao?.length) return false;
     return servico.deferimento_status_ativacao.includes(s.status);
   };
@@ -442,7 +467,7 @@ const InternoDashboard = () => {
     // Activate if solicitar_lacre_armador is true on the process
     if (s.solicitar_lacre_armador === true) return true;
     // Or if service has status activation configured and current status matches
-    const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+    const servico = servicos.find((sv) => sv.nome === s.tipo_operacao);
     if (!servico?.lacre_armador_status_ativacao?.length) return false;
     return servico.lacre_armador_status_ativacao.includes(s.status);
   };
@@ -452,14 +477,14 @@ const InternoDashboard = () => {
   const showApprovalColumns = (() => {
     if (tipoServicoFilter === "Todos") {
       // Show if ANY service has both approvals enabled
-      return servicos.some(s => s.aprovacao_ativada && s.aprovacao_administrativo && s.aprovacao_operacional);
+      return servicos.some((s) => s.aprovacao_ativada && s.aprovacao_administrativo && s.aprovacao_operacional);
     }
-    const svc = servicos.find(s => s.nome === tipoServicoFilter);
+    const svc = servicos.find((s) => s.nome === tipoServicoFilter);
     return svc?.aprovacao_ativada && svc?.aprovacao_administrativo && svc?.aprovacao_operacional;
   })();
 
   // Count pending cancellations
-  const cancelamentoPendenteCount = dashboardFiltered.filter(s => s.cancelamento_solicitado === true).length;
+  const cancelamentoPendenteCount = dashboardFiltered.filter((s) => s.cancelamento_solicitado === true).length;
 
   const canAccessProcess = (s: any) => {
     if (isAdmin || isGestor) return true;
@@ -480,7 +505,12 @@ const InternoDashboard = () => {
             <div className="min-w-0">
               <h1 className="text-xs sm:text-sm font-bold truncate">Serviços Adicionais</h1>
               <p className="text-[10px] sm:text-xs text-primary-foreground/70 truncate">
-                {profile?.nome} · {isAdmin ? "Administrador" : isGestor ? `Gestor${profile?.setor_emails?.descricao ? ` · ${profile.setor_emails.descricao}` : ""}` : (profile?.setor_emails?.descricao || getSetorLabel(profile?.setor) || "—")}
+                {profile?.nome} ·{" "}
+                {isAdmin
+                  ? "Administrador"
+                  : isGestor
+                    ? `Gestor${profile?.setor_emails?.descricao ? ` · ${profile.setor_emails.descricao}` : ""}`
+                    : profile?.setor_emails?.descricao || getSetorLabel(profile?.setor) || "—"}
               </p>
             </div>
           </div>
@@ -493,7 +523,7 @@ const InternoDashboard = () => {
                     Admin
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 z-[100] bg-popover"  sideOffset={8}>
+                <DropdownMenuContent align="end" className="w-48 z-[100] bg-popover" sideOffset={8}>
                   <DropdownMenuItem onClick={() => navigate("/interno/admin/parametros")}>
                     <Settings className="h-4 w-4 mr-2" />
                     Parâmetros
@@ -530,9 +560,14 @@ const InternoDashboard = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            
+
             {!isAdmin && !isGestor && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("/interno/admin/logs")} className="text-primary-foreground hover:bg-primary-foreground/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/interno/admin/logs")}
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+              >
                 <FileText className="h-4 w-4" />
               </Button>
             )}
@@ -572,7 +607,13 @@ const InternoDashboard = () => {
             )}
 
             {isGestor && isAdmin && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("/interno/gestor/regras")} className="text-primary-foreground hover:bg-primary-foreground/10" title="Regras de Serviço">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/interno/gestor/regras")}
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+                title="Regras de Serviço"
+              >
                 <Shield className="h-4 w-4" />
               </Button>
             )}
@@ -608,7 +649,7 @@ const InternoDashboard = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -622,7 +663,12 @@ const InternoDashboard = () => {
                 </span>
               )}
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-primary-foreground hover:bg-primary-foreground/10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+            >
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -631,10 +677,13 @@ const InternoDashboard = () => {
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {showNotifications && user && (
-          <NotificationsPanel userId={user.id} onClose={() => {
-            setShowNotifications(false);
-            fetchUnread();
-          }} />
+          <NotificationsPanel
+            userId={user.id}
+            onClose={() => {
+              setShowNotifications(false);
+              fetchUnread();
+            }}
+          />
         )}
 
         {/* Weekly Dashboard */}
@@ -648,18 +697,30 @@ const InternoDashboard = () => {
                     <SelectValue placeholder="Tipo de Serviço" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tipoServicosOptions.map(tipo => (
-                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                    {tipoServicosOptions.map((tipo) => (
+                      <SelectItem key={tipo} value={tipo}>
+                        {tipo}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="text-xs sm:text-sm font-medium min-w-[80px] sm:min-w-[100px] text-center">
                   {format(currentWeekStart, "'Semana de' dd/MM", { locale: ptBR })}
                 </span>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}
+                >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -668,12 +729,12 @@ const InternoDashboard = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
               {weekDays.map((day, i) => (
                 <div key={i} className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground uppercase">
-                    {format(day, "EEEE", { locale: ptBR })}
-                  </p>
+                  <p className="text-xs text-muted-foreground uppercase">{format(day, "EEEE", { locale: ptBR })}</p>
                   <p className="text-lg font-bold">{format(day, "dd/MM")}</p>
                   <p className="text-2xl font-bold text-primary mt-1">{getCountForDay(day)}</p>
-                  <p className="text-[10px] text-muted-foreground">{getCountForDay(day) === 1 ? "solicitação" : "solicitações"}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {getCountForDay(day) === 1 ? "solicitação" : "solicitações"}
+                  </p>
                 </div>
               ))}
             </div>
@@ -682,36 +743,51 @@ const InternoDashboard = () => {
 
         {/* Stats Cards - horizontal row */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
-          <StatCard 
-            label={tipoServicoFilter === "Todos" ? "Serviços" : tipoServicoFilter} 
-            value={dashboardFiltered.length} 
-            icon={<ClipboardList className="h-5 w-5" />} 
+          <StatCard
+            label={tipoServicoFilter === "Todos" ? "Serviços" : tipoServicoFilter}
+            value={dashboardFiltered.length}
+            icon={<ClipboardList className="h-5 w-5" />}
           />
-          <StatCard label="Aguardando" value={dashboardStatusCounts["aguardando_confirmacao"] || 0} icon={<Clock className="h-5 w-5" />} color="text-yellow-600" />
-          <StatCard label="Confirmados" value={dashboardStatusCounts["confirmado_aguardando_vistoria"] || 0} icon={<CheckCircle2 className="h-5 w-5" />} color="text-blue-600" />
-          <StatCard label="Cancelados" value={dashboardStatusCounts["cancelado"] || 0} icon={<XCircle className="h-5 w-5" />} color="text-destructive" />
-          <StatCard 
-            label="Def. Pendente" 
-            value={deferimentoCounts.pendente} 
-            icon={<FileText className="h-5 w-5" />} 
-            color="text-yellow-600" 
+          <StatCard
+            label="Aguardando"
+            value={dashboardStatusCounts["aguardando_confirmacao"] || 0}
+            icon={<Clock className="h-5 w-5" />}
+            color="text-yellow-600"
+          />
+          <StatCard
+            label="Confirmados"
+            value={dashboardStatusCounts["confirmado_aguardando_vistoria"] || 0}
+            icon={<CheckCircle2 className="h-5 w-5" />}
+            color="text-blue-600"
+          />
+          <StatCard
+            label="Cancelados"
+            value={dashboardStatusCounts["cancelado"] || 0}
+            icon={<XCircle className="h-5 w-5" />}
+            color="text-destructive"
+          />
+          <StatCard
+            label="Def. Pendente"
+            value={deferimentoCounts.pendente}
+            icon={<FileText className="h-5 w-5" />}
+            color="text-yellow-600"
           />
         </div>
 
         {/* Launch Counters */}
         {(lancamentoPendente > 0 || lancamentoConfirmado > 0) && (
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <StatCard 
-              label="Lançamento Pendente" 
-              value={lancamentoPendente} 
-              icon={<DollarSign className="h-5 w-5" />} 
-              color="text-destructive" 
+            <StatCard
+              label="Lançamento Pendente"
+              value={lancamentoPendente}
+              icon={<DollarSign className="h-5 w-5" />}
+              color="text-destructive"
             />
-            <StatCard 
-              label="Lançamento Confirmado" 
-              value={lancamentoConfirmado} 
-              icon={<DollarSign className="h-5 w-5" />} 
-              color="text-muted-foreground" 
+            <StatCard
+              label="Lançamento Confirmado"
+              value={lancamentoConfirmado}
+              icon={<DollarSign className="h-5 w-5" />}
+              color="text-muted-foreground"
             />
           </div>
         )}
@@ -719,9 +795,12 @@ const InternoDashboard = () => {
         {/* Status breakdown - only actionable statuses */}
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6">
           {statusOptions
-            .filter(({ value, label }) => !['cancelado', 'recusado'].includes(value) && !label.toLowerCase().includes('concluído'))
+            .filter(
+              ({ value, label }) =>
+                !["cancelado", "recusado"].includes(value) && !label.toLowerCase().includes("concluído"),
+            )
             .map(({ value: key, label }) => (
-            <Badge
+              <Badge
                 key={key}
                 variant={statusFilter === key ? "default" : "outline"}
                 className="cursor-pointer hover:bg-muted transition-colors px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm"
@@ -729,7 +808,7 @@ const InternoDashboard = () => {
               >
                 {label}: {dashboardStatusCounts[key] || 0}
               </Badge>
-          ))}
+            ))}
         </div>
 
         {/* Filters */}
@@ -752,10 +831,10 @@ const InternoDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
-                  {statusOptions
-                    .filter(({ value, label }) => !['cancelado', 'recusado'].includes(value) && !label.toLowerCase().includes('concluído'))
-                    .map(({ value, label }) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  {statusOptions.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -786,21 +865,21 @@ const InternoDashboard = () => {
                 Atualizar
               </Button>
               {selectedIds.length > 0 && selectedIds.length <= 10 && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => downloadBatchPdfs(filtered.filter(s => selectedIds.includes(s.id)))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadBatchPdfs(filtered.filter((s) => selectedIds.includes(s.id)))}
                 >
                   <FileText className="h-4 w-4 mr-1" />
                   PDF ({selectedIds.length})
                 </Button>
               )}
-              
+
               {selectedIds.length > 0 && (
                 <div className="flex gap-2">
                   {hasOperacionalProfile && selectedForBatchApproval.length > 0 && (
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
                       onClick={() => setShowBatchApproval(true)}
                     >
@@ -809,11 +888,7 @@ const InternoDashboard = () => {
                     </Button>
                   )}
                   {selectedForBatchStatus.length > 0 && (
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => setShowBatchStatus(true)}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => setShowBatchStatus(true)}>
                       <RefreshCw className="h-4 w-4 mr-1" />
                       Atualizar Status ({selectedForBatchStatus.length})
                     </Button>
@@ -871,10 +946,7 @@ const InternoDashboard = () => {
                   paginatedFiltered.map((s) => (
                     <TableRow key={s.id} className="hover:bg-muted/30">
                       <TableCell>
-                        <Checkbox
-                          checked={selectedIds.includes(s.id)}
-                          onCheckedChange={() => toggleSelection(s.id)}
-                        />
+                        <Checkbox checked={selectedIds.includes(s.id)} onCheckedChange={() => toggleSelection(s.id)} />
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -911,48 +983,63 @@ const InternoDashboard = () => {
                             </Button>
                           )}
                           {/* Deferimento button - only for Posicionamento from aguardando_vistoria onwards */}
-                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => isDeferimentoActive(s) ? setDeferimentoSolicitacao(s) : null}
-                              title="Deferimento"
-                              disabled={!isDeferimentoActive(s)}
-                              className={isDeferimentoActive(s) ? "text-blue-600 hover:text-blue-700" : "text-muted-foreground/40"}
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
-                          )}
+                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) &&
+                            [
+                              "confirmado_aguardando_vistoria",
+                              "vistoria_finalizada",
+                              "vistoriado_com_pendencia",
+                              "nao_vistoriado",
+                            ].includes(s.status) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => (isDeferimentoActive(s) ? setDeferimentoSolicitacao(s) : null)}
+                                title="Deferimento"
+                                disabled={!isDeferimentoActive(s)}
+                                className={
+                                  isDeferimentoActive(s)
+                                    ? "text-blue-600 hover:text-blue-700"
+                                    : "text-muted-foreground/40"
+                                }
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            )}
                           {/* Lacre Armador button - only for Posicionamento from aguardando_vistoria onwards */}
-                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) && ["confirmado_aguardando_vistoria", "vistoria_finalizada", "vistoriado_com_pendencia", "nao_vistoriado"].includes(s.status) && (
+                          {(s.tipo_operacao === "Posicionamento" || !s.tipo_operacao) &&
+                            [
+                              "confirmado_aguardando_vistoria",
+                              "vistoria_finalizada",
+                              "vistoriado_com_pendencia",
+                              "nao_vistoriado",
+                            ].includes(s.status) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => (isLacreArmadorActive(s) ? setLacreArmadorSolicitacao(s) : null)}
+                                title="Lacre Armador"
+                                disabled={!isLacreArmadorActive(s)}
+                                className={
+                                  isLacreArmadorActive(s)
+                                    ? "text-amber-600 hover:text-amber-700"
+                                    : "text-muted-foreground/40"
+                                }
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            )}
+                          {s.status !== "recusado" && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => isLacreArmadorActive(s) ? setLacreArmadorSolicitacao(s) : null}
-                              title="Lacre Armador"
-                              disabled={!isLacreArmadorActive(s)}
-                              className={isLacreArmadorActive(s) ? "text-amber-600 hover:text-amber-700" : "text-muted-foreground/40"}
+                              onClick={() => setCorrecaoStatusSolicitacao(s)}
+                              title="Corrigir Status"
+                              className="text-muted-foreground hover:text-foreground"
                             >
-                              <Lock className="h-4 w-4" />
+                              <RotateCcw className="h-4 w-4" />
                             </Button>
                           )}
-                          {s.status !== "recusado" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setCorrecaoStatusSolicitacao(s)}
-                            title="Corrigir Status"
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => downloadInternalPdf(s)}
-                            title="Salvar PDF"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => downloadInternalPdf(s)} title="Salvar PDF">
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
@@ -960,9 +1047,10 @@ const InternoDashboard = () => {
                       <TableCell>
                         {(() => {
                           if (!needsLaunchConfirmation(s)) return null;
-                          const servico = servicos.find(sv => sv.nome === s.tipo_operacao);
+                          const servico = servicos.find((sv) => sv.nome === s.tipo_operacao);
                           const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
-                            const matchService = cfg.servico_ids.length === 0 || (servico && cfg.servico_ids.includes(servico.id));
+                            const matchService =
+                              cfg.servico_ids.length === 0 || (servico && cfg.servico_ids.includes(servico.id));
                             if (!matchService) return false;
                             const statusAtivacao = cfg.status_ativacao || [];
                             if (statusAtivacao.length > 0 && !statusAtivacao.includes(s.status)) return false;
@@ -972,14 +1060,26 @@ const InternoDashboard = () => {
                           if (applicableConfigs.length === 0) {
                             // Legacy fallback
                             const allConf = isLancamentoAllConfirmed(s);
-                            return allConf 
-                              ? <Check className="h-4 w-4 text-muted-foreground/50 mx-auto" />
-                              : <Button variant="ghost" size="sm" onClick={() => setSelectedSolicitacao(s)} className="text-destructive" title="Aguardando confirmação de lançamento"><DollarSign className="h-4 w-4" /></Button>;
+                            return allConf ? (
+                              <Check className="h-4 w-4 text-muted-foreground/50 mx-auto" />
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedSolicitacao(s)}
+                                className="text-destructive"
+                                title="Aguardando confirmação de lançamento"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </Button>
+                            );
                           }
                           return (
                             <div className="flex items-start gap-0.5 justify-center">
                               {applicableConfigs.map((cfg: any) => {
-                                const registro = lancamentoRegistros.find((r: any) => r.solicitacao_id === s.id && r.cobranca_config_id === cfg.id);
+                                const registro = lancamentoRegistros.find(
+                                  (r: any) => r.solicitacao_id === s.id && r.cobranca_config_id === cfg.id,
+                                );
                                 const isConfirmed = registro?.confirmado === true;
                                 return (
                                   <button
@@ -988,17 +1088,16 @@ const InternoDashboard = () => {
                                     title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : "Pendente"}`}
                                     className="p-0.5 rounded hover:bg-muted/50 transition-colors overflow-visible"
                                   >
-                                    {isConfirmed 
-                                      ? <Check className="h-3.5 w-3.5 text-muted-foreground/50" />
-                                      : cfg.tipo === "pendencia" ? (
-                                        <span className="relative inline-flex items-center text-destructive pr-2">
-                                          <DollarSign className="h-3.5 w-3.5" />
-                                          <Lock className="h-2 w-2 absolute -bottom-0.5 right-0" />
-                                        </span>
-                                      ) : (
-                                        <DollarSign className="h-3.5 w-3.5 text-destructive" />
-                                      )
-                                    }
+                                    {isConfirmed ? (
+                                      <Check className="h-3.5 w-3.5 text-muted-foreground/50" />
+                                    ) : cfg.tipo === "pendencia" ? (
+                                      <span className="relative inline-flex items-center text-destructive pr-2">
+                                        <DollarSign className="h-3.5 w-3.5" />
+                                        <Lock className="h-2 w-2 absolute -bottom-0.5 right-0" />
+                                      </span>
+                                    ) : (
+                                      <DollarSign className="h-3.5 w-3.5 text-destructive" />
+                                    )}
                                   </button>
                                 );
                               })}
@@ -1010,7 +1109,10 @@ const InternoDashboard = () => {
                       <TableCell>
                         {s.cancelamento_solicitado && (
                           <div className="flex items-center gap-1">
-                            <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 text-[10px] whitespace-nowrap">
+                            <Badge
+                              variant="outline"
+                              className="text-amber-700 border-amber-400 bg-amber-50 text-[10px] whitespace-nowrap"
+                            >
                               Cancelamento solicitado
                             </Badge>
                             <Button
@@ -1025,7 +1127,10 @@ const InternoDashboard = () => {
                                   .from("solicitacoes")
                                   .update({ cancelamento_solicitado: false, cancelamento_solicitado_em: null })
                                   .eq("id", s.id);
-                                if (error) { toast.error("Erro: " + error.message); return; }
+                                if (error) {
+                                  toast.error("Erro: " + error.message);
+                                  return;
+                                }
                                 toast.success("Pedido de cancelamento recusado.");
                                 fetchSolicitacoes();
                               }}
@@ -1038,25 +1143,28 @@ const InternoDashboard = () => {
                       <TableCell className="text-sm">{s.tipo_operacao || "Posicionamento"}</TableCell>
                       <TableCell className="text-sm">
                         {(() => {
-                          const servicoConfig = servicos.find(sv => sv.nome === s.tipo_operacao);
+                          const servicoConfig = servicos.find((sv) => sv.nome === s.tipo_operacao);
                           if (servicoConfig?.tipo_agendamento === "data_horario" && s.data_agendamento) {
                             return new Date(s.data_agendamento).toLocaleString("pt-BR", {
-                              day: "2-digit", month: "2-digit", year: "numeric",
-                              hour: "2-digit", minute: "2-digit"
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
                             });
                           }
                           if (s.data_posicionamento) {
-                            return new Date(s.data_posicionamento + 'T00:00:00').toLocaleDateString("pt-BR");
+                            return new Date(s.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR");
                           }
                           return "—";
                         })()}
                       </TableCell>
                       <TableCell className="text-sm font-mono">{s.numero_conteiner || "—"}</TableCell>
-                      <TableCell className="text-sm">
-                        {formatTipoCarga(s.tipo_carga)}
-                      </TableCell>
+                      <TableCell className="text-sm">{formatTipoCarga(s.tipo_carga)}</TableCell>
                       <TableCell className="text-sm">{s.cliente_nome}</TableCell>
-                      <TableCell><StatusBadge status={s.status} /></TableCell>
+                      <TableCell>
+                        <StatusBadge status={s.status} />
+                      </TableCell>
                       {showApprovalColumns && (
                         <TableCell>
                           <ApprovalIndicator approved={s.comex_aprovado} />
@@ -1086,7 +1194,7 @@ const InternoDashboard = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -1094,7 +1202,7 @@ const InternoDashboard = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -1113,7 +1221,7 @@ const InternoDashboard = () => {
           profile={{
             ...profile,
             setor: profile.setor === "COMEX" ? "COMEX" : profile.setor === "ARMAZEM" ? "ARMAZEM" : profile.setor,
-            perfis: userPerfis
+            perfis: userPerfis,
           }}
           userId={user.id}
           isAdmin={isAdmin}
@@ -1195,7 +1303,7 @@ const InternoDashboard = () => {
 
       {/* Excel Export Dialog */}
       <ExcelExportDialog open={showExcelExport} onClose={() => setShowExcelExport(false)} />
-      
+
       {/* Navis N4 Export Dialog */}
       <NavisN4ExportDialog open={showNavisN4} onClose={() => setShowNavisN4(false)} />
 
@@ -1224,22 +1332,26 @@ const InternoDashboard = () => {
       )}
 
       {/* Extrair Relatório Dialog */}
-      <ExtrairRelatorioDialog
-        open={showExtrairRelatorio}
-        onClose={() => setShowExtrairRelatorio(false)}
-      />
+      <ExtrairRelatorioDialog open={showExtrairRelatorio} onClose={() => setShowExtrairRelatorio(false)} />
 
       {/* Modelos Excel Dialog */}
-      <ModelosExcelDialog
-        open={showModelosExcel}
-        onClose={() => setShowModelosExcel(false)}
-      />
+      <ModelosExcelDialog open={showModelosExcel} onClose={() => setShowModelosExcel(false)} />
     </div>
   );
 };
 
 // Helper Components
-const StatCard = ({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color?: string }) => (
+const StatCard = ({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  color?: string;
+}) => (
   <Card className="border-0 shadow-sm">
     <CardContent className="py-3 sm:py-4 px-3 sm:px-5 flex items-center gap-3 sm:gap-4">
       <div className={`${color || "text-primary"} shrink-0`}>{icon}</div>
@@ -1253,7 +1365,11 @@ const StatCard = ({ label, value, icon, color }: { label: string; value: number;
 
 const ApprovalIndicator = ({ approved }: { approved: boolean | null }) => {
   if (approved === null) {
-    return <Badge variant="outline" className="text-muted-foreground">Pendente</Badge>;
+    return (
+      <Badge variant="outline" className="text-muted-foreground">
+        Pendente
+      </Badge>
+    );
   }
   if (approved) {
     return <Badge className="bg-secondary text-secondary-foreground">Aprovado</Badge>;

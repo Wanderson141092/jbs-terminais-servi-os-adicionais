@@ -753,7 +753,7 @@ const InternoDashboard = () => {
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
                   {statusOptions
-                    .filter(({ value, label }) =>.includes(value) && !label.toLowerCase().includes('concluído'))
+                    .filter(({ value, label }) => !['cancelado', 'recusado'].includes(value) && !label.toLowerCase().includes('concluído'))
                     .map(({ value, label }) => (
                     <SelectItem key={value} value={value}>{label}</SelectItem>
                   ))}

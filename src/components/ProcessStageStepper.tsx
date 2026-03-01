@@ -53,11 +53,11 @@ const MOTIVOS_SERVICO = [
 const isMotivosServico = (categoria?: string | null): boolean => {
   if (!categoria) return false;
   const lower = categoria.toLowerCase().trim();
-  return MOTIVOS_SERVICO.some(m => lower.includes(m) || m.includes(lower));
+  return MOTIVOS_SERVICO.some((m) => lower.includes(m) || m.includes(lower));
 };
 
 const isPosicionamento = (tipoOperacao?: string | null): boolean => {
-  return (tipoOperacao || "").toLowerCase().includes("posicionamento");
+  return (tipoOperacao || "").toLowerCase().includes("Posicionamento");
 };
 
 // Status ordering for determining progression
@@ -65,8 +65,11 @@ const STATUS_ORDER: Record<string, number> = {
   aguardando_confirmacao: 1,
   confirmado_aguardando_vistoria: 2,
   vistoria_finalizada: 3,
+  servico_finalizado: 3,
+  servico_concluido: 3,
   vistoriado_com_pendencia: 3,
   nao_vistoriado: 3,
+  nao_executado: 3,
   cancelado: 99,
   recusado: 99,
 };
@@ -87,29 +90,31 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
 
   // Helper to get configured title, falling back to default
   const getTitle = (chave: string, fallback: string): string => {
-    const cfg = etapasConfig.find(e => e.chave === chave);
+    const cfg = etapasConfig.find((e) => e.chave === chave);
     return cfg?.titulo || fallback;
   };
 
   // Determine if terminal based on tipo_resultado from statusLabels
-  const currentStatusLabel = statusLabels.find(sl => sl.sigla === status);
+  const currentStatusLabel = statusLabels.find((sl) => sl.sigla === status);
   const isNaoConforme = currentStatusLabel?.tipo_resultado === "nao_conforme";
   const isEmPendencia = currentStatusLabel?.tipo_resultado === "em_pendencia";
   const isNeutro = !currentStatusLabel?.tipo_resultado || currentStatusLabel?.tipo_resultado === "neutro";
-  
+
   // Fallback for hardcoded terminal states if no tipo_resultado available
   const isCancelled = status === "cancelado";
   const isRecusado = status === "recusado";
   const isTerminal = isNaoConforme || isCancelled || isRecusado;
-  
+
   // Get the display label for terminal status
-  const terminalLabel = isTerminal ? (currentStatusLabel?.valor || (isCancelled ? "Cancelado" : isRecusado ? "Recusado" : status)) : "";
-  
+  const terminalLabel = isTerminal
+    ? currentStatusLabel?.valor || (isCancelled ? "Cancelado" : isRecusado ? "Recusado" : status)
+    : "";
+
   const isPosic = isPosicionamento(tipoOperacao);
   const isServico = isPosic && isMotivosServico(categoria);
 
   const stages: Stage[] = [];
-  
+
   // For terminal states, determine the effective order based on where in the flow it happened
   // rather than using STATUS_ORDER (which assigns 99 to terminal states)
   let currentOrder = STATUS_ORDER[status] ?? 0;
@@ -119,8 +124,10 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
       currentOrder = 1;
     } else {
       // Cancelado: check if process was confirmed before cancellation
-      const wasConfirmed = (custoposicionamento !== null && custoposicionamento !== undefined) ||
-        (props.comexAprovado === true || props.armazemAprovado === true);
+      const wasConfirmed =
+        (custoposicionamento !== null && custoposicionamento !== undefined) ||
+        props.comexAprovado === true ||
+        props.armazemAprovado === true;
       currentOrder = wasConfirmed ? 2 : 1;
     }
   }
@@ -129,7 +136,11 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // For terminal states at early stage (order<=1), terminal replaces aguardando_confirmacao
   // For em_pendencia states, completed stages revert to "pending" (gray with ✓)
   // For neutral states (e.g. aguardando_confirmacao), prior stages use "current" (blue) to match
-  const completedState = isTerminal ? "error" as const : isEmPendencia ? "pending" as const : "completed" as const;
+  const completedState = isTerminal
+    ? ("error" as const)
+    : isEmPendencia
+      ? ("pending" as const)
+      : ("completed" as const);
 
   // Determine icon override for special states (only for terminal/error)
   const stateIcon = isTerminal ? <X className="h-4 w-4" /> : null;
@@ -147,7 +158,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   // For Posicionamento cancellations, determine if it was early (before confirmation) or late (after confirmation)
   const isPosicCancelled = isPosic && isCancelled;
   // Late cancel: custo_posicionamento is not null (was answered), OR approvals exist
-  const isLateCancellation = isPosicCancelled && (custoposicionamento !== null && custoposicionamento !== undefined);
+  const isLateCancellation = isPosicCancelled && custoposicionamento !== null && custoposicionamento !== undefined;
   // Early cancel: cancelled but no custo_posicionamento answer
   const isEarlyCancellation = isPosicCancelled && !isLateCancellation;
 
@@ -232,9 +243,18 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           stages.push({
             key: "aguardando_servico",
             label,
-            icon: isFinalResult
-              ? (isEmPendencia ? <AlertTriangle className="h-4 w-4" /> : stateIcon || <Check className="h-4 w-4" />)
-              : (stateIcon || (state === "pending" && isEmPendencia ? <Check className="h-4 w-4" /> : null) || <Clock className="h-4 w-4" />),
+            icon: isFinalResult ? (
+              isEmPendencia ? (
+                <AlertTriangle className="h-4 w-4" />
+              ) : (
+                stateIcon || <Check className="h-4 w-4" />
+              )
+            ) : (
+              stateIcon ||
+              (state === "pending" && isEmPendencia ? <Check className="h-4 w-4" /> : null) || (
+                <Clock className="h-4 w-4" />
+              )
+            ),
             state: isFinalResult && isEmPendencia ? "warning" : state,
           });
         }
@@ -301,7 +321,7 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
           stages.push({
             key: "aguardando_vistoria",
             label,
-            icon: state === "current" || state === "pending" ? (stateIcon || icon) : icon,
+            icon: state === "current" || state === "pending" ? stateIcon || icon : icon,
             state,
             detail,
           });
@@ -364,7 +384,12 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
         stages.push({
           key: "servico_concluido",
           label: resolvedLabel,
-          icon: isEmPendencia && state === "warning" ? <AlertTriangle className="h-4 w-4" /> : stateIcon || <Check className="h-4 w-4" />,
+          icon:
+            isEmPendencia && state === "warning" ? (
+              <AlertTriangle className="h-4 w-4" />
+            ) : (
+              stateIcon || <Check className="h-4 w-4" />
+            ),
           state,
         });
       }
@@ -375,7 +400,10 @@ const getStages = (props: ProcessStageStepperProps): Stage[] => {
   if (solicitarDeferimento && deferimentoStatus !== "recebido" && !isTerminal) {
     // Encontrar a última etapa que está "current" ou "completed" e transformar em warning
     const lastActiveIdx = stages.length - 1;
-    if (lastActiveIdx >= 0 && (stages[lastActiveIdx].state === "current" || stages[lastActiveIdx].state === "completed")) {
+    if (
+      lastActiveIdx >= 0 &&
+      (stages[lastActiveIdx].state === "current" || stages[lastActiveIdx].state === "completed")
+    ) {
       stages[lastActiveIdx] = {
         ...stages[lastActiveIdx],
         state: "warning",
@@ -396,9 +424,12 @@ interface DeferimentoStage {
   icon: React.ReactNode;
 }
 
-const getDeferimentoStages = (deferimentoStatus: "recebido" | "recusado" | "aguardando" | null, etapasConfig: EtapaConfigItem[] = []): DeferimentoStage[] => {
+const getDeferimentoStages = (
+  deferimentoStatus: "recebido" | "recusado" | "aguardando" | null,
+  etapasConfig: EtapaConfigItem[] = [],
+): DeferimentoStage[] => {
   const getTitle = (chave: string, fallback: string): string => {
-    const cfg = etapasConfig.find(e => e.chave === chave);
+    const cfg = etapasConfig.find((e) => e.chave === chave);
     return cfg?.titulo || fallback;
   };
 
@@ -500,7 +531,19 @@ const stateIcons: Record<string, React.ReactNode> = {
   warning: <AlertTriangle className="h-3.5 w-3.5" />,
 };
 
-const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; label: string; state: "completed" | "current" | "pending" | "error" | "warning"; icon: React.ReactNode; detail?: string }[]; compact?: boolean }) => {
+const TimelineStepper = ({
+  stages,
+  compact = false,
+}: {
+  stages: {
+    key: string;
+    label: string;
+    state: "completed" | "current" | "pending" | "error" | "warning";
+    icon: React.ReactNode;
+    detail?: string;
+  }[];
+  compact?: boolean;
+}) => {
   if (compact) {
     return (
       <div className="flex items-center gap-1 flex-wrap">
@@ -509,15 +552,13 @@ const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; l
             <div
               className={cn(
                 "w-6 h-6 rounded-full flex items-center justify-center border-2 shrink-0",
-                stateStyles[stage.state].circle
+                stateStyles[stage.state].circle,
               )}
               title={stage.label}
             >
               {stage.icon || stateIcons[stage.state]}
             </div>
-            {i < stages.length - 1 && (
-              <div className={cn("w-4 h-0.5 rounded", stateStyles[stage.state].line)} />
-            )}
+            {i < stages.length - 1 && <div className={cn("w-4 h-0.5 rounded", stateStyles[stage.state].line)} />}
           </div>
         ))}
       </div>
@@ -542,7 +583,7 @@ const TimelineStepper = ({ stages, compact = false }: { stages: { key: string; l
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 relative z-10",
-                stateStyles[stage.state].circle
+                stateStyles[stage.state].circle,
               )}
             >
               {stage.icon || stateIcons[stage.state]}
@@ -566,7 +607,9 @@ const ProcessStageStepper = (props: ProcessStageStepperProps) => {
   const stages = getStages(props);
   const { compact = false, solicitarDeferimento = false, deferimentoStatus } = props;
 
-  const deferimentoStages = solicitarDeferimento ? getDeferimentoStages(deferimentoStatus ?? null, props.etapasConfig) : [];
+  const deferimentoStages = solicitarDeferimento
+    ? getDeferimentoStages(deferimentoStatus ?? null, props.etapasConfig)
+    : [];
 
   return (
     <div className="space-y-4">
@@ -574,20 +617,32 @@ const ProcessStageStepper = (props: ProcessStageStepperProps) => {
 
       {/* Deferimento sub-timeline */}
       {solicitarDeferimento && deferimentoStages.length > 0 && (
-        <div className={cn(
-          "ml-4 pl-4 border-l-2",
-          deferimentoStatus === "recusado" ? "border-red-300" :
-          deferimentoStatus === "recebido" ? "border-green-300" :
-          deferimentoStatus === "aguardando" ? "border-blue-300" :
-          "border-yellow-300"
-        )}>
-          <p className={cn(
-            "text-[10px] font-semibold mb-2 uppercase tracking-wide",
-            deferimentoStatus === "recusado" ? "text-red-700" :
-            deferimentoStatus === "recebido" ? "text-green-700" :
-            deferimentoStatus === "aguardando" ? "text-blue-700" :
-            "text-yellow-700"
-          )}>Deferimento</p>
+        <div
+          className={cn(
+            "ml-4 pl-4 border-l-2",
+            deferimentoStatus === "recusado"
+              ? "border-red-300"
+              : deferimentoStatus === "recebido"
+                ? "border-green-300"
+                : deferimentoStatus === "aguardando"
+                  ? "border-blue-300"
+                  : "border-yellow-300",
+          )}
+        >
+          <p
+            className={cn(
+              "text-[10px] font-semibold mb-2 uppercase tracking-wide",
+              deferimentoStatus === "recusado"
+                ? "text-red-700"
+                : deferimentoStatus === "recebido"
+                  ? "text-green-700"
+                  : deferimentoStatus === "aguardando"
+                    ? "text-blue-700"
+                    : "text-yellow-700",
+            )}
+          >
+            Deferimento
+          </p>
           <TimelineStepper stages={deferimentoStages} compact={compact} />
         </div>
       )}

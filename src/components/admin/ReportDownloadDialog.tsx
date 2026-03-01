@@ -71,7 +71,7 @@ const ReportDownloadDialog = ({ modeloId, modeloNome, modeloFileName, open, onCl
     setDownloading(true);
     try {
       // Build query
-      let query = supabase.from("solicitacoes").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("solicitacoes_v" as any).select("*").order("created_at", { ascending: false });
 
       if (filters.servico !== "todos") {
         query = query.eq("tipo_operacao", filters.servico);

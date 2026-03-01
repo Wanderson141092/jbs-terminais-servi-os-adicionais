@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       }
 
       const { data: sol } = await supabaseAdmin
-        .from("solicitacoes")
+        .from("solicitacoes_v")
         .select("protocolo, cliente_email, chave_consulta")
         .eq("id", solicitacao_id)
         .single();
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
 
     // Fetch solicitação
     const { data: solicitacao } = await supabaseAdmin
-      .from("solicitacoes")
+      .from("solicitacoes_v")
       .select("*")
       .eq("id", solicitacao_id)
       .single();

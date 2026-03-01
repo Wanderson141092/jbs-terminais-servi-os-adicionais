@@ -14,10 +14,26 @@ export type Database = {
   }
   public: {
     Tables: {
+      _encryption_keys: {
+        Row: {
+          id: number
+          key_value: string
+        }
+        Insert: {
+          id?: number
+          key_value: string
+        }
+        Update: {
+          id?: number
+          key_value?: string
+        }
+        Relationships: []
+      }
       admin_accounts: {
         Row: {
           ativo: boolean | null
           cpf: string
+          cpf_hash: string | null
           created_at: string | null
           id: string
           nome: string
@@ -27,6 +43,7 @@ export type Database = {
         Insert: {
           ativo?: boolean | null
           cpf: string
+          cpf_hash?: string | null
           created_at?: string | null
           id?: string
           nome: string
@@ -36,6 +53,7 @@ export type Database = {
         Update: {
           ativo?: boolean | null
           cpf?: string
+          cpf_hash?: string | null
           created_at?: string | null
           id?: string
           nome?: string
@@ -81,6 +99,13 @@ export type Database = {
             columns: ["solicitacao_id"]
             isOneToOne: false
             referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
             referencedColumns: ["id"]
           },
         ]
@@ -204,6 +229,13 @@ export type Database = {
             columns: ["solicitacao_id"]
             isOneToOne: false
             referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campos_analise_valores_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
             referencedColumns: ["id"]
           },
         ]
@@ -365,6 +397,13 @@ export type Database = {
             columns: ["solicitacao_id"]
             isOneToOne: false
             referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deferimento_documents_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
             referencedColumns: ["id"]
           },
         ]
@@ -761,6 +800,13 @@ export type Database = {
             referencedRelation: "solicitacoes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "integration_history_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
+            referencedColumns: ["id"]
+          },
         ]
       }
       lacre_armador_dados: {
@@ -824,6 +870,13 @@ export type Database = {
             columns: ["solicitacao_id"]
             isOneToOne: false
             referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lacre_armador_dados_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
             referencedColumns: ["id"]
           },
         ]
@@ -911,6 +964,13 @@ export type Database = {
             columns: ["solicitacao_id"]
             isOneToOne: false
             referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamento_cobranca_registros_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
             referencedColumns: ["id"]
           },
         ]
@@ -1072,6 +1132,13 @@ export type Database = {
             referencedRelation: "solicitacoes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notifications_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
+            referencedColumns: ["id"]
+          },
         ]
       }
       observacao_historico: {
@@ -1108,6 +1175,13 @@ export type Database = {
             columns: ["solicitacao_id"]
             isOneToOne: false
             referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "observacao_historico_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
             referencedColumns: ["id"]
           },
         ]
@@ -1626,8 +1700,11 @@ export type Database = {
           categoria: string | null
           chave_consulta: string
           cliente_email: string
+          cliente_email_hash: string | null
           cliente_nome: string
+          cliente_nome_hash: string | null
           cnpj: string | null
+          cnpj_hash: string | null
           comex_aprovado: boolean | null
           comex_data: string | null
           comex_justificativa: string | null
@@ -1665,8 +1742,11 @@ export type Database = {
           categoria?: string | null
           chave_consulta?: string
           cliente_email: string
+          cliente_email_hash?: string | null
           cliente_nome: string
+          cliente_nome_hash?: string | null
           cnpj?: string | null
+          cnpj_hash?: string | null
           comex_aprovado?: boolean | null
           comex_data?: string | null
           comex_justificativa?: string | null
@@ -1704,8 +1784,11 @@ export type Database = {
           categoria?: string | null
           chave_consulta?: string
           cliente_email?: string
+          cliente_email_hash?: string | null
           cliente_nome?: string
+          cliente_nome_hash?: string | null
           cnpj?: string | null
+          cnpj_hash?: string | null
           comex_aprovado?: boolean | null
           comex_data?: string | null
           comex_justificativa?: string | null
@@ -1830,9 +1913,212 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      admin_accounts_v: {
+        Row: {
+          ativo: boolean | null
+          cpf: string | null
+          cpf_hash: string | null
+          created_at: string | null
+          id: string | null
+          nome: string | null
+          senha_hash: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cpf?: never
+          cpf_hash?: string | null
+          created_at?: string | null
+          id?: string | null
+          nome?: never
+          senha_hash?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cpf?: never
+          cpf_hash?: string | null
+          created_at?: string | null
+          id?: string | null
+          nome?: never
+          senha_hash?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles_v: {
+        Row: {
+          bloqueado: boolean | null
+          created_at: string | null
+          email: string | null
+          email_setor: string | null
+          id: string | null
+          nome: string | null
+          setor: Database["public"]["Enums"]["setor_tipo"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          bloqueado?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          email_setor?: string | null
+          id?: string | null
+          nome?: never
+          setor?: Database["public"]["Enums"]["setor_tipo"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          bloqueado?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          email_setor?: string | null
+          id?: string | null
+          nome?: never
+          setor?: Database["public"]["Enums"]["setor_tipo"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_email_setor_fkey"
+            columns: ["email_setor"]
+            isOneToOne: false
+            referencedRelation: "setor_emails"
+            referencedColumns: ["email_setor"]
+          },
+        ]
+      }
+      solicitacoes_v: {
+        Row: {
+          armazem_aprovado: boolean | null
+          armazem_data: string | null
+          armazem_justificativa: string | null
+          armazem_usuario_id: string | null
+          cancelamento_solicitado: boolean | null
+          cancelamento_solicitado_em: string | null
+          categoria: string | null
+          chave_consulta: string | null
+          cliente_email: string | null
+          cliente_email_hash: string | null
+          cliente_nome: string | null
+          cliente_nome_hash: string | null
+          cnpj: string | null
+          cnpj_hash: string | null
+          comex_aprovado: boolean | null
+          comex_data: string | null
+          comex_justificativa: string | null
+          comex_usuario_id: string | null
+          created_at: string | null
+          custo_posicionamento: boolean | null
+          data_agendamento: string | null
+          data_posicionamento: string | null
+          id: string | null
+          lacre_armador_aceite_custo: boolean | null
+          lacre_armador_possui: boolean | null
+          lancamento_confirmado: boolean | null
+          lancamento_confirmado_data: string | null
+          lancamento_confirmado_por: string | null
+          lpco: string | null
+          numero_conteiner: string | null
+          observacoes: string | null
+          pendencias_selecionadas: string[] | null
+          protocolo: string | null
+          solicitar_deferimento: boolean | null
+          solicitar_lacre_armador: boolean | null
+          status: Database["public"]["Enums"]["status_solicitacao"] | null
+          status_vistoria: string | null
+          tipo_carga: string | null
+          tipo_operacao: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          armazem_aprovado?: boolean | null
+          armazem_data?: string | null
+          armazem_justificativa?: string | null
+          armazem_usuario_id?: string | null
+          cancelamento_solicitado?: boolean | null
+          cancelamento_solicitado_em?: string | null
+          categoria?: string | null
+          chave_consulta?: string | null
+          cliente_email?: never
+          cliente_email_hash?: string | null
+          cliente_nome?: never
+          cliente_nome_hash?: string | null
+          cnpj?: never
+          cnpj_hash?: string | null
+          comex_aprovado?: boolean | null
+          comex_data?: string | null
+          comex_justificativa?: string | null
+          comex_usuario_id?: string | null
+          created_at?: string | null
+          custo_posicionamento?: boolean | null
+          data_agendamento?: string | null
+          data_posicionamento?: string | null
+          id?: string | null
+          lacre_armador_aceite_custo?: boolean | null
+          lacre_armador_possui?: boolean | null
+          lancamento_confirmado?: boolean | null
+          lancamento_confirmado_data?: string | null
+          lancamento_confirmado_por?: string | null
+          lpco?: string | null
+          numero_conteiner?: string | null
+          observacoes?: string | null
+          pendencias_selecionadas?: string[] | null
+          protocolo?: string | null
+          solicitar_deferimento?: boolean | null
+          solicitar_lacre_armador?: boolean | null
+          status?: Database["public"]["Enums"]["status_solicitacao"] | null
+          status_vistoria?: string | null
+          tipo_carga?: string | null
+          tipo_operacao?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          armazem_aprovado?: boolean | null
+          armazem_data?: string | null
+          armazem_justificativa?: string | null
+          armazem_usuario_id?: string | null
+          cancelamento_solicitado?: boolean | null
+          cancelamento_solicitado_em?: string | null
+          categoria?: string | null
+          chave_consulta?: string | null
+          cliente_email?: never
+          cliente_email_hash?: string | null
+          cliente_nome?: never
+          cliente_nome_hash?: string | null
+          cnpj?: never
+          cnpj_hash?: string | null
+          comex_aprovado?: boolean | null
+          comex_data?: string | null
+          comex_justificativa?: string | null
+          comex_usuario_id?: string | null
+          created_at?: string | null
+          custo_posicionamento?: boolean | null
+          data_agendamento?: string | null
+          data_posicionamento?: string | null
+          id?: string | null
+          lacre_armador_aceite_custo?: boolean | null
+          lacre_armador_possui?: boolean | null
+          lancamento_confirmado?: boolean | null
+          lancamento_confirmado_data?: string | null
+          lancamento_confirmado_por?: string | null
+          lpco?: string | null
+          numero_conteiner?: string | null
+          observacoes?: string | null
+          pendencias_selecionadas?: string[] | null
+          protocolo?: string | null
+          solicitar_deferimento?: boolean | null
+          solicitar_lacre_armador?: boolean | null
+          status?: Database["public"]["Enums"]["status_solicitacao"] | null
+          status_vistoria?: string | null
+          tipo_carga?: string | null
+          tipo_operacao?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      _get_enc_key: { Args: never; Returns: string }
       create_notifications_for_others: {
         Args: {
           p_exclude_user_id: string
@@ -1842,6 +2128,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      decrypt_pii: { Args: { encrypted_text: string }; Returns: string }
+      encrypt_pii: { Args: { plain_text: string }; Returns: string }
       get_user_email_setor: { Args: { _user_id: string }; Returns: string }
       get_user_sector: {
         Args: { user_id: string }
@@ -1854,6 +2142,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_pii: { Args: { plain_text: string }; Returns: string }
       insert_audit_log: {
         Args: {
           p_acao: string

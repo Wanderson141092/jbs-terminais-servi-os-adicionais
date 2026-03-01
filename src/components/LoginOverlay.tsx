@@ -22,7 +22,9 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         onOpenChange(false);
         navigate("/interno/dashboard");
@@ -64,8 +66,8 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "apikey": supabaseKey,
-          "Authorization": `Bearer ${supabaseKey}`,
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
         },
         body: JSON.stringify({ username: trimmed, password }),
       });
@@ -101,19 +103,17 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
             </div>
           </div>
           <DialogHeader className="text-center">
-            <DialogTitle className="text-lg font-bold text-primary-foreground">
-              Acesso Interno
-            </DialogTitle>
-            <p className="text-xs text-primary-foreground/70 mt-1">
-              Painel de Gestão de Posicionamento
-            </p>
+            <DialogTitle className="text-lg font-bold text-primary-foreground">Acesso Interno</DialogTitle>
+            <p className="text-xs text-primary-foreground/70 mt-1">Painel de Gestão de Serviços Adicionais</p>
           </DialogHeader>
         </div>
 
         <div className="px-6 pb-6 pt-4">
           <form onSubmit={handleLogin} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="overlay-id" className="text-sm font-medium text-foreground">Usuário</Label>
+              <Label htmlFor="overlay-id" className="text-sm font-medium text-foreground">
+                Usuário
+              </Label>
               <Input
                 id="overlay-id"
                 type="text"
@@ -122,12 +122,12 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
                 placeholder="E-mail corporativo ou usuário administrativo"
                 className="h-10 rounded-lg border-input focus:ring-2 focus:ring-primary/20"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Informe o seu email ou usuário.
-              </p>
+              <p className="text-[11px] text-muted-foreground">Informe o seu email ou usuário.</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="overlay-password" className="text-sm font-medium text-foreground">Senha</Label>
+              <Label htmlFor="overlay-password" className="text-sm font-medium text-foreground">
+                Senha
+              </Label>
               <PasswordInput
                 id="overlay-password"
                 value={password}
@@ -136,12 +136,19 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
                 className="h-10 rounded-lg border-input focus:ring-2 focus:ring-primary/20"
               />
             </div>
-            <Button type="submit" disabled={loading} className="w-full jbs-btn-primary h-11 rounded-lg font-medium mt-2">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full jbs-btn-primary h-11 rounded-lg font-medium mt-2"
+            >
               <LogIn className="h-4 w-4 mr-2" />
               {loading ? "Aguarde..." : "Entrar"}
             </Button>
             <div className="text-center mt-3">
-              <a href="/recuperar-senha" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <a
+                href="/recuperar-senha"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
                 Esqueci minha senha
               </a>
             </div>

@@ -48,7 +48,10 @@ const loadLogoBase64 = (): Promise<string> => {
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext("2d");
-      if (!ctx) { reject("No canvas"); return; }
+      if (!ctx) {
+        reject("No canvas");
+        return;
+      }
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
@@ -63,23 +66,34 @@ const getStatusLabel = (status: string) => STATUS_LABELS[status] || status;
 
 const getStatusColor = (status: string): RGB => {
   switch (status) {
-    case "vistoria_finalizada": return JBS_GREEN;
-    case "confirmado_aguardando_vistoria": return COLOR_BLUE_LIGHT;
-    case "vistoriado_com_pendencia": return [234, 138, 0];
+    case "vistoria_finalizada":
+      return JBS_GREEN;
+    case "confirmado_aguardando_vistoria":
+      return COLOR_BLUE_LIGHT;
+    case "vistoriado_com_pendencia":
+      return [234, 138, 0];
     case "recusado":
-    case "cancelado": return COLOR_RED;
-    case "nao_vistoriado": return [100, 100, 100];
-    default: return COLOR_AMBER;
+    case "cancelado":
+      return COLOR_RED;
+    case "nao_vistoriado":
+      return [100, 100, 100];
+    default:
+      return COLOR_AMBER;
   }
 };
 
 const getStateColor = (state: string): RGB => {
   switch (state) {
-    case "completed": return JBS_GREEN;
-    case "current": return COLOR_BLUE_LIGHT;
-    case "error": return COLOR_RED;
-    case "warning": return [217, 140, 20];
-    default: return [160, 160, 160];
+    case "completed":
+      return JBS_GREEN;
+    case "current":
+      return COLOR_BLUE_LIGHT;
+    case "error":
+      return COLOR_RED;
+    case "warning":
+      return [217, 140, 20];
+    default:
+      return [160, 160, 160];
   }
 };
 
@@ -139,10 +153,12 @@ const drawFooter = (doc: jsPDF) => {
   doc.setTextColor(...JBS_LABEL);
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  doc.text("JBS Terminais - Sistema de Gestao de Processos", MARGIN, footerY + 10);
+  doc.text("JBS Terminais - Sistema de Gestão de Serviços Adicionais", MARGIN, footerY + 10);
   doc.text(
     `Emitido em ${new Date().toLocaleString("pt-BR")}  |  Pag. ${doc.getCurrentPageInfo().pageNumber}`,
-    pageW - MARGIN, footerY + 10, { align: "right" }
+    pageW - MARGIN,
+    footerY + 10,
+    { align: "right" },
   );
 };
 
@@ -221,17 +237,28 @@ const drawStatusPill = (doc: jsPDF, label: string, color: RGB, x: number, y: num
 // ─── State marker text ───
 const getStateMarker = (state: string): string => {
   switch (state) {
-    case "completed": return "\u2713";
-    case "done": return "\u2713";
-    case "error": return "X";
-    case "warning": return "!";
-    case "current": return "\u23F3";
-    default: return "\u23F3";
+    case "completed":
+      return "\u2713";
+    case "done":
+      return "\u2713";
+    case "error":
+      return "X";
+    case "warning":
+      return "!";
+    case "current":
+      return "\u23F3";
+    default:
+      return "\u23F3";
   }
 };
 
 // ─── Timeline stages (colored pills with state marker + label) ───
-const drawTimelineStages = (doc: jsPDF, stages: { label: string; state: string; detail?: string }[], y: number, indent = 0): number => {
+const drawTimelineStages = (
+  doc: jsPDF,
+  stages: { label: string; state: string; detail?: string }[],
+  y: number,
+  indent = 0,
+): number => {
   const pageW = doc.internal.pageSize.getWidth();
   const startX = MARGIN + indent;
   let x = startX;
@@ -358,7 +385,11 @@ const drawNeutralIcon = (doc: jsPDF, cx: number, cy: number, r: number) => {
 };
 
 // ─── Checklist items (rows with colored accent bar + drawn icon) ───
-const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; detail?: string }[], y: number): number => {
+const drawChecklistItems = (
+  doc: jsPDF,
+  items: { label: string; status: string; detail?: string }[],
+  y: number,
+): number => {
   const pageW = doc.internal.pageSize.getWidth();
   const rowH = 14;
   const rowW = pageW - MARGIN * 2;
@@ -369,10 +400,15 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
     y = ensureSpace(doc, y, rowH + 4);
 
     const color: RGB =
-      item.status === "done" ? JBS_GREEN :
-      item.status === "error" ? COLOR_RED :
-      item.status === "warning" ? [217, 140, 20] :
-      item.status === "pending" ? COLOR_BLUE_LIGHT : [160, 160, 160];
+      item.status === "done"
+        ? JBS_GREEN
+        : item.status === "error"
+          ? COLOR_RED
+          : item.status === "warning"
+            ? [217, 140, 20]
+            : item.status === "pending"
+              ? COLOR_BLUE_LIGHT
+              : [160, 160, 160];
 
     // Light row background
     doc.setFillColor(248, 249, 250);
@@ -419,7 +455,13 @@ const drawChecklistItems = (doc: jsPDF, items: { label: string; status: string; 
 
 // ─── Lacre armador sub-timeline ───
 const getLacreStagesForPdf = (lacreStatus: string) => {
-  const statusOrder = ["aguardando_preenchimento", "aguardando_confirmacao", "posicionamento_confirmado", "aguardando_lacre", "servico_concluido"];
+  const statusOrder = [
+    "aguardando_preenchimento",
+    "aguardando_confirmacao",
+    "posicionamento_confirmado",
+    "aguardando_lacre",
+    "servico_concluido",
+  ];
   const currentIdx = statusOrder.indexOf(lacreStatus);
   const isRecusado = lacreStatus === "recusado";
 
@@ -442,7 +484,8 @@ const getLacreStagesForPdf = (lacreStatus: string) => {
     } else if (logicalIdx < currentIdx) {
       state = "completed";
     } else if (logicalIdx === currentIdx) {
-      if (step.key === "servico_concluido" || step.key === "posicionamento_confirmado" || step.key === "lacre_inserido") state = "completed";
+      if (step.key === "servico_concluido" || step.key === "posicionamento_confirmado" || step.key === "lacre_inserido")
+        state = "completed";
       else if (step.key === "aguardando_confirmacao") state = "current";
       else state = "warning";
     }
@@ -472,7 +515,11 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   } = options;
 
   let logoBase64: string | null = null;
-  try { logoBase64 = await loadLogoBase64(); } catch { /* fallback */ }
+  try {
+    logoBase64 = await loadLogoBase64();
+  } catch {
+    /* fallback */
+  }
 
   let y = drawHeader(doc, logoBase64, "Comprovante de Solicitacao", new Date().toLocaleString("pt-BR"));
 
@@ -502,7 +549,13 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   const dateLabel = isPosic ? "Posicionar dia" : isAgendamento ? "Agendar para" : "Data do servico";
   let dateValue = "---";
   if (isAgendamento && solicitacao.data_agendamento) {
-    dateValue = new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    dateValue = new Date(solicitacao.data_agendamento).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } else if (solicitacao.data_posicionamento) {
     dateValue = new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR");
   }
@@ -514,7 +567,7 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     solicitacao.numero_conteiner ? ["Conteiner", solicitacao.numero_conteiner] : null,
     solicitacao.lpco ? ["LPCO", solicitacao.lpco] : null,
     dateValue !== "---" ? [dateLabel, dateValue] : null,
-    ...camposDinamicosExternos.map(c => [c.campo_nome, c.valor] as [string, string]),
+    ...camposDinamicosExternos.map((c) => [c.campo_nome, c.valor] as [string, string]),
   ].filter(Boolean) as [string, string][];
 
   if (infoFields.length > 0) {
@@ -554,12 +607,13 @@ const generateExternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     const lacreStatus = lacreArmadorDados.lacre_status || "aguardando_preenchimento";
 
     if (lacreStatus !== "aguardando_preenchimento") {
-      const lacreFields: [string, string][] = [
-        ["Lacre coletado", lacreArmadorDados.lacre_coletado ? "Sim" : "Nao"],
-      ];
+      const lacreFields: [string, string][] = [["Lacre coletado", lacreArmadorDados.lacre_coletado ? "Sim" : "Nao"]];
       if (lacreArmadorDados.data_posicionamento_lacre) {
         const periodo = lacreArmadorDados.periodo_lacre === "manha" ? "Manha" : "Tarde";
-        lacreFields.push(["Data / Periodo", `${new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} - ${periodo}`]);
+        lacreFields.push([
+          "Data / Periodo",
+          `${new Date(lacreArmadorDados.data_posicionamento_lacre + "T00:00:00").toLocaleDateString("pt-BR")} - ${periodo}`,
+        ]);
       }
 
       // Status as plain text field (same style as other data fields)
@@ -612,7 +666,11 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   const pageW = doc.internal.pageSize.getWidth();
   const { aprovacaoAtivada = false, deferimentoStatus } = options;
   let logoBase64: string | null = null;
-  try { logoBase64 = await loadLogoBase64(); } catch { /* fallback */ }
+  try {
+    logoBase64 = await loadLogoBase64();
+  } catch {
+    /* fallback */
+  }
 
   let y = drawHeader(doc, logoBase64, "Relatorio Interno de Processo", new Date().toLocaleString("pt-BR"), true);
 
@@ -634,8 +692,12 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     ["Conteiner", solicitacao.numero_conteiner || "---"],
     ["LPCO", solicitacao.lpco || "---"],
     ["Tipo de Carga", formatTipoCarga(solicitacao.tipo_carga)],
-    ["Data Posicionamento", solicitacao.data_posicionamento
-      ? new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR") : "---"],
+    [
+      "Data Posicionamento",
+      solicitacao.data_posicionamento
+        ? new Date(solicitacao.data_posicionamento + "T00:00:00").toLocaleDateString("pt-BR")
+        : "---",
+    ],
     ["Status Vistoria", solicitacao.status_vistoria || "---"],
     ["Data Solicitacao", new Date(solicitacao.created_at).toLocaleString("pt-BR")],
   ];
@@ -665,7 +727,11 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
     y = drawSectionTitle(doc, "Aprovacoes", y);
     const approvals = [
       { label: "Administrativo", approved: solicitacao.comex_aprovado, justificativa: solicitacao.comex_justificativa },
-      { label: "Operacional", approved: solicitacao.armazem_aprovado, justificativa: solicitacao.armazem_justificativa },
+      {
+        label: "Operacional",
+        approved: solicitacao.armazem_aprovado,
+        justificativa: solicitacao.armazem_justificativa,
+      },
     ];
     for (const ap of approvals) {
       y = ensureSpace(doc, y, 14);
@@ -691,8 +757,10 @@ const generateInternalPdf = async (solicitacao: any, options: PdfOptions = {}): 
   // ─── Deferimento ───
   if (solicitacao.solicitar_deferimento && deferimentoStatus) {
     y = drawSectionTitle(doc, "Deferimento", y);
-    const defLabel = deferimentoStatus === "recebido" ? "RECEBIDO" : deferimentoStatus === "recusado" ? "RECUSADO" : "AGUARDANDO";
-    const defColor: RGB = deferimentoStatus === "recebido" ? JBS_GREEN : deferimentoStatus === "recusado" ? COLOR_RED : COLOR_AMBER;
+    const defLabel =
+      deferimentoStatus === "recebido" ? "RECEBIDO" : deferimentoStatus === "recusado" ? "RECUSADO" : "AGUARDANDO";
+    const defColor: RGB =
+      deferimentoStatus === "recebido" ? JBS_GREEN : deferimentoStatus === "recusado" ? COLOR_RED : COLOR_AMBER;
     drawStatusPill(doc, defLabel, defColor, MARGIN + 4, y);
     y += 18;
     y = drawSectionBorder(doc, y);
@@ -738,6 +806,6 @@ export const downloadBatchPdfs = async (solicitacoes: any[], options: PdfOptions
   const limit = Math.min(solicitacoes.length, 10);
   for (let i = 0; i < limit; i++) {
     await downloadInternalPdf(solicitacoes[i], options);
-    if (i < limit - 1) await new Promise(r => setTimeout(r, 300));
+    if (i < limit - 1) await new Promise((r) => setTimeout(r, 300));
   }
 };

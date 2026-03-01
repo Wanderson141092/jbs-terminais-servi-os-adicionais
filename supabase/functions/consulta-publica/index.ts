@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, solicitar_lacre_armador, lacre_armador_possui, lacre_armador_aceite_custo, pendencias_selecionadas, observacoes, custo_posicionamento, armazem_justificativa, comex_justificativa, cancelamento_solicitado";
+    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, solicitar_lacre_armador, lacre_armador_possui, lacre_armador_aceite_custo, pendencias_selecionadas";
 
     let solicitacao = null;
 
@@ -233,9 +233,7 @@ Deno.serve(async (req) => {
           key === "comex_aprovado" || key === "armazem_aprovado" || key === "solicitar_deferimento" ||
           key === "solicitar_lacre_armador" || key === "lacre_armador_possui" || key === "lacre_armador_aceite_custo" ||
           key === "pendencias_selecionadas" || key === "status_vistoria" || key === "categoria" ||
-          key === "tipo_operacao" || key === "observacoes" || key === "custo_posicionamento" ||
-          key === "armazem_justificativa" || key === "comex_justificativa" ||
-          key === "cancelamento_solicitado" ||
+          key === "tipo_operacao" ||
           visibleFixedFields.includes(key)) {
         sanitizedSolicitacao[key] = value;
       }

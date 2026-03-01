@@ -104,7 +104,7 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
           </div>
           <DialogHeader className="text-center">
             <DialogTitle className="text-lg font-bold text-primary-foreground">Acesso Interno</DialogTitle>
-            <p className="text-xs text-primary-foreground/70 mt-1">Painel de Gestão de Serviços Adicionais</p>
+            <p className="text-xs text-primary-foreground/70 mt-1">Painel de Gestão | Serviços Adicionais</p>
           </DialogHeader>
         </div>
 
@@ -119,10 +119,10 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="E-mail corporativo ou usuário administrativo"
+                placeholder="E-mail corporativo"
                 className="h-10 rounded-lg border-input focus:ring-2 focus:ring-primary/20"
               />
-              <p className="text-[11px] text-muted-foreground">Informe o seu email ou usuário.</p>
+              <p className="text-[11px] text-muted-foreground">Informe o seu email.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="overlay-password" className="text-sm font-medium text-foreground">

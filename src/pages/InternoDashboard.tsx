@@ -124,11 +124,26 @@ const InternoDashboard = () => {
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("*, setor_emails(id, perfis, descricao)")
+    // Use decrypted view for profiles (nome is encrypted at rest)
+    const { data: profileData } = await (supabase
+      .from("profiles_v" as any)
+      .select("*")
       .eq("id", user.id)
-      .maybeSingle();
+      .maybeSingle() as any);
+    
+    // Separately fetch setor_emails (view doesn't support FK joins)
+    let setorEmailsData = null;
+    if (profileData?.email_setor) {
+      const { data: seData } = await supabase
+        .from("setor_emails")
+        .select("id, perfis, descricao")
+        .eq("email_setor", profileData.email_setor)
+        .eq("ativo", true)
+        .maybeSingle();
+      setorEmailsData = seData;
+    }
+
+    const data = profileData ? { ...profileData, setor_emails: setorEmailsData } : null;
     setProfile(data);
     
     if (data?.setor_emails?.perfis) {
@@ -171,7 +186,7 @@ const InternoDashboard = () => {
     setLoading(true);
     
     const [solRes, regRes] = await Promise.all([
-      supabase.from("solicitacoes").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("solicitacoes_v" as any).select("*").order("created_at", { ascending: false }).limit(500),
       supabase.from("lancamento_cobranca_registros").select("*"),
     ]);
 

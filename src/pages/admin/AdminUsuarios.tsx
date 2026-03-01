@@ -105,14 +105,15 @@ const AdminUsuarios = () => {
 
   const fetchData = async () => {
     const [profilesRes, setoresRes, rolesRes] = await Promise.all([
-      supabase.from("profiles").select("*").order("nome"),
+      supabase.from("profiles_v" as any).select("*").order("nome"),
       supabase.from("setor_emails").select("email_setor, setor, descricao").eq("ativo", true),
       supabase.from("user_roles").select("user_id, role")
     ]);
 
     if (profilesRes.data) {
+      const profilesList = profilesRes.data as any[];
       // Remover duplicados por email
-      const uniqueProfiles = profilesRes.data.reduce((acc: Profile[], profile) => {
+      const uniqueProfiles = profilesList.reduce((acc: Profile[], profile: any) => {
         if (!acc.find(p => p.email === profile.email)) {
           acc.push(profile);
         }

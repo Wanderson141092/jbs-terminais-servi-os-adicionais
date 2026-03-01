@@ -85,7 +85,7 @@ const ExcelExportDialog = ({ open, onClose }: ExcelExportDialogProps) => {
 
     setExporting(true);
     try {
-      let query = supabase.from("solicitacoes").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("solicitacoes_v" as any).select("*").order("created_at", { ascending: false });
 
       if (selectedServico !== "todos") {
         query = query.eq("tipo_operacao", selectedServico);

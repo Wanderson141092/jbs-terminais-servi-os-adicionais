@@ -51,10 +51,10 @@ const AdminLogs = () => {
   };
 
   const fetchProfiles = async () => {
-    const { data } = await supabase.from("profiles").select("id, nome, email");
+    const { data } = await (supabase.from("profiles_v" as any).select("id, nome, email") as any);
     if (data) {
       const map: Record<string, string> = {};
-      data.forEach(p => { map[p.id] = p.nome || p.email; });
+      (data as any[]).forEach((p: any) => { map[p.id] = p.nome || p.email; });
       setProfiles(map);
     }
   };

@@ -7,7 +7,9 @@ const FALLBACK_LABELS: Record<string, string> = {
   recusado: "Recusado",
   confirmado_aguardando_vistoria: "Aguardando conclusão do serviço",
   vistoria_finalizada: "Vistoriado",
+  servico_finalizado: "Serviço finalizado",
   vistoriado_com_pendencia: "Vistoriado com Pendência",
+  servico_concluido: "Serviço concluído",
   nao_vistoriado: "Não Vistoriado",
 };
 
@@ -21,11 +23,7 @@ const StatusBadge = ({ status }: StatusBadgeProps) => {
   // Dynamic labels take priority, fallback for instant render
   const label = statusLabels[status] || FALLBACK_LABELS[status] || status;
 
-  return (
-    <span className={`status-badge status-${status}`}>
-      {label}
-    </span>
-  );
+  return <span className={`status-badge status-${status}`}>{label}</span>;
 };
 
 // Export dynamic hook for consumers that need the labels map

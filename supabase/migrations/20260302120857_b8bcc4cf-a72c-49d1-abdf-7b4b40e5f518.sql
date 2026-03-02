@@ -1,0 +1,1 @@
+ALTER TYPE public.status_solicitacao ADD VALUE IF NOT EXISTS 'confirmado_aguardando_servico';

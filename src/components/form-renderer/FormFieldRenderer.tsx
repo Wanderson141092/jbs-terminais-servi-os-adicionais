@@ -812,8 +812,24 @@ const FormFieldRenderer = ({
             {sp.tipo === "email" && (
               <Input type="email" value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} />
             )}
+            {sp.tipo === "texto_longo" && (
+              <Textarea value={value || ""} onChange={(e) => onValueChange(e.target.value)} placeholder={sp.placeholder || ""} rows={4} />
+            )}
             {sp.tipo === "data" && (
               <Input type="date" value={value || ""} onChange={(e) => onValueChange(e.target.value)} />
+            )}
+            {sp.tipo === "data_hora" && (
+              <Input type="datetime-local" value={value || ""} onChange={(e) => onValueChange(e.target.value)} />
+            )}
+            {sp.tipo === "selecao_unica" && sp.opcoes && (
+              <RadioGroup value={value || ""} onValueChange={onValueChange} className="space-y-2">
+                {sp.opcoes.map((o: string, i: number) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <RadioGroupItem value={o} id={`${pergunta.id}_cond_su_${i}`} />
+                    <Label htmlFor={`${pergunta.id}_cond_su_${i}`} className="cursor-pointer font-normal">{o}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
             )}
             {sp.tipo === "checkbox" && (
               <div className="flex items-center gap-2">

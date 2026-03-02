@@ -122,6 +122,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [showLacreConfirmDialog, setShowLacreConfirmDialog] = useState(false);
   // Lacre form state
   const [lacreColetado, setLacreColetado] = useState<boolean | null>(null);
   const [lacreFotoFile, setLacreFotoFile] = useState<File | null>(null);
@@ -633,27 +634,6 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                 {/* Mini-form - show when needs filling */}
                 {canFillLacreForm && (
                   <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Lacre Armador coletado?</Label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="radio" name="lacre_coletado" checked={lacreColetado === true} onChange={() => setLacreColetado(true)} className="accent-amber-600" />
-                          <span className="text-sm">Sim</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="radio" name="lacre_coletado" checked={lacreColetado === false} onChange={() => setLacreColetado(false)} className="accent-amber-600" />
-                          <span className="text-sm">Não</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    {lacreArmadorConfig?.anexo_ativo !== false && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> RIC do novo lacre com imagem do novo lacre</Label>
-                        <Input type="file" accept="image/jpeg,image/png" onChange={(e) => setLacreFotoFile(e.target.files?.[0] || null)} className="text-sm" />
-                      </div>
-                    )}
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Data do Posicionamento</Label>
@@ -687,46 +667,11 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
 
                     <Button
                       size="sm"
-                      disabled={savingLacre || lacreColetado === null || !lacreDataPos || !lacrePeriodo || !lacreResponsavel.trim()}
-                      onClick={async () => {
-                        setSavingLacre(true);
-                        try {
-                          // Upload photo first if exists
-                          if (lacreFotoFile) {
-                            const formData = new FormData();
-                            formData.append("file", lacreFotoFile);
-                            formData.append("bucket", "deferimento");
-                            formData.append("solicitacao_id", solicitacao.id);
-                            formData.append("document_type", "lacre_foto");
-                            const { error: uploadErr } = await supabase.functions.invoke("upload-publico", { body: formData });
-                            if (uploadErr) throw uploadErr;
-                          }
-
-                          // Submit form data
-                          const { error } = await supabase.functions.invoke("upload-publico", {
-                            body: {
-                              action: "submit_lacre_form",
-                              solicitacao_id: solicitacao.id,
-                              lacre_coletado: lacreColetado,
-                              data_posicionamento_lacre: lacreDataPos,
-                              periodo_lacre: lacrePeriodo,
-                              responsavel_nome: lacreResponsavel,
-                              responsavel_telefone: lacreTelefone,
-                              responsavel_email: lacreEmail,
-                            },
-                          });
-                          if (error) throw error;
-                          toast.success("Dados enviados! Aguardando confirmação.");
-                          onRefresh();
-                        } catch {
-                          toast.error("Erro ao enviar dados do lacre.");
-                        } finally {
-                          setSavingLacre(false);
-                        }
-                      }}
+                      disabled={!lacreDataPos || !lacrePeriodo || !lacreResponsavel.trim()}
+                      onClick={() => setShowLacreConfirmDialog(true)}
                       className="w-full bg-amber-600 hover:bg-amber-700 text-white"
                     >
-                      {savingLacre ? "Enviando..." : "Enviar Solicitação de Posicionamento"}
+                      Enviar Solicitação de Posicionamento
                     </Button>
                   </div>
                 )}
@@ -892,6 +837,87 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             </Button>
             <Button variant="destructive" onClick={handleCancelSolicitacao} disabled={cancelling}>
               {cancelling ? "Cancelando..." : "Confirmar Cancelamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmação do lacre */}
+      <Dialog open={showLacreConfirmDialog} onOpenChange={setShowLacreConfirmDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-amber-600" />
+              Dados do Lacre Armador
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {(lacreArmadorConfig as any)?.lacre_coletado_ativo !== false && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Lacre Armador coletado?</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="lacre_coletado_dialog" checked={lacreColetado === true} onChange={() => setLacreColetado(true)} className="accent-amber-600" />
+                    <span className="text-sm">Sim</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="lacre_coletado_dialog" checked={lacreColetado === false} onChange={() => setLacreColetado(false)} className="accent-amber-600" />
+                    <span className="text-sm">Não</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {lacreArmadorConfig?.anexo_ativo !== false && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> RIC do novo lacre com imagem do novo lacre</Label>
+                <Input type="file" accept="image/jpeg,image/png" onChange={(e) => setLacreFotoFile(e.target.files?.[0] || null)} className="text-sm" />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowLacreConfirmDialog(false)} disabled={savingLacre}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={savingLacre || ((lacreArmadorConfig as any)?.lacre_coletado_ativo !== false && lacreColetado === null)}
+              onClick={async () => {
+                setSavingLacre(true);
+                try {
+                  if (lacreFotoFile) {
+                    const formData = new FormData();
+                    formData.append("file", lacreFotoFile);
+                    formData.append("bucket", "deferimento");
+                    formData.append("solicitacao_id", solicitacao.id);
+                    formData.append("document_type", "lacre_foto");
+                    const { error: uploadErr } = await supabase.functions.invoke("upload-publico", { body: formData });
+                    if (uploadErr) throw uploadErr;
+                  }
+                  const { error } = await supabase.functions.invoke("upload-publico", {
+                    body: {
+                      action: "submit_lacre_form",
+                      solicitacao_id: solicitacao.id,
+                      lacre_coletado: lacreColetado,
+                      data_posicionamento_lacre: lacreDataPos,
+                      periodo_lacre: lacrePeriodo,
+                      responsavel_nome: lacreResponsavel,
+                      responsavel_telefone: lacreTelefone,
+                      responsavel_email: lacreEmail,
+                    },
+                  });
+                  if (error) throw error;
+                  toast.success("Dados enviados! Aguardando confirmação.");
+                  setShowLacreConfirmDialog(false);
+                  onRefresh();
+                } catch {
+                  toast.error("Erro ao enviar dados do lacre.");
+                } finally {
+                  setSavingLacre(false);
+                }
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {savingLacre ? "Enviando..." : "Salvar e Enviar"}
             </Button>
           </DialogFooter>
         </DialogContent>

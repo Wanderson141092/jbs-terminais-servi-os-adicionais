@@ -1,151 +1,141 @@
 
 
-# Plano de Reestruturação Completa do Sistema
+# Plan: Complete Implementation/Fix of All 25 Items
 
-Este plano aborda os 24 itens solicitados, organizados em fases de implementação por dependência e prioridade.
-
----
-
-## Fase 1 — Banco de Dados e Estrutura
-
-### 1.1 Status: Campo "Grupo do Status" e "Sigla" obrigatória
-- Adicionar coluna `grupo_status` (text, NOT NULL DEFAULT 'outros_servicos') em `parametros_campos` com valores: `posicionamento_vistoria`, `posicionamento_servico`, `outros_servicos`
-- Tornar `sigla` NOT NULL na tabela `parametros_campos` (para grupo `status_processo`)
-- Atualizar `ParametrosCamposManager.tsx`: adicionar campo obrigatório "Grupo do Status" (select com 3 opções) e tornar "Sigla" visível e obrigatória para `status_processo`
-
-### 1.2 Observações internas vs externas
-- Adicionar coluna `tipo_observacao` (text, DEFAULT 'interna') em `observacao_historico` com valores: `interna`, `externa`
-- Atualizar `consulta-publica` Edge Function para filtrar apenas observações `tipo_observacao = 'externa'`
-
-### 1.3 Protocolo por serviço
-- Alterar `protocol_config`: adicionar `servico_id` (uuid, nullable FK) para sequências independentes por serviço
-- Adicionar coluna `ano_referencia` (integer) para controle de reset anual
-- Atualizar `enviar-formulario` Edge Function para gerar protocolo com formato `YY` + prefixo + sequência ampliada
-
-### 1.4 Horário de corte por dia da semana
-- Adicionar coluna `horarios_por_dia` (jsonb, nullable) em `regras_servico` — formato: `{"seg":"15:00","ter":"16:00",...}`
-- Adicionar coluna `usar_horario_por_dia` (boolean, DEFAULT false) em `regras_servico`
+Many of these items were partially implemented in Phases 1-7 but have gaps or bugs. This plan addresses every remaining issue.
 
 ---
 
-## Fase 2 — Backend / Edge Functions
+## Group A: Already Implemented — Needs Verification/Fixes Only
 
-### 2.1 Correção "Aplica Dia Anterior" (item 20)
-- Corrigir lógica em `enviar-formulario`: quando ativado, comparar horário da solicitação com horário de corte E verificar se data informada é D+1 ou anterior. Quando desativado, aplicar corte apenas pelo horário do pedido. Em ambos os casos, seguir o "Comportamento após o Corte" configurado.
+These items were implemented but may have bugs based on the code review:
 
-### 2.2 Consulta pública — observações externas
-- Alterar filtro em `consulta-publica` para retornar apenas `tipo_observacao = 'externa'` (substituindo o filtro atual de `[Correção de Status]`)
-
-### 2.3 Recusa com motivo na página externa
-- Na resposta de `consulta-publica`, incluir `motivo_recusa` da última observação externa quando status = `recusado`
-
----
-
-## Fase 3 — Frontend: Parâmetros e Admin
-
-### 3.1 Nome descriptografado no header (item 3)
-- O `fetchProfile` já usa `profiles_v` (view descriptografada). Verificar se o `trigger_encrypt_profiles` está re-encriptando em UPDATE desnecessariamente. O problema provavelmente é que o nome salvo no perfil já estava criptografado antes da migração de views. Corrigir: garantir que `profiles_v` retorna `decrypt_pii(nome)` corretamente.
-
-### 3.2 ParametrosCamposManager — grupo do status e sigla
-- Para `status_processo`: adicionar Select "Grupo do Status" (obrigatório, 3 opções)
-- Tornar campo "Sigla" visível e obrigatório (já existe `showSigla` mas está `false` para `status_processo`)
-- Atualizar constante `GRUPOS` para `status_processo`: `showSigla: true`
-
-### 3.3 Desfazer lançamento de cobrança (item 6)
-- Em `AnaliseDialog.tsx`: adicionar botão "Desfazer" ao lado de cada lançamento confirmado
-- Lógica: `UPDATE lancamento_cobranca_registros SET confirmado = false, confirmado_por = null, confirmado_data = null`
-- Registrar em audit_log
-
-### 3.4 Toggle deferimento/lacre armador (item 7)
-- Corrigir lógica em `AnaliseDialog.tsx`: toggle só aparece se serviço do processo = serviço da config E status atual está na lista de ativação. Se pendência marcada no checkbox, mostrar toggle imediatamente (antes de salvar). Se pendência em branco, ocultar.
-
-### 3.5 Observações internas vs externas (item 8)
-- Adicionar toggle "Interna / Externa (Cliente)" na seção de observações do `AnaliseDialog.tsx`
-- Gravar `tipo_observacao` na inserção de `observacao_historico`
-
-### 3.6 Correção de status — reset total (item 5)
-- Em `StatusCorrectionDialog.tsx`: ao corrigir, além de mudar o status, limpar: `pendencias_selecionadas = []`, `status_vistoria = null`, `solicitar_deferimento = false`, `solicitar_lacre_armador = false`, `lancamento_confirmado = null`, `custo_posicionamento = null`
-
-### 3.7 Recusa obrigatória com motivo (item 4)
-- Em `AnaliseDialog.tsx` e `executeRecusa`: já exige justificativa. Garantir que o motivo é gravado em `observacao_historico` com `tipo_observacao = 'externa'` para aparecer na consulta pública quando status = recusado.
-
-### 3.8 Logs descriptografados + "Ver detalhes" (item 9)
-- Em `AdminLogs.tsx`: já usa `profiles` para nomes. Adicionar botão "Ver detalhes" por linha que abre modal mostrando todos os campos do log formatados.
-
-### 3.9 Notificações — Administrador (item 21)
-- Em `AdminParametros.tsx`, seção Notificações: adicionar opção "Administrador do Sistema" no select de setores destinatários
-- Em `notificar-status` Edge Function: quando setor = `admin`, enviar para todos usuários com role `admin`
-
-### 3.10 Manual auto-atualizável (item 11)
-- Em `AdminParametrosAjuda.tsx`: substituir schema estático por consulta dinâmica que varre tabelas de configuração
-- Adicionar botão "Atualizar Manual" que recarrega os dados
-- Corrigir botão "Voltar" para `/interno/admin/parametros`
+| # | Item | Status | Fix Needed |
+|---|------|--------|------------|
+| 2 | Sigla field missing in status dialog | Code exists (line 276-281 in ParametrosCamposManager) | Verify `showSigla: true` is set for `status_processo` — **already set** on line 39. Should work. |
+| 5 | Status correction reset | Code exists in StatusCorrectionDialog | Already clears fields. Verify it also clears `status_vistoria` to null. |
+| 6 | Desfazer lançamento | `handleDesfazerLancamento` exists (line 796) | Verify UI button renders for each confirmed config. |
+| 8 | Internal/External observation toggle | `observacaoTipo` state exists (line 65) | Verify toggle UI renders and external observations update `solicitacoes.observacoes`. |
+| 9 | Logs detail modal | Code exists in AdminLogs | Already has Eye button + detail modal. |
+| 13 | NavisN4 service/status filters | Already added | Verify functionality. |
+| 15 | Conditional self-reference block | Already added in FormularioBuilder | Verify. |
+| 17 | Prefix validation (3 chars) | Already updated regex | Verify. |
+| 19 | Cutoff by weekday | Already added in GestorRegras | Verify. |
+| 22 | Protocol format JBS+Letter+YY+6digits | Already migrated | Verify. |
+| 24 | External page button sizing | Already reduced | Verify. |
+| 25 | Logoff redirect & /interno redirect | Already updated | Verify. |
 
 ---
 
-## Fase 4 — Frontend: Dashboard e Ações em Lote
+## Group B: Needs Implementation or Significant Fixes
 
-### 4.1 Ações em lote (item 10)
-- Adicionar opções no menu de ações em lote: "Lançamento de cobrança em lote" e "Lacre armador em lote"
-- Criar `BatchBillingDialog.tsx` para confirmação de múltiplos lançamentos
+### B1. Item 1 — Status Group Structure & Validation with Timeline (Moderate)
+**Current state**: `grupo_status` field exists in `ParametrosCamposManager` with 3 options.
+**Missing**: The status group needs to integrate with `consulta_etapas_config` (Timeline). The classification rule (Posicionamento? → Vistoria vs Serviço vs Outros) should be documented in the UI and optionally enforced.
+**Plan**:
+- Add descriptive help text in the `grupo_status` selector explaining the classification tree
+- When creating/editing timeline etapas in `ConsultaEtapasManager`, show which status groups they map to
+- No schema changes needed — `grupo_status` column already exists
 
-### 4.2 Relatórios personalizados (item 12)
-- Em `ExtrairRelatorioDialog.tsx`: adicionar filtros "Apenas com Deferimento" e "Apenas Lançamentos de Cobrança"
+### B2. Item 3 — Encrypted name in header (Bug Fix)
+**Current state**: Dashboard uses `profiles_v` view which should decrypt. The `nome` field shows encrypted because `profiles_v` calls `decrypt_pii(nome)`.
+**Root cause**: The view `profiles_v` likely already decrypts. Need to verify the view definition. If `profile?.nome` still shows encrypted text, it could be that the view isn't returning the decrypted value properly.
+**Plan**:
+- Query the view definition to confirm it decrypts `nome`
+- If the view is correct but the name was double-encrypted (encrypted before trigger was added), fix by running a data correction
+- Ensure `AdminLogs` also uses `profiles_v` for display names (it currently does)
 
-### 4.3 Navis N4 — filtros (item 13)
-- Em `NavisN4ExportDialog.tsx`: adicionar dropdowns de Serviço e Status (ambos com padrão "Todos")
+### B3. Item 4 — Recusa requires motivo + show in external page
+**Current state**: `executeRecusa` already saves motivo as `tipo_observacao: "externa"`. The `consulta-publica` edge function filters for `tipo_observacao = 'externa'`.
+**Missing**: Verify that the external `ConsultaResultado` component actually displays the recusa reason when status is `recusado`. Check `consulta-publica` returns observations properly.
+**Plan**:
+- In `ConsultaResultado.tsx`, add a section that shows the refusal reason from `observacoes` when status is `recusado`
+- Verify `consulta-publica` returns `observacoes` array with `tipo_observacao = 'externa'`
+
+### B4. Item 7 — Toggle Activation Logic Fix (Complex)
+**Current state**: Toggles show based on service config status/pendency lists.
+**Missing**: The described rule is: (1) if current status matches config AND service matches → show toggle section; (2) if a pendency checkbox is checked (even before saving) → show the toggle immediately.
+**Plan**:
+- In `AnaliseDialog.tsx`, refactor toggle visibility logic:
+  - Check if `servicoConfig` matches current service
+  - Check if `selectedStatus` is in `deferimento_status_ativacao` or `lacre_armador_status_ativacao`
+  - Additionally, if any `pendenciasSelecionadas` matches `deferimento_pendencias_ativacao` or `lacre_armador_pendencias_ativacao`, show the toggle immediately
+- Ensure the toggle appears reactively when a pendency checkbox is clicked (before save)
+
+### B5. Item 10 — Batch Billing Registration (New Feature)
+**Plan**:
+- Create `BatchBillingDialog.tsx` component
+- Add batch action button in dashboard when multiple processes are selected
+- For each selected process, create/confirm `lancamento_cobranca_registros` entries
+- Support both service billing and lacre positioning billing
+
+### B6. Item 11 — Manual Auto-Update + Back Button Fix
+**Current state**: `AdminParametrosAjuda.tsx` uses static `DOCUMENTACAO` array.
+**Plan**:
+- Add "Atualizar Manual" button that fetches current field configs from DB and rebuilds documentation
+- Fix back button to navigate to `/interno/admin/parametros` instead of `/interno/dashboard`
+
+### B7. Item 12 — Custom Reports for Deferimento & Billing
+**Plan**:
+- In `ExtrairRelatorioDialog.tsx`, add filter toggles:
+  - "Apenas processos com Deferimento" (filter where `solicitar_deferimento = true`)
+  - "Apenas processos com Lançamento de Cobrança" (filter by `lancamento_cobranca_registros` existence)
+
+### B8. Item 14 — Conditional sub-questions inherit full config
+**Plan**:
+- In `FormularioBuilder.tsx`, when adding a sub-question to a conditional, render the full field configuration (masks, domain blocking, options import, width control, etc.) exactly like the main question type
+- In `FormFieldRenderer.tsx`, ensure sub-questions pass through all config properties
+
+### B9. Item 16 — Description/subtitle field for form questions
+**Current state**: `banco_perguntas` table has `descricao` column.
+**Plan**:
+- In `FormularioBuilder.tsx`, add `descricao` input field with italic/font-size options
+- In `FormFieldRenderer.tsx`, render description below the label in italic with smaller font
+
+### B10. Item 18 — Lacre Armador External Page Fixes (Complex)
+**Plan**:
+- In `ConsultaResultado.tsx`: respect `is_active` toggle for each lacre config field
+- Show "Mensagem de custo do Lacre" and "Tipo de Aceite do Lacre" when active
+- Add toggle for "Lacre Coletado" field visibility in `PaginaExternaConfigManager`
+- In `LacreArmadorDialog.tsx`: derive "Custo de Serviço" from `solicitacao.lacre_armador_aceite_custo` (Sim/Não/blank mirrors the toggle value)
+- Show "Tipo de Aceite do Lacre" in "Ciente do custo de novo posicionamento" field
+
+### B11. Item 20 — Fix "Aplica Dia Anterior" Logic
+**Current state**: Logic in `enviar-formulario` (line 187-205) already implements the corrected rule.
+**Plan**: Verify the implementation matches the spec:
+- When enabled: cut applies only when time >= cutoff AND date is D+1 or earlier
+- When disabled: cut applies purely on time >= cutoff regardless of date
+- Review and fix if the current `tomorrow` calculation is correct (should compare `dataPos <= tomorrow` meaning the date is today or tomorrow)
+
+### B12. Item 21 — Notification config: add "Administrador" option
+**Current state**: `notificar-status` edge function supports `"admin"` in `setor_ids`.
+**Plan**:
+- In `AdminParametros.tsx` notification section, add "Administrador do Sistema" as a selectable setor option
+
+### B13. Item 23 — Routing rules: add "Administrador" option
+**Plan**:
+- In `AdminParametros.tsx` routing rules section, add "Administrador" to the setor notification dropdown
 
 ---
 
-## Fase 5 — Frontend: Formulários
+## Implementation Order
 
-### 5.1 Sub-perguntas condicionais completas (item 14)
-- Em `FormFieldRenderer.tsx`: ao renderizar sub-pergunta condicional, aplicar mesmas configurações (máscara, validação, opções) da pergunta principal
+1. **Schema fixes**: Verify `profiles_v` view decrypts `nome` correctly (Item 3)
+2. **Edge function fixes**: Verify `aplica_dia_anterior` logic (Item 20)
+3. **ParametrosCamposManager**: Verify grupo_status + sigla display (Items 1, 2)
+4. **AnaliseDialog**: Fix toggle logic (Item 7), verify recusa/observation (Items 4, 8, 6)
+5. **ConsultaResultado**: Show recusa reason, lacre fixes (Items 4, 18)
+6. **LacreArmadorDialog**: Cost derivation fix (Item 18)
+7. **PaginaExternaConfigManager**: Lacre field toggles (Item 18)
+8. **AdminParametros**: Admin notification option (Items 21, 23)
+9. **Dashboard**: Batch billing (Item 10)
+10. **FormularioBuilder + FormFieldRenderer**: Sub-question config + description (Items 14, 16)
+11. **ExtrairRelatorioDialog**: Deferimento/billing filters (Item 12)
+12. **AdminParametrosAjuda**: Auto-update + back button (Item 11)
 
-### 5.2 Bloqueio de autoreferência (item 15)
-- Em `FormularioBuilder.tsx`: filtrar a pergunta atual da lista de opções de "pergunta pai" no dropdown de condicionais
-
-### 5.3 Descrição/subtítulo em perguntas (item 16)
-- Adicionar coluna `descricao` (text, nullable) em `banco_perguntas` (se não existir)
-- Renderizar abaixo do rótulo com suporte a itálico e tamanho de fonte configurável
-
----
-
-## Fase 6 — Frontend: Serviços e Página Externa
-
-### 6.1 Prefixo de serviço (item 17)
-- Em `AdminServicos.tsx`: validar prefixo como 1 letra + 0-2 números (até 3 chars)
-- Em `enviar-formulario`: usar apenas o 1° caractere (letra) no protocolo
-
-### 6.2 Lacre armador — página externa (item 18)
-- Em `ConsultaResultado.tsx`: mostrar campos somente se toggle ativo. Adicionar toggle "Lacre Coletado". Aplicar regra: "Há cobrança?" = Sim → "Custo de Serviço" = Sim. Exibir tipo de aceite no campo "Ciente do custo de novo posicionamento".
-
-### 6.3 UI — botões externos menores (item 23)
-- Em `Index.tsx`: reduzir tamanho dos cards de botão em 50%. Adicionar `max-h-[400px] overflow-y-auto` na área de botões a partir de 4 botões.
-
-### 6.4 Login/Logoff/Redirecionamento (item 24)
-- Logoff: já redireciona para `/servicos-adicionais` (correto)
-- Em `InternoLogin.tsx`: se não logado, redirecionar para `/` (página externa) em vez de mostrar o formulário de login vazio. Manter overlay de login acessível.
-- Rota `/interno`: redirecionar para `/interno/dashboard` se logado
-
-### 6.5 Protocolo por serviço — UI (item 22)
-- Em `AdminParametros.tsx`, seção Protocolo: mostrar tabela com quantidade e última numeração por serviço. Exibir formato com 2 dígitos do ano.
-
----
-
-## Fase 7 — Horário de corte por dia (item 19)
-
-- Em `GestorRegras.tsx` e `AdminParametros.tsx`: adicionar toggle "Horário por dia da semana". Ao ativar, exibir inputs de hora para cada dia selecionado.
-- Em `enviar-formulario`: ler `horarios_por_dia` se `usar_horario_por_dia = true`, obter hora de corte do dia correspondente.
-
----
-
-## Resumo de Alterações por Camada
-
-**Migrações SQL**: 1 migração com ~6 alterações de schema  
-**Edge Functions**: `enviar-formulario`, `consulta-publica`, `notificar-status`  
-**Componentes principais**: ~15 arquivos React modificados  
-**Novos componentes**: `BatchBillingDialog.tsx`  
-
-A implementação será feita em sequência de fases, garantindo que cada fase esteja funcional antes de avançar.
+### Estimated Changes
+- **~12 frontend files** modified
+- **1 new component** (`BatchBillingDialog.tsx`)
+- **1 edge function** potentially updated (`enviar-formulario` if `aplica_dia_anterior` logic needs correction)
+- **Possible 1 data migration** (if `profiles_v` view needs fixing or names need re-encryption)
 

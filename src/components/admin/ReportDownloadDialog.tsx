@@ -25,9 +25,10 @@ interface ReportDownloadDialogProps {
   modeloFileName: string;
   open: boolean;
   onClose: () => void;
+  extraFilters?: { deferimento?: boolean; cobranca?: boolean };
 }
 
-const ReportDownloadDialog = ({ modeloId, modeloNome, modeloFileName, open, onClose }: ReportDownloadDialogProps) => {
+const ReportDownloadDialog = ({ modeloId, modeloNome, modeloFileName, open, onClose, extraFilters }: ReportDownloadDialogProps) => {
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,10 +88,27 @@ const ReportDownloadDialog = ({ modeloId, modeloNome, modeloFileName, open, onCl
         endDate.setHours(23, 59, 59, 999);
         query = query.lte("created_at", endDate.toISOString());
       }
+      if (extraFilters?.deferimento) {
+        query = query.eq("solicitar_deferimento", true);
+      }
 
-      const { data, error } = await query.limit(1000);
+      const { data: rawData, error } = await query.limit(1000);
       if (error) { toast.error("Erro ao buscar dados"); setDownloading(false); return; }
-      if (!data || data.length === 0) { toast.info("Nenhum dado encontrado para os filtros selecionados."); setDownloading(false); return; }
+      
+      let data = rawData || [];
+      
+      // Filter by cobranca (requires a second query)
+      if (extraFilters?.cobranca && data.length > 0) {
+        const ids = data.map((d: any) => d.id);
+        const { data: cobrancaRegs } = await supabase
+          .from("lancamento_cobranca_registros")
+          .select("solicitacao_id")
+          .in("solicitacao_id", ids);
+        const cobrancaIds = new Set((cobrancaRegs || []).map((r: any) => r.solicitacao_id));
+        data = data.filter((d: any) => cobrancaIds.has(d.id));
+      }
+      
+      if (data.length === 0) { toast.info("Nenhum dado encontrado para os filtros selecionados."); setDownloading(false); return; }
 
       // Generate Excel with mapped columns
       const ExcelJS = await import("exceljs");

@@ -491,6 +491,7 @@ const AdminParametros = () => {
   };
 
   const getSetorLabel = (setorId: string) => {
+    if (setorId === "admin") return "🛡️ Administrador do Sistema";
     const setor = setorEmails.find(s => s.id === setorId);
     return setor?.descricao || setor?.email_setor || setorId;
   };
@@ -1185,8 +1186,11 @@ const AdminParametros = () => {
                 onCheckedChange={(c) => setRegraFormData(prev => ({ ...prev, aplica_dia_anterior: !!c }))}
               />
               <div>
-                <Label htmlFor="aplica_dia_anterior">Aplicar regra ao dia anterior</Label>
-                <p className="text-xs text-muted-foreground">Quando ativado, solicitações enviadas após o corte contam como se fossem do dia anterior.</p>
+                <Label htmlFor="aplica_dia_anterior">Considerar data informada (D+1)</Label>
+                <p className="text-xs text-muted-foreground">
+                  <strong>Ativado:</strong> O corte só se aplica se o horário do pedido ≥ corte <strong>E</strong> a data informada (posicionamento/agendamento) for D+1 ou anterior.{" "}
+                  <strong>Desativado:</strong> O corte se aplica apenas pelo horário, independente da data informada. Em ambos os casos, o tratamento segue o "Comportamento após o Corte".
+                </p>
               </div>
             </div>
           </div>
@@ -1297,6 +1301,16 @@ const AdminParametros = () => {
               <Label>Setores que devem ser notificados *</Label>
               <p className="text-xs text-muted-foreground mb-2">Selecione pelo menos um setor</p>
               <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="setor-admin-routing"
+                    checked={routingFormData.setor_ids.includes("admin")}
+                    onCheckedChange={() => toggleSetorForRouting("admin")}
+                  />
+                  <Label htmlFor="setor-admin-routing" className="cursor-pointer text-sm font-semibold">
+                    🛡️ Administrador do Sistema
+                  </Label>
+                </div>
                 {setorEmails.map(setor => (
                   <div key={setor.id} className="flex items-center space-x-2">
                     <Checkbox
@@ -1367,6 +1381,16 @@ const AdminParametros = () => {
               <Label>Setores a serem notificados</Label>
               <p className="text-xs text-muted-foreground mb-2">Se vazio, notifica todos os envolvidos</p>
               <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-auto">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="setor-notif-admin"
+                    checked={notifFormData.setor_ids.includes("admin")}
+                    onCheckedChange={() => toggleSetorNotif("admin")}
+                  />
+                  <label htmlFor="setor-notif-admin" className="text-sm cursor-pointer font-semibold">
+                    🛡️ Administrador do Sistema
+                  </label>
+                </div>
                 {setorEmails.map(setor => (
                   <div key={setor.id} className="flex items-center gap-2">
                     <Checkbox

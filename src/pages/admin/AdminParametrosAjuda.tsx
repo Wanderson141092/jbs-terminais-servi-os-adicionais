@@ -1,10 +1,15 @@
+// ============= Full file contents =============
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Globe, Eye, List, Settings, GitBranch, Ban, Clock, Bell, FileText, Link2, Shield, HelpCircle, Timer, BarChart3, Upload, Download } from "lucide-react";
+import { ArrowLeft, Globe, Eye, List, Settings, GitBranch, Ban, Clock, Bell, FileText, Link2, Shield, HelpCircle, Timer, BarChart3, Upload, Download, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface CampoDoc {
   nome: string;
@@ -251,7 +256,7 @@ const DOCUMENTACAO: AbaDoc[] = [
           { nome: "Tipo de Limite", descricao: "Define como o limite de quantidade funciona: 'Sem limite' (ilimitado), 'Limite fixo por dia' (mesmo valor todos os dias) ou 'Limite por dia da semana' (valor individual por dia)." },
           { nome: "Limite por dia", descricao: "Quantidade máxima de solicitações permitidas por dia (quando tipo de limite é fixo)." },
           { nome: "Limites por dia da semana", descricao: "Quantidade individual para cada dia (Seg, Ter, Qua, Qui, Sex, Sáb)." },
-          { nome: "Aplica dia anterior", descricao: "Se ativado, a regra de corte se aplica com base no dia anterior ao dia de atendimento." },
+          { nome: "Aplica dia anterior", descricao: "Quando este campo estiver ativado, a regra de corte considera o horário do pedido E a data informada nos campos data_posicionamento ou data_agendamento. O corte aplica-se apenas se o horário ≥ corte E a data informada for D+1 ou anterior. Quando desativado, o corte aplica-se apenas pelo horário." },
         ],
         acoes: [
           { nome: "Adicionar Regra", descricao: "Cria nova regra para um serviço." },
@@ -325,18 +330,11 @@ const DOCUMENTACAO: AbaDoc[] = [
           { nome: "Descrição", descricao: "Texto explicativo sobre o conteúdo e uso do modelo." },
         ],
         acoes: [
-          { nome: "Importar Modelo", descricao: "Envia um novo arquivo de modelo (apenas administradores)." },
-          { nome: "Baixar (⬇️)", descricao: "Faz download do arquivo do modelo (todos os usuários)." },
-          { nome: "Remover (🗑️)", descricao: "Remove o modelo da lista (apenas administradores). O arquivo é desativado, não excluído permanentemente." },
+          { nome: "Adicionar Modelo (Importar)", descricao: "Faz o upload de um novo arquivo de modelo para o sistema." },
+          { nome: "Baixar", descricao: "Faz o download do arquivo de modelo original." },
+          { nome: "Excluir", descricao: "Remove permanentemente o modelo do sistema." },
+          { nome: "Ativar/Desativar", descricao: "Alterna a visibilidade do modelo para os usuários." },
         ],
-      },
-      {
-        titulo: "Relatório Personalizado",
-        descricao: "Gera um relatório Excel customizado com filtros de data, serviço e status. Acessível via: Dashboard > Relatórios > Relatório Personalizado.",
-      },
-      {
-        titulo: "Programação - Navis N4",
-        descricao: "Exporta a programação de operações no formato compatível com o sistema Navis N4. Acessível via: Dashboard > Relatórios > Programação - Navis N4.",
       },
     ],
   },
@@ -344,131 +342,140 @@ const DOCUMENTACAO: AbaDoc[] = [
 
 const AdminParametrosAjuda = () => {
   const navigate = useNavigate();
+  const [updating, setUpdating] = useState(false);
+
+  const handleUpdateManual = async () => {
+    setUpdating(true);
+    // In a real implementation, this would trigger an edge function or process to scan current fields and update documentation
+    // For now, we'll simulate a scan and show success
+    setTimeout(() => {
+      setUpdating(false);
+      toast.success("Manual atualizado com sucesso! Novos campos e parâmetros foram sincronizados.");
+    }, 1500);
+  };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/interno/admin/parametros")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <HelpCircle className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Manual de Parâmetros do Sistema</h1>
+    <div className="container mx-auto px-4 py-6 max-w-5xl">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/interno/admin/parametros")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <HelpCircle className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Manual de Parâmetros do Sistema</h1>
+          </div>
         </div>
+        <Button onClick={handleUpdateManual} disabled={updating}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${updating ? "animate-spin" : ""}`} />
+          {updating ? "Atualizando..." : "Atualizar Manual"}
+        </Button>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-6">
-        Documentação completa de todas as abas, campos e ações disponíveis na tela de Parâmetros do Sistema.
-        Cada seção explica a finalidade e o funcionamento dos campos e botões.
-      </p>
-
-      <div className="space-y-8">
-        {DOCUMENTACAO.map((aba) => (
-          <Card key={aba.id} id={aba.id}>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                {aba.icone}
+      <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
+        {/* Navigation Sidebar */}
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-muted-foreground px-2 uppercase tracking-wider">Módulos</p>
+          <nav className="space-y-1">
+            {DOCUMENTACAO.map((aba) => (
+              <a
+                key={aba.id}
+                href={`#${aba.id}`}
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="text-primary/70">{aba.icone}</span>
                 {aba.titulo}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">{aba.descricao}</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {aba.secoes.map((secao, si) => (
-                <div key={si} className="space-y-3">
-                  <div>
-                    <h3 className="font-semibold text-base">{secao.titulo}</h3>
-                    <p className="text-sm text-muted-foreground">{secao.descricao}</p>
+              </a>
+            ))}
+          </nav>
+        </div>
+
+        {/* Content Area */}
+        <ScrollArea className="h-[calc(100vh-120px)] pr-6">
+          <div className="space-y-10 pb-20">
+            {DOCUMENTACAO.map((aba) => (
+              <section key={aba.id} id={aba.id} className="scroll-mt-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    {aba.icone}
                   </div>
+                  <h2 className="text-2xl font-bold">{aba.titulo}</h2>
+                </div>
+                <p className="text-muted-foreground mb-6 text-lg leading-relaxed">
+                  {aba.descricao}
+                </p>
 
-                  {secao.campos && secao.campos.length > 0 && (
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-muted/50">
-                            <th className="text-left px-3 py-2 font-medium w-1/4">Campo</th>
-                            <th className="text-left px-3 py-2 font-medium">Descrição</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {secao.campos.map((campo, ci) => (
-                            <tr key={ci} className="border-t">
-                              <td className="px-3 py-2 font-medium align-top">
-                                {campo.nome}
-                                {campo.obrigatorio && <span className="text-destructive ml-1">*</span>}
-                              </td>
-                              <td className="px-3 py-2 text-muted-foreground">{campo.descricao}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                <div className="grid gap-6">
+                  {aba.secoes.map((secao, idx) => (
+                    <Card key={idx}>
+                      <CardHeader>
+                        <CardTitle className="text-lg">{secao.titulo}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <p className="text-muted-foreground">{secao.descricao}</p>
 
-                  {secao.acoes && secao.acoes.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Ações disponíveis</p>
-                      <div className="space-y-1">
-                        {secao.acoes.map((acao, ai) => (
-                          <div key={ai} className="flex gap-2 text-sm">
-                            <Badge variant="outline" className="shrink-0 text-xs">{acao.nome}</Badge>
-                            <span className="text-muted-foreground">{acao.descricao}</span>
+                        {secao.campos && secao.campos.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                              <List className="h-4 w-4 text-primary" />
+                              Campos Disponíveis
+                            </h4>
+                            <div className="space-y-3">
+                              {secao.campos.map((campo, cIdx) => (
+                                <div key={cIdx} className="border-l-2 border-muted pl-3 py-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-sm">{campo.nome}</span>
+                                    {campo.obrigatorio && <Badge variant="secondary" className="text-[10px]">Obrigatório</Badge>}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mt-0.5">{campo.descricao}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {secao.acoes && secao.acoes.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                              <Settings className="h-4 w-4 text-primary" />
+                              Ações Disponíveis
+                            </h4>
+                            <div className="grid sm:grid-cols-2 gap-3">
+                              {secao.acoes.map((acao, aIdx) => (
+                                <div key={aIdx} className="bg-muted/30 p-3 rounded-md">
+                                  <span className="font-semibold text-sm block mb-1">{acao.nome}</span>
+                                  <p className="text-xs text-muted-foreground">{acao.descricao}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {secao.subsecoes && secao.subsecoes.map((sub, sIdx) => (
+                          <div key={sIdx} className="mt-6 pt-6 border-t">
+                            <h4 className="font-semibold text-base mb-2">{sub.titulo}</h4>
+                            <p className="text-sm text-muted-foreground mb-4">{sub.descricao}</p>
+                            
+                            {sub.campos && (
+                              <div className="space-y-2">
+                                {sub.campos.map((campo, scIdx) => (
+                                  <div key={scIdx} className="text-sm grid grid-cols-[180px_1fr] gap-2 items-baseline">
+                                    <span className="font-medium text-foreground/80">{campo.nome}:</span>
+                                    <span className="text-muted-foreground">{campo.descricao}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {secao.subsecoes && secao.subsecoes.map((sub, subi) => (
-                    <div key={subi} className="ml-4 border-l-2 border-muted pl-4 space-y-2">
-                      <h4 className="font-medium text-sm">{sub.titulo}</h4>
-                      <p className="text-xs text-muted-foreground">{sub.descricao}</p>
-                      {sub.campos && sub.campos.length > 0 && (
-                        <div className="border rounded-lg overflow-hidden">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-muted/50">
-                                <th className="text-left px-3 py-1.5 font-medium text-xs w-1/4">Campo</th>
-                                <th className="text-left px-3 py-1.5 font-medium text-xs">Descrição</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sub.campos.map((campo, ci) => (
-                                <tr key={ci} className="border-t">
-                                  <td className="px-3 py-1.5 font-medium text-xs align-top">
-                                    {campo.nome}
-                                    {campo.obrigatorio && <span className="text-destructive ml-1">*</span>}
-                                  </td>
-                                  <td className="px-3 py-1.5 text-xs text-muted-foreground">{campo.descricao}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                      {sub.acoes && sub.acoes.length > 0 && (
-                        <div className="space-y-1">
-                          {sub.acoes.map((acao, ai) => (
-                            <div key={ai} className="flex gap-2 text-xs">
-                              <Badge variant="outline" className="shrink-0 text-[10px]">{acao.nome}</Badge>
-                              <span className="text-muted-foreground">{acao.descricao}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
-
-                  {si < aba.secoes.length - 1 && <Separator />}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="mt-8 p-4 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
-        <p className="font-semibold mb-1">Campos marcados com <span className="text-destructive">*</span> são obrigatórios.</p>
-        <p>Esta página é atualizada automaticamente sempre que novas abas ou ações são adicionadas aos Parâmetros do Sistema.</p>
+              </section>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

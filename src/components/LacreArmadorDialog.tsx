@@ -248,7 +248,15 @@ const LacreArmadorDialog = ({ solicitacao, userId, onClose }: LacreArmadorDialog
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Custo de Serviço</p>
-                <p className="font-medium">{solicitacao.custo_posicionamento === true ? "Sim" : "Não"}</p>
+                <p className="font-medium">
+                  {solicitacao.lacre_armador_aceite_custo === true ? "Sim" : solicitacao.lacre_armador_aceite_custo === false ? "Não" : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Ciente do custo de novo posicionamento</p>
+                <p className="font-medium">
+                  {solicitacao.lacre_armador_aceite_custo === true ? "Sim — Cliente ciente" : solicitacao.lacre_armador_aceite_custo === false ? "Não" : "—"}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Status</p>

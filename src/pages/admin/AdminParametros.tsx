@@ -304,6 +304,8 @@ const AdminParametros = () => {
       limite_sex: regraFormData.limite_sex ? parseInt(regraFormData.limite_sex) : null,
       limite_sab: regraFormData.limite_sab ? parseInt(regraFormData.limite_sab) : null,
       aplica_dia_anterior: regraFormData.aplica_dia_anterior,
+      usar_horario_por_dia: regraFormData.usar_horario_por_dia,
+      horarios_por_dia: regraFormData.usar_horario_por_dia ? regraFormData.horarios_por_dia : null,
       updated_at: new Date().toISOString()
     };
 

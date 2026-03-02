@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Download, Ship } from "lucide-react";
 import ExcelJS from "exceljs";
+import { useStatusProcesso } from "@/hooks/useStatusProcesso";
 
 interface NavisN4ExportDialogProps {
   open: boolean;
@@ -21,6 +22,7 @@ const NavisN4ExportDialog = ({ open, onClose }: NavisN4ExportDialogProps) => {
   const [servicos, setServicos] = useState<{ id: string; nome: string }[]>([]);
   const [servicoFilter, setServicoFilter] = useState("todos");
   const [statusFilter, setStatusFilter] = useState("todos");
+  const { statusOptions } = useStatusProcesso();
 
   // Load campos_analise IDs for N4 fields and services
   useEffect(() => {
@@ -70,8 +72,6 @@ const NavisN4ExportDialog = ({ open, onClose }: NavisN4ExportDialogProps) => {
       }
       if (statusFilter !== "todos") {
         query = query.eq("status", statusFilter as any);
-      } else {
-        query = query.in("status", ["confirmado_aguardando_vistoria"] as any);
       }
 
       const { data: solicitacoes, error } = await query;
@@ -222,10 +222,8 @@ const NavisN4ExportDialog = ({ open, onClose }: NavisN4ExportDialogProps) => {
             <div>
               <Label>Status</Label>
               <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPreview(null); }} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1">
-                <option value="todos">Todos confirmados</option>
-                <option value="confirmado_aguardando_vistoria">Aguardando Vistoria</option>
-                <option value="vistoria_finalizada">Vistoria Finalizada</option>
-                <option value="vistoriado_com_pendencia">Com Pendência</option>
+                <option value="todos">Todos</option>
+                {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
             <div className="flex items-end">

@@ -46,7 +46,7 @@ const ReativacaoDialog = ({ solicitacao, userId, onClose }: ReativacaoDialogProp
 
       // Add observation
       const { data: profileData } = await supabase
-        .from("profiles")
+        .from("profiles_v")
         .select("nome")
         .eq("id", userId)
         .maybeSingle();

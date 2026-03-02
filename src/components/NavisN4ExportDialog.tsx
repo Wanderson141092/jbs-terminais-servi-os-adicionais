@@ -78,7 +78,7 @@ const NavisN4ExportDialog = ({ open, onClose }: NavisN4ExportDialogProps) => {
 
       if (error) throw error;
       if (!solicitacoes || solicitacoes.length === 0) {
-        toast.warning("Nenhuma solicitação encontrada para esta data com status confirmado");
+        toast.warning("Nenhuma solicitação encontrada para os critérios informados");
         setPreview([]);
         setExporting(false);
         return;

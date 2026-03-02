@@ -1262,7 +1262,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                                   {pendenciaConfig?.rotulo_analise || "Custo Posic. Lacre"}: {pendenciaConfirmed ? "Confirmado" : "Aguardando confirmação"}
                                 </span>
                               </div>
-                              {!pendenciaConfirmed && (
+                              {!pendenciaConfirmed ? (
                                 <Button 
                                   size="sm"
                                   variant="outline"
@@ -1270,6 +1270,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                                   onClick={() => handleConfirmarLancamento(pendenciaConfig?.id)}
                                 >
                                   Confirmar Lançamento
+                                </Button>
+                              ) : (
+                                <Button 
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-xs text-muted-foreground hover:text-destructive h-7 w-full"
+                                  onClick={() => handleDesfazerLancamento(pendenciaConfig?.id)}
+                                  disabled={loading}
+                                >
+                                  Desfazer
                                 </Button>
                               )}
                             </div>

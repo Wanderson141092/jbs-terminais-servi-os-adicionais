@@ -577,13 +577,21 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                 </div>
 
                 {/* Cost warning */}
-                {(solicitacao as any).custo_posicionamento === true && lacreArmadorConfig?.mensagem_custo && (
+                {/* Mensagem de custo do lacre - respeita is_active */}
+                {lacreArmadorConfig?.mensagem_custo && (
                   <Alert className="border-amber-400 bg-amber-50">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                     <AlertDescription className="ml-2 text-sm text-amber-700">
                       {lacreArmadorConfig.mensagem_custo}
                     </AlertDescription>
                   </Alert>
+                )}
+
+                {/* Tipo de Aceite do Lacre */}
+                {lacreArmadorConfig?.tipo_aceite && lacreArmadorConfig.tipo_aceite !== "informativo" && (
+                  <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2 border border-amber-300">
+                    <strong>Tipo de Aceite:</strong> {lacreArmadorConfig.tipo_aceite === "aceite_custo" ? "Aceite de Custo" : lacreArmadorConfig.tipo_aceite}
+                  </div>
                 )}
 
                 {/* Recusa warning */}

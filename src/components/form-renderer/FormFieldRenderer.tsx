@@ -185,6 +185,9 @@ const FormFieldRenderer = ({
     return (
       <div className="space-y-3">
         <div className="bg-muted/40 rounded-lg p-4 border border-muted">
+          {pergunta.descricao && (
+            <p className="text-xs text-muted-foreground italic mb-2">{pergunta.descricao}</p>
+          )}
           {config?.tipo_conteudo === "imagem" && config.imagem_url ? (
             <div className="flex flex-col items-center gap-2">
               <ImageIcon className="h-5 w-5 text-muted-foreground" />
@@ -204,6 +207,7 @@ const FormFieldRenderer = ({
                     ? <div className="prose-content text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: config.conteudo }} />
                     : <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{config.conteudo}</p>
                 )}
+                {pergunta.descricao && <p className="text-xs text-muted-foreground italic mt-1">{pergunta.descricao}</p>}
               </div>
             </div>
           )}

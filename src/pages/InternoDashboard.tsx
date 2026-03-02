@@ -59,6 +59,7 @@ import StatusCorrectionDialog from "@/components/StatusCorrectionDialog";
 import SetorSelector from "@/components/SetorSelector";
 import BatchApprovalDialog from "@/components/BatchApprovalDialog";
 import BatchStatusDialog from "@/components/BatchStatusDialog";
+import BatchBillingDialog from "@/components/BatchBillingDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
@@ -120,6 +121,7 @@ const InternoDashboard = () => {
   const [showNavisN4, setShowNavisN4] = useState(false);
   const [reativacaoSolicitacao, setReativacaoSolicitacao] = useState<any>(null);
   const [correcaoStatusSolicitacao, setCorrecaoStatusSolicitacao] = useState<any>(null);
+  const [showBatchBilling, setShowBatchBilling] = useState(false);
   const [showExtrairRelatorio, setShowExtrairRelatorio] = useState(false);
   const [showModelosExcel, setShowModelosExcel] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -1336,6 +1338,17 @@ const InternoDashboard = () => {
 
       {/* Modelos Excel Dialog */}
       <ModelosExcelDialog open={showModelosExcel} onClose={() => setShowModelosExcel(false)} />
+      {showBatchBilling && (
+        <BatchBillingDialog
+          solicitacoes={filtered.filter(s => selectedIds.includes(s.id))}
+          open={showBatchBilling}
+          onClose={() => setShowBatchBilling(false)}
+          onSuccess={() => {
+            setSelectedIds([]);
+            fetchSolicitacoes();
+          }}
+        />
+      )}
     </div>
   );
 };

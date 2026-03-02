@@ -283,7 +283,9 @@ const ParametrosCamposManager = () => {
             {currentGrupo?.showGrupoStatus && (
               <div>
                 <Label>Grupo do Status *</Label>
-                <p className="text-xs text-muted-foreground mb-2">Define o fluxo semântico do processo</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Classifica o status em um dos fluxos: É Posicionamento? → Se sim, tem vistoria (Laudo RFB / Fumigação = Serviço, demais = Vistoria). Se não → Outros Serviços.
+                </p>
                 <Select value={formData.grupo_status} onValueChange={(v) => setFormData({ ...formData, grupo_status: v })}>
                   <SelectTrigger>
                     <SelectValue />

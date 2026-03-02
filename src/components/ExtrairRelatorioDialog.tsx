@@ -36,6 +36,8 @@ const ExtrairRelatorioDialog = ({ open, onClose }: ExtrairRelatorioDialogProps) 
   const [loading, setLoading] = useState(true);
   const [modeloMappingCounts, setModeloMappingCounts] = useState<Record<string, number>>({});
   const [downloadModelo, setDownloadModelo] = useState<ModeloRelatorio | null>(null);
+  const [filterDeferimento, setFilterDeferimento] = useState(false);
+  const [filterCobranca, setFilterCobranca] = useState(false);
 
   const fetchModelos = useCallback(async () => {
     setLoading(true);
@@ -90,6 +92,17 @@ const ExtrairRelatorioDialog = ({ open, onClose }: ExtrairRelatorioDialogProps) 
             Selecione um modelo para exportar os dados do sistema.
           </p>
 
+          <div className="flex flex-wrap gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={filterDeferimento} onChange={e => setFilterDeferimento(e.target.checked)} className="accent-primary" />
+              Apenas com Deferimento
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={filterCobranca} onChange={e => setFilterCobranca(e.target.checked)} className="accent-primary" />
+              Apenas com Lançamento de Cobrança
+            </label>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -132,6 +145,7 @@ const ExtrairRelatorioDialog = ({ open, onClose }: ExtrairRelatorioDialogProps) 
           modeloFileName={downloadModelo.file_name}
           open={!!downloadModelo}
           onClose={() => setDownloadModelo(null)}
+          extraFilters={{ deferimento: filterDeferimento, cobranca: filterCobranca }}
         />
       )}
     </>

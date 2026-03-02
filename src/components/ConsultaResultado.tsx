@@ -410,8 +410,20 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                 : <StatusBadge status={solicitacao.status} />
               }
             </div>
+
+            {/* Motivo da recusa - visível na consulta pública */}
+            {solicitacao.status === "recusado" && observacoes && observacoes.length > 0 && (
+              <Alert className="mt-2 border-red-500 bg-red-50">
+                <X className="h-4 w-4 text-red-600" />
+                <AlertDescription className="ml-2">
+                  <span className="font-semibold text-red-700">Motivo da Recusa</span>
+                  <p className="text-sm text-red-600 mt-1">{observacoes[0]?.observacao || "Solicitação recusada pela equipe interna."}</p>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Pendências sub-status */}
-             {solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas && solicitacao.pendencias_selecionadas.length > 0 && (
+            {solicitacao.status === "vistoriado_com_pendencia" && solicitacao.pendencias_selecionadas && solicitacao.pendencias_selecionadas.length > 0 && (
               <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1 mt-1">
                 Pendências: {solicitacao.pendencias_selecionadas.join(", ")}
               </div>

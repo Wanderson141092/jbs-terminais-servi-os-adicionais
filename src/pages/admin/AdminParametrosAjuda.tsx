@@ -346,19 +346,88 @@ const AdminParametrosAjuda = () => {
 
   const handleUpdateManual = async () => {
     setUpdating(true);
-    // In a real implementation, this would trigger an edge function or process to scan current fields and update documentation
-    // For now, we'll simulate a scan and show success
-    setTimeout(() => {
-      setUpdating(false);
-      toast.success("Manual atualizado com sucesso! Novos campos e parâmetros foram sincronizados.");
-    }, 1500);
+    try {
+      // Fetch current configuration from database to build dynamic sections
+      const [camposFixosRes, camposDinamicosRes, cobrancaRes, pendenciasRes] = await Promise.all([
+        supabase.from("campos_fixos_config").select("campo_chave, campo_label, visivel_analise, visivel_externo, obrigatorio_analise").eq("ativo", true).order("ordem"),
+        supabase.from("campos_analise").select("nome, tipo, obrigatorio, visivel_externo").eq("ativo", true).order("ordem"),
+        supabase.from("lancamento_cobranca_config").select("nome, rotulo_analise, tipo").eq("ativo", true).order("created_at"),
+        supabase.from("pendencia_opcoes").select("valor").eq("ativo", true).order("ordem"),
+      ]);
+
+      const camposFixos = camposFixosRes.data || [];
+      const camposDinamicos = camposDinamicosRes.data || [];
+      const cobrancas = cobrancaRes.data || [];
+      const pendencias = pendenciasRes.data || [];
+
+      // Build dynamic documentation sections
+      const dynamicSections: SecaoDoc[] = [];
+
+      if (camposFixos.length > 0) {
+        dynamicSections.push({
+          titulo: `Campos Fixos Ativos (${camposFixos.length})`,
+          descricao: "Campos nativos do sistema atualmente configurados.",
+          campos: camposFixos.map(c => ({
+            nome: c.campo_label,
+            descricao: `Chave: ${c.campo_chave}. Análise: ${c.visivel_analise ? "Visível" : "Oculto"}${c.obrigatorio_analise ? " (Obrigatório)" : ""}. Externo: ${c.visivel_externo ? "Visível" : "Oculto"}.`,
+          })),
+        });
+      }
+
+      if (camposDinamicos.length > 0) {
+        dynamicSections.push({
+          titulo: `Campos Dinâmicos de Análise (${camposDinamicos.length})`,
+          descricao: "Campos customizáveis criados para a tela de análise.",
+          campos: camposDinamicos.map(c => ({
+            nome: c.nome,
+            descricao: `Tipo: ${c.tipo}. ${c.obrigatorio ? "Obrigatório." : "Opcional."} Externo: ${c.visivel_externo ? "Visível" : "Oculto"}.`,
+          })),
+        });
+      }
+
+      if (cobrancas.length > 0) {
+        dynamicSections.push({
+          titulo: `Gerenciamento de Lançamento de Cobranças (${cobrancas.length})`,
+          descricao: "Configurações de lançamento de cobrança ativas no sistema.",
+          campos: cobrancas.map(c => ({
+            nome: c.rotulo_analise,
+            descricao: `Nome interno: ${c.nome}. Tipo: ${c.tipo === "servico" ? "Serviço" : c.tipo === "pendencia" ? "Pendência" : c.tipo}.`,
+          })),
+        });
+      }
+
+      if (pendencias.length > 0) {
+        dynamicSections.push({
+          titulo: `Opções de Pendência (${pendencias.length})`,
+          descricao: "Pendências disponíveis para seleção na análise de processos.",
+          campos: pendencias.map(p => ({
+            nome: p.valor,
+            descricao: "Opção de pendência ativa.",
+          })),
+        });
+      }
+
+      // Update the Pág. Interna section with dynamic data
+      const pagInternaIdx = DOCUMENTACAO.findIndex(d => d.id === "pagina-interna");
+      if (pagInternaIdx >= 0 && dynamicSections.length > 0) {
+        DOCUMENTACAO[pagInternaIdx].secoes = [
+          ...DOCUMENTACAO[pagInternaIdx].secoes.filter(s => !s.titulo.startsWith("Campos Fixos Ativos") && !s.titulo.startsWith("Campos Dinâmicos") && !s.titulo.startsWith("Gerenciamento de Lançamento") && !s.titulo.startsWith("Opções de Pendência")),
+          ...dynamicSections,
+        ];
+      }
+
+      toast.success(`Manual atualizado! ${camposFixos.length} campos fixos, ${camposDinamicos.length} campos dinâmicos, ${cobrancas.length} cobranças sincronizados.`);
+    } catch (err) {
+      toast.error("Erro ao atualizar manual.");
+    }
+    setUpdating(false);
   };
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/interno/admin/parametros")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/interno/admin/parametros")} title="Voltar para Parâmetros">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">

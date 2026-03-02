@@ -249,7 +249,13 @@ const LacreArmadorDialog = ({ solicitacao, userId, onClose }: LacreArmadorDialog
               <div>
                 <p className="text-xs text-muted-foreground">Custo de Serviço</p>
                 <p className="font-medium">
-                  {solicitacao.lacre_armador_aceite_custo === true ? "Sim" : solicitacao.lacre_armador_aceite_custo === false ? "Não" : "—"}
+                  {(() => {
+                    // Derivar do campo "Há cobrança de novo serviço (Posicionamento — Pendência de Lacre armador)?"
+                    const custoLacre = solicitacao.lacre_armador_aceite_custo;
+                    if (custoLacre === true) return "Sim";
+                    if (custoLacre === false) return "Não";
+                    return "—";
+                  })()}
                 </p>
               </div>
               <div>

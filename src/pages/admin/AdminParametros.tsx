@@ -26,6 +26,7 @@ import CancelamentoRecusaManager from "@/components/admin/CancelamentoRecusaMana
 import PaginaExternaConfigManager from "@/components/admin/PaginaExternaConfigManager";
 import LancamentoCobrancaManager from "@/components/admin/LancamentoCobrancaManager";
 import ToggleActivationManager from "@/components/admin/ToggleActivationManager";
+import ProtocolCountByService from "@/components/admin/ProtocolCountByService";
 
 interface RegraServico {
   id: string;
@@ -43,6 +44,8 @@ interface RegraServico {
   recusar_apos_corte: boolean;
   agendar_proximo_dia: boolean;
   ativo: boolean;
+  usar_horario_por_dia: boolean;
+  horarios_por_dia: Record<string, string> | null;
 }
 
 interface Servico {
@@ -1027,6 +1030,10 @@ const AdminParametros = () => {
                   </Button>
                 </div>
               )}
+
+              {/* Contagem de protocolos por serviço */}
+              <Separator className="my-4" />
+              <ProtocolCountByService servicos={servicos} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1059,13 +1066,53 @@ const AdminParametros = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Hora de Corte</Label>
-                <Input
-                  type="time"
-                  value={regraFormData.hora_corte}
-                  onChange={(e) => setRegraFormData(prev => ({ ...prev, hora_corte: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground mt-1">Horário limite para recebimento de solicitações no dia. Após esse horário, o comportamento depende das configurações de corte.</p>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Hora de Corte Geral</Label>
+                  <div className="flex items-center gap-2">
+                    <Switch 
+                      checked={regraFormData.usar_horario_por_dia} 
+                      onCheckedChange={(checked) => setRegraFormData(prev => ({ ...prev, usar_horario_por_dia: checked }))} 
+                    />
+                    <span className="text-xs text-muted-foreground">Horário diferenciado por dia</span>
+                  </div>
+                </div>
+                
+                {!regraFormData.usar_horario_por_dia ? (
+                  <>
+                    <Input
+                      type="time"
+                      value={regraFormData.hora_corte}
+                      onChange={(e) => setRegraFormData(prev => ({ ...prev, hora_corte: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Horário limite padrão para todos os dias.</p>
+                  </>
+                ) : (
+                  <div className="space-y-3 mt-3 border rounded-md p-3 max-h-60 overflow-y-auto">
+                    <p className="text-xs text-muted-foreground mb-2">Selecione os dias que terão horário diferenciado:</p>
+                    {DIAS_SEMANA.map(dia => {
+                      const isDiaAtivo = regraFormData.dias_semana.includes(dia.key);
+                      if (!isDiaAtivo) return null; // Only show cutoff config for active days
+                      
+                      const currentTime = regraFormData.horarios_por_dia?.[dia.key] || regraFormData.hora_corte;
+                      
+                      return (
+                        <div key={dia.key} className="flex items-center justify-between">
+                          <Label className="text-sm w-24">{dia.label}</Label>
+                          <Input
+                            type="time"
+                            value={currentTime}
+                            className="w-32 h-8 text-sm"
+                            onChange={(e) => {
+                              const newHorarios = { ...(regraFormData.horarios_por_dia || {}) };
+                              newHorarios[dia.key] = e.target.value;
+                              setRegraFormData(prev => ({ ...prev, horarios_por_dia: newHorarios }));
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
             <div>

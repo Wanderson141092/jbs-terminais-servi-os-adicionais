@@ -554,8 +554,9 @@ const BancoPerguntasManager = () => {
               </div>
             </div>
             <div>
-              <Label>Descrição (texto de ajuda para o admin)</Label>
-              <Input value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} placeholder="Descrição interna" />
+              <Label>Subtítulo / Descrição</Label>
+              <p className="text-xs text-muted-foreground mb-1">Texto exibido abaixo do rótulo no formulário (itálico, fonte menor)</p>
+              <Input value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} placeholder="Ex: Preencha conforme documento oficial" />
             </div>
 
             {formData.tipo !== "informativo" && formData.tipo !== "checkbox" && (

@@ -538,7 +538,7 @@ const FormFieldRenderer = ({
           {pergunta.obrigatorio && <span className="text-destructive">*</span>}
         </Label>
         {pergunta.descricao && (
-          <p className="text-xs text-muted-foreground">{pergunta.descricao}</p>
+          <p className="text-xs text-muted-foreground italic">{pergunta.descricao}</p>
         )}
         <div className="space-y-2">
           {entries.map((entry, idx) => (
@@ -583,7 +583,7 @@ const FormFieldRenderer = ({
         {pergunta.obrigatorio && <span className="text-destructive">*</span>}
       </Label>
       {pergunta.descricao && (
-        <p className="text-xs text-muted-foreground">{pergunta.descricao}</p>
+        <p className="text-xs text-muted-foreground italic">{pergunta.descricao}</p>
       )}
 
       {renderSingleField(value, onValueChange)}

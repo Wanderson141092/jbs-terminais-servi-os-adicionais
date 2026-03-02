@@ -449,7 +449,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
               <Select value={condPai} onValueChange={setCondPai}>
                 <SelectTrigger><SelectValue placeholder="Selecione a pergunta pai" /></SelectTrigger>
                 <SelectContent>
-                  {vinculadas.filter((v) => v.pergunta_id !== condTarget).map((v) => (
+                  {vinculadas.filter((v) => v.pergunta_id !== condTarget && v.pergunta_id !== condTarget).map((v) => (
                     <SelectItem key={v.pergunta_id} value={v.pergunta_id}>
                       {v.pergunta?.rotulo}
                     </SelectItem>

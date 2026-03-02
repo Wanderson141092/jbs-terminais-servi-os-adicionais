@@ -18,7 +18,8 @@ const InternoLogin = () => {
       if (session) {
         navigate("/interno/dashboard");
       } else {
-        setShowLogin(true);
+        // Redirect unauthenticated users to external page
+        navigate("/");
       }
     });
 

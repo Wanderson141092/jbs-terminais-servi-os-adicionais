@@ -144,8 +144,9 @@ const AdminServicos = () => {
     if (!formData.nome || !formData.codigo_prefixo) {
       toast.error("Nome e código são obrigatórios"); return;
     }
-    if (formData.codigo_prefixo.length !== 1) {
-      toast.error("Código prefixo deve ter apenas 1 caractere"); return;
+    // Validate: 1 letter + 0-2 numbers (up to 3 chars)
+    if (!/^[A-Za-z][0-9]{0,2}$/.test(formData.codigo_prefixo)) {
+      toast.error("Código prefixo deve ter 1 letra seguida de até 2 números (ex: P, S1, M12)"); return;
     }
 
     const tipoAgendamento = formData.tipo_agendamento === "none" ? null : formData.tipo_agendamento;
@@ -286,9 +287,9 @@ const AdminServicos = () => {
                 <Input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} placeholder="Ex: Posicionamento" />
               </div>
               <div>
-                <Label>Código Prefixo (1 letra)</Label>
-                <Input value={formData.codigo_prefixo} onChange={(e) => setFormData({ ...formData, codigo_prefixo: e.target.value.slice(0, 1).toUpperCase() })} placeholder="P" maxLength={1} className="w-20" />
-                <p className="text-sm text-muted-foreground mt-1">Usado no protocolo: JBS{formData.codigo_prefixo || "X"}000001</p>
+                <Label>Código Prefixo (1 letra + até 2 números)</Label>
+                <Input value={formData.codigo_prefixo} onChange={(e) => setFormData({ ...formData, codigo_prefixo: e.target.value.slice(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, '') })} placeholder="P" maxLength={3} className="w-24" />
+                <p className="text-sm text-muted-foreground mt-1">Usado no protocolo: JBS{(formData.codigo_prefixo || "X")[0]}26000001 (apenas 1ª letra)</p>
               </div>
               <div>
                 <Label>Descrição</Label>

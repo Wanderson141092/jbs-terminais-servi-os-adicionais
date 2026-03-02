@@ -31,6 +31,8 @@ interface RegraServico {
   aplica_dia_anterior: boolean;
   recusar_apos_corte: boolean;
   agendar_proximo_dia: boolean;
+  usar_horario_por_dia: boolean;
+  horarios_por_dia: Record<string, string> | null;
   ativo: boolean;
 }
 
@@ -74,6 +76,8 @@ const GestorRegras = () => {
     aplica_dia_anterior: false,
     recusar_apos_corte: false,
     agendar_proximo_dia: false,
+    usar_horario_por_dia: false,
+    horarios_por_dia: {} as Record<string, string>,
   });
 
   const fetchData = useCallback(async () => {
@@ -136,7 +140,7 @@ const GestorRegras = () => {
     ]);
 
     setServicos(servicosRes.data || []);
-    setRegras(regrasRes.data || []);
+    setRegras((regrasRes.data || []) as RegraServico[]);
     setLoading(false);
   }, [navigate]);
 
@@ -164,6 +168,8 @@ const GestorRegras = () => {
         aplica_dia_anterior: regra.aplica_dia_anterior,
         recusar_apos_corte: regra.recusar_apos_corte,
         agendar_proximo_dia: regra.agendar_proximo_dia,
+        usar_horario_por_dia: regra.usar_horario_por_dia || false,
+        horarios_por_dia: (regra.horarios_por_dia as Record<string, string>) || {},
       });
     } else {
       setEditingRegra(null);
@@ -177,6 +183,8 @@ const GestorRegras = () => {
         aplica_dia_anterior: false,
         recusar_apos_corte: false,
         agendar_proximo_dia: false,
+        usar_horario_por_dia: false,
+        horarios_por_dia: {},
       });
     }
     setShowDialog(true);
@@ -207,6 +215,8 @@ const GestorRegras = () => {
       aplica_dia_anterior: formData.aplica_dia_anterior,
       recusar_apos_corte: formData.recusar_apos_corte,
       agendar_proximo_dia: formData.agendar_proximo_dia,
+      usar_horario_por_dia: formData.usar_horario_por_dia,
+      horarios_por_dia: formData.usar_horario_por_dia ? formData.horarios_por_dia : null,
       updated_at: new Date().toISOString(),
     };
 
@@ -472,6 +482,31 @@ const GestorRegras = () => {
             <div className="flex items-center justify-between">
               <Label>Aplica dia anterior?</Label>
               <Switch checked={formData.aplica_dia_anterior} onCheckedChange={c => setFormData({ ...formData, aplica_dia_anterior: c })} />
+            </div>
+
+            <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Horário de corte por dia da semana</Label>
+                  <p className="text-[11px] text-muted-foreground">Definir horários diferentes para cada dia</p>
+                </div>
+                <Switch checked={formData.usar_horario_por_dia} onCheckedChange={c => setFormData({ ...formData, usar_horario_por_dia: c })} />
+              </div>
+              {formData.usar_horario_por_dia && (
+                <div className="grid grid-cols-3 gap-2">
+                  {DIAS_SEMANA.filter(d => formData.dias_semana.includes(d.key)).map(d => (
+                    <div key={d.key}>
+                      <Label className="text-xs">{d.label}</Label>
+                      <Input
+                        type="time"
+                        value={formData.horarios_por_dia[d.key] || formData.hora_corte}
+                        onChange={e => setFormData({ ...formData, horarios_por_dia: { ...formData.horarios_por_dia, [d.key]: e.target.value } })}
+                        className="h-8"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>

@@ -139,7 +139,9 @@ const AdminParametros = () => {
     limite_qui: "",
     limite_sex: "",
     limite_sab: "",
-    aplica_dia_anterior: false
+    aplica_dia_anterior: false,
+    usar_horario_por_dia: false,
+    horarios_por_dia: {} as Record<string, string>
   });
 
   // Configuração de Protocolo
@@ -214,7 +216,7 @@ const AdminParametros = () => {
       supabase.from("notification_rules").select("*").order("created_at")
     ]);
 
-    if (regrasRes.data) setRegras(regrasRes.data);
+    if (regrasRes.data) setRegras(regrasRes.data.map(r => ({ ...r, horarios_por_dia: (r.horarios_por_dia as Record<string, string> | null) })));
     if (servicosRes.data) setServicos(servicosRes.data);
     if (protocolRes.data) setProtocolConfig(protocolRes.data);
     if (pageConfigRes.data) setPageConfigs(pageConfigRes.data);
@@ -249,7 +251,9 @@ const AdminParametros = () => {
         limite_qui: regra.limite_qui?.toString() || "",
         limite_sex: regra.limite_sex?.toString() || "",
         limite_sab: regra.limite_sab?.toString() || "",
-        aplica_dia_anterior: regra.aplica_dia_anterior
+        aplica_dia_anterior: regra.aplica_dia_anterior,
+        usar_horario_por_dia: regra.usar_horario_por_dia,
+        horarios_por_dia: regra.horarios_por_dia || {}
       });
     } else {
       setEditingRegra(null);
@@ -265,7 +269,9 @@ const AdminParametros = () => {
         limite_qui: "",
         limite_sex: "",
         limite_sab: "",
-        aplica_dia_anterior: false
+        aplica_dia_anterior: false,
+        usar_horario_por_dia: false,
+        horarios_por_dia: {}
       });
     }
     setShowRegraDialog(true);

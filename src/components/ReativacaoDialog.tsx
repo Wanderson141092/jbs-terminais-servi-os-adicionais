@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface ReativacaoDialogProps {
-  solicitacao: { id: string; protocolo: string };
+  solicitacao: { id: string; protocolo: string; tipo_operacao?: string | null };
   userId: string;
   onClose: () => void;
 }
@@ -24,10 +24,14 @@ const ReativacaoDialog = ({ solicitacao, userId, onClose }: ReativacaoDialogProp
 
     setSaving(true);
     try {
-      // Update status back to aguardando_confirmacao
+      // Determine target status based on service type
+      const isPosicionamento = solicitacao.tipo_operacao?.toLowerCase().includes("posicionamento");
+      const targetStatus = isPosicionamento ? "aguardando_confirmacao" : "confirmado_aguardando_servico";
+
+      // Update status
       const { error: updateError } = await supabase
         .from("solicitacoes")
-        .update({ status: "aguardando_confirmacao" as any })
+        .update({ status: targetStatus as any })
         .eq("id", solicitacao.id);
 
       if (updateError) throw updateError;
@@ -52,7 +56,7 @@ const ReativacaoDialog = ({ solicitacao, userId, onClose }: ReativacaoDialogProp
         autor_id: userId,
         autor_nome: profileData?.nome || "Usuário interno",
         observacao: `[REATIVAÇÃO] ${justificativa.trim()}`,
-        status_no_momento: "aguardando_confirmacao",
+        status_no_momento: targetStatus,
       });
 
       toast.success("Solicitação reativada com sucesso!");

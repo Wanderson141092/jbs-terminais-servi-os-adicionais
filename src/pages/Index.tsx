@@ -182,7 +182,7 @@ const Index = () => {
             <h2 className="text-lg font-semibold text-primary mb-4 pb-3 border-b-4 border-secondary">
               Solicitação de Serviço
             </h2>
-            <div className={`grid grid-cols-2 gap-2 ${buttons.length >= 4 ? "max-h-[400px] overflow-y-auto pr-1" : ""}`}>
+            <div className={`grid grid-cols-2 gap-2 max-w-[50%] ${buttons.length >= 4 ? "max-h-[400px] overflow-y-auto pr-1" : ""}`}>
               {buttons.map((button) => (
                 <Card
                   key={button.id}

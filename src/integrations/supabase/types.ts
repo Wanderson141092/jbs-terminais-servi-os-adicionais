@@ -1150,6 +1150,7 @@ export type Database = {
           observacao: string
           solicitacao_id: string
           status_no_momento: string
+          tipo_observacao: string
         }
         Insert: {
           autor_id: string
@@ -1159,6 +1160,7 @@ export type Database = {
           observacao: string
           solicitacao_id: string
           status_no_momento: string
+          tipo_observacao?: string
         }
         Update: {
           autor_id?: string
@@ -1168,6 +1170,7 @@ export type Database = {
           observacao?: string
           solicitacao_id?: string
           status_no_momento?: string
+          tipo_observacao?: string
         }
         Relationships: [
           {
@@ -1224,6 +1227,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           grupo: string
+          grupo_status: string
           id: string
           ordem: number
           servico_ids: string[]
@@ -1236,6 +1240,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           grupo: string
+          grupo_status?: string
           id?: string
           ordem?: number
           servico_ids?: string[]
@@ -1248,6 +1253,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           grupo?: string
+          grupo_status?: string
           id?: string
           ordem?: number
           servico_ids?: string[]
@@ -1429,27 +1435,41 @@ export type Database = {
       }
       protocol_config: {
         Row: {
+          ano_referencia: number | null
           created_at: string
           id: string
           prefixo: string
+          servico_id: string | null
           ultimo_numero: number
           updated_at: string
         }
         Insert: {
+          ano_referencia?: number | null
           created_at?: string
           id?: string
           prefixo?: string
+          servico_id?: string | null
           ultimo_numero?: number
           updated_at?: string
         }
         Update: {
+          ano_referencia?: number | null
           created_at?: string
           id?: string
           prefixo?: string
+          servico_id?: string | null
           ultimo_numero?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "protocol_config_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       regras_servico: {
         Row: {
@@ -1459,6 +1479,7 @@ export type Database = {
           created_at: string
           dias_semana: string[]
           hora_corte: string
+          horarios_por_dia: Json | null
           id: string
           limite_dia: number | null
           limite_qua: number | null
@@ -1470,6 +1491,7 @@ export type Database = {
           recusar_apos_corte: boolean
           servico_id: string
           updated_at: string
+          usar_horario_por_dia: boolean
         }
         Insert: {
           agendar_proximo_dia?: boolean
@@ -1478,6 +1500,7 @@ export type Database = {
           created_at?: string
           dias_semana?: string[]
           hora_corte?: string
+          horarios_por_dia?: Json | null
           id?: string
           limite_dia?: number | null
           limite_qua?: number | null
@@ -1489,6 +1512,7 @@ export type Database = {
           recusar_apos_corte?: boolean
           servico_id: string
           updated_at?: string
+          usar_horario_por_dia?: boolean
         }
         Update: {
           agendar_proximo_dia?: boolean
@@ -1497,6 +1521,7 @@ export type Database = {
           created_at?: string
           dias_semana?: string[]
           hora_corte?: string
+          horarios_por_dia?: Json | null
           id?: string
           limite_dia?: number | null
           limite_qua?: number | null
@@ -1508,6 +1533,7 @@ export type Database = {
           recusar_apos_corte?: boolean
           servico_id?: string
           updated_at?: string
+          usar_horario_por_dia?: boolean
         }
         Relationships: [
           {

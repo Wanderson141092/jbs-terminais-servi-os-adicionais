@@ -49,8 +49,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // (supabase client already created above)
-
     // 1. Save form response
     const { error: respError } = await supabase.from("formulario_respostas").insert({
       formulario_id,
@@ -68,73 +66,142 @@ Deno.serve(async (req) => {
       for (const map of mapeamentos) {
         if (respostas[map.pergunta_id] !== undefined) {
           if (map.campo_analise_id) {
-            // Dynamic field mapping
             dynamicFieldValues.push({
               campo_id: map.campo_analise_id,
               valor: String(respostas[map.pergunta_id]),
             });
           } else if (map.campo_solicitacao && map.campo_solicitacao !== "__dinamico__") {
-            // Fixed field mapping
             solicitacaoData[map.campo_solicitacao] = respostas[map.pergunta_id];
           }
         }
       }
     }
 
-    // 3. Generate protocol number
-    const { data: configData } = await supabase
-      .from("protocol_config")
-      .select("*")
-      .limit(1)
-      .single();
-
-    const prefixo = configData?.prefixo || "JBS";
-    const nextNum = (configData?.ultimo_numero || 0) + 1;
-    const codigoLetra = solicitacaoData.tipo_operacao?.[0]?.toUpperCase() || "S";
-    const protocolo = `${prefixo}${codigoLetra}${String(nextNum).padStart(5, "0")}`;
-
-    // 4. Update protocol counter
-    if (configData) {
-      await supabase
-        .from("protocol_config")
-        .update({ ultimo_numero: nextNum })
-        .eq("id", configData.id);
-    }
-
-    // 4.5 Check cutoff time (hora_corte) - auto-reject if past cutoff
-    let autoRecusado = false;
+    // 3. Resolve service to get prefixo and generate protocol per-service
     const tipoOp = solicitacaoData.tipo_operacao || null;
+    let servicoData: any = null;
+    let servicoId: string | null = null;
+    let codigoLetra = "S";
+
     if (tipoOp) {
-      // Find the service
-      const { data: servicoData } = await supabase
+      const { data: svc } = await supabase
         .from("servicos")
-        .select("id")
+        .select("id, codigo_prefixo")
         .eq("nome", tipoOp)
         .eq("ativo", true)
         .maybeSingle();
+      servicoData = svc;
+      if (svc) {
+        servicoId = svc.id;
+        // Use first character (letter) of codigo_prefixo
+        codigoLetra = (svc.codigo_prefixo || "S")[0].toUpperCase();
+      }
+    }
 
-      if (servicoData) {
-        // Find service rules
-        const { data: regraData } = await supabase
-          .from("regras_servico")
-          .select("hora_corte, dias_semana, aplica_dia_anterior")
-          .eq("servico_id", servicoData.id)
-          .eq("ativo", true)
-          .maybeSingle();
+    // 4. Generate protocol number — per-service, with annual reset (YY prefix)
+    const now = new Date();
+    const brTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const currentYear = brTime.getFullYear();
+    const yearPrefix = String(currentYear).slice(-2); // "25", "26", etc.
 
-        if (regraData?.hora_corte) {
-          // Get current time in Brazil timezone (UTC-3)
-          const now = new Date();
-          const brTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-          const currentHour = brTime.getHours();
-          const currentMinute = brTime.getMinutes();
-          
-          const [cutHour, cutMinute] = regraData.hora_corte.split(":").map(Number);
-          const currentMinutes = currentHour * 60 + currentMinute;
+    // Try to find existing config for this service+year
+    let configQuery = supabase
+      .from("protocol_config")
+      .select("*");
+
+    if (servicoId) {
+      configQuery = configQuery.eq("servico_id", servicoId);
+    } else {
+      configQuery = configQuery.is("servico_id", null);
+    }
+
+    const { data: configRows } = await configQuery;
+
+    let configData = (configRows || []).find((c: any) => c.ano_referencia === currentYear);
+    let nextNum: number;
+
+    if (configData) {
+      // Existing config for this service+year
+      nextNum = (configData.ultimo_numero || 0) + 1;
+      await supabase
+        .from("protocol_config")
+        .update({ ultimo_numero: nextNum, updated_at: new Date().toISOString() })
+        .eq("id", configData.id);
+    } else {
+      // Create new config row for this service+year (or reset annual)
+      nextNum = 1;
+      const { error: insertErr } = await supabase.from("protocol_config").insert({
+        prefixo: codigoLetra,
+        ultimo_numero: nextNum,
+        servico_id: servicoId,
+        ano_referencia: currentYear,
+      });
+      if (insertErr) {
+        // Fallback: maybe another request created it concurrently, try to fetch again
+        const { data: retryRows } = await configQuery;
+        configData = (retryRows || []).find((c: any) => c.ano_referencia === currentYear);
+        if (configData) {
+          nextNum = (configData.ultimo_numero || 0) + 1;
+          await supabase
+            .from("protocol_config")
+            .update({ ultimo_numero: nextNum })
+            .eq("id", configData.id);
+        }
+      }
+    }
+
+    // Format: YY + Letter + 6-digit sequence (e.g., 25S000001)
+    const protocolo = `${yearPrefix}${codigoLetra}${String(nextNum).padStart(6, "0")}`;
+
+    // 5. Check cutoff time (hora_corte) - auto-reject if past cutoff
+    let autoRecusado = false;
+    if (servicoId) {
+      const { data: regraData } = await supabase
+        .from("regras_servico")
+        .select("hora_corte, dias_semana, aplica_dia_anterior, recusar_apos_corte, usar_horario_por_dia, horarios_por_dia")
+        .eq("servico_id", servicoId)
+        .eq("ativo", true)
+        .maybeSingle();
+
+      if (regraData) {
+        const currentHour = brTime.getHours();
+        const currentMinute = brTime.getMinutes();
+        const currentMinutes = currentHour * 60 + currentMinute;
+
+        // Determine which cutoff time to use
+        let cutoffTime = regraData.hora_corte;
+
+        if (regraData.usar_horario_por_dia && regraData.horarios_por_dia) {
+          const dayMap: Record<number, string> = { 0: "dom", 1: "seg", 2: "ter", 3: "qua", 4: "qui", 5: "sex", 6: "sab" };
+          const currentDayKey = dayMap[brTime.getDay()];
+          const horariosDia = regraData.horarios_por_dia as Record<string, string>;
+          if (horariosDia[currentDayKey]) {
+            cutoffTime = horariosDia[currentDayKey];
+          }
+        }
+
+        if (cutoffTime) {
+          const [cutHour, cutMinute] = cutoffTime.split(":").map(Number);
           const cutoffMinutes = cutHour * 60 + cutMinute;
 
-          if (currentMinutes >= cutoffMinutes) {
-            autoRecusado = true;
+          if (regraData.aplica_dia_anterior) {
+            // When aplica_dia_anterior is true: check if the scheduled date is tomorrow or earlier
+            // AND the current time is past the cutoff
+            const dataPosStr = solicitacaoData.data_posicionamento || solicitacaoData.data_agendamento;
+            if (dataPosStr && currentMinutes >= cutoffMinutes) {
+              const dataPos = new Date(dataPosStr + "T00:00:00");
+              const tomorrow = new Date(brTime);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              tomorrow.setHours(0, 0, 0, 0);
+              if (dataPos <= tomorrow) {
+                autoRecusado = regraData.recusar_apos_corte === true;
+              }
+            }
+          } else {
+            // When aplica_dia_anterior is false: simply check if current time >= cutoff
+            if (currentMinutes >= cutoffMinutes) {
+              autoRecusado = regraData.recusar_apos_corte === true;
+            }
           }
         }
       }
@@ -143,7 +210,6 @@ Deno.serve(async (req) => {
     // 6. Insert solicitacao
     const { error: solError } = await supabase.from("solicitacoes").insert({
       protocolo,
-      chave_consulta: chaveConsulta,
       cliente_nome: solicitacaoData.cliente_nome || "Cliente via formulário",
       cliente_email: solicitacaoData.cliente_email || "nao-informado@formulario.local",
       tipo_operacao: solicitacaoData.tipo_operacao || null,
@@ -162,14 +228,14 @@ Deno.serve(async (req) => {
 
     if (solError) throw solError;
 
-    // Get the created solicitation id for dynamic fields and notifications
+    // Get the created solicitation id
     const { data: solData } = await supabase
       .from("solicitacoes")
-      .select("id")
+      .select("id, chave_consulta")
       .eq("protocolo", protocolo)
       .single();
 
-    // 6. Save dynamic field values
+    // 7. Save dynamic field values
     if (dynamicFieldValues.length > 0 && solData) {
       const inserts = dynamicFieldValues.map((dv) => ({
         solicitacao_id: solData.id,
@@ -179,11 +245,11 @@ Deno.serve(async (req) => {
       await supabase.from("campos_analise_valores").insert(inserts);
     }
 
-    // 7. Trigger notifications for the new solicitation (aguardando_confirmacao)
+    // 8. Trigger notifications
     if (solData) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      
+
       fetch(`${supabaseUrl}/functions/v1/notificar-status`, {
         method: "POST",
         headers: {
@@ -193,13 +259,17 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           solicitacao_id: solData.id,
           novo_status: autoRecusado ? "recusado" : "aguardando_confirmacao",
-          usuario_id: "00000000-0000-0000-0000-000000000000", // system user
+          usuario_id: "00000000-0000-0000-0000-000000000000",
         }),
       }).catch((err) => console.error("Error triggering notification:", err));
     }
 
     return new Response(
-      JSON.stringify({ protocolo, chave_consulta: chaveConsulta, auto_recusado: autoRecusado }),
+      JSON.stringify({
+        protocolo,
+        chave_consulta: solData?.chave_consulta || "",
+        auto_recusado: autoRecusado,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {

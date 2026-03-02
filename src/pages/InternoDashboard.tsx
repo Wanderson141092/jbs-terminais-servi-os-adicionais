@@ -404,6 +404,8 @@ const InternoDashboard = () => {
       (s.status === "confirmado_aguardando_vistoria" || s.comex_aprovado || s.armazem_aprovado),
   );
 
+  
+
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
@@ -457,6 +459,10 @@ const InternoDashboard = () => {
     }
     return s.lancamento_confirmado === true;
   };
+
+  const selectedForBatchBilling = filtered.filter(
+    (s) => selectedIds.includes(s.id) && matchesLaunchStatus(s) && !isLancamentoAllConfirmed(s),
+  );
 
   // Check if deferimento button should be active - uses service config
   const isDeferimentoActive = (s: any) => {
@@ -893,6 +899,12 @@ const InternoDashboard = () => {
                     <Button size="sm" variant="outline" onClick={() => setShowBatchStatus(true)}>
                       <RefreshCw className="h-4 w-4 mr-1" />
                       Atualizar Status ({selectedForBatchStatus.length})
+                    </Button>
+                  )}
+                  {selectedForBatchBilling.length > 0 && (
+                    <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50" onClick={() => setShowBatchBilling(true)}>
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      Lançar Cobrança ({selectedForBatchBilling.length})
                     </Button>
                   )}
                 </div>
@@ -1340,7 +1352,7 @@ const InternoDashboard = () => {
       <ModelosExcelDialog open={showModelosExcel} onClose={() => setShowModelosExcel(false)} />
       {showBatchBilling && (
         <BatchBillingDialog
-          solicitacoes={filtered.filter(s => selectedIds.includes(s.id))}
+          solicitacoes={selectedForBatchBilling}
           open={showBatchBilling}
           onClose={() => setShowBatchBilling(false)}
           onSuccess={() => {

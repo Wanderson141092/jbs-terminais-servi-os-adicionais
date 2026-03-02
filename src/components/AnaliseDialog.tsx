@@ -183,8 +183,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   // Use approval flag from service config
   const approvalRequired = servicoConfig?.aprovacao_ativada !== false; // Default true if undefined
   
-  const canDecide = approvalRequired && solicitacao.status === "aguardando_confirmacao" && !alreadyApproved && setor !== null;
-  const canChangeRefusal = approvalRequired && wasRefused && solicitacao.status !== "recusado";
+  const canDecide = approvalRequired && (solicitacao.status === "aguardando_confirmacao" || (solicitacao.status === "recusado" && currentApproval === null)) && !alreadyApproved && setor !== null;
+  const canChangeRefusal = approvalRequired && wasRefused;
 
   // Determinar labels de data baseado no serviço
   const isPositionamento = (solicitacao.tipo_operacao || "").toLowerCase().includes("posicionamento");

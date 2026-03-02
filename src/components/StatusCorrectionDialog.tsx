@@ -62,7 +62,7 @@ const StatusCorrectionDialog = ({ solicitacao, userId, onClose }: StatusCorrecti
 
     const statusLabel = statusOptions.find(s => s.value === selectedStatus)?.label || selectedStatus;
 
-    // Reset total: limpa campos, pendências e flags ao corrigir status
+    // Reset total: limpa campos, pendências, flags e aprovações ao corrigir status
     const { error } = await supabase
       .from("solicitacoes")
       .update({
@@ -78,6 +78,14 @@ const StatusCorrectionDialog = ({ solicitacao, userId, onClose }: StatusCorrecti
         lancamento_confirmado: null,
         lancamento_confirmado_por: null,
         lancamento_confirmado_data: null,
+        comex_aprovado: null,
+        comex_justificativa: null,
+        comex_usuario_id: null,
+        comex_data: null,
+        armazem_aprovado: null,
+        armazem_justificativa: null,
+        armazem_usuario_id: null,
+        armazem_data: null,
       })
       .eq("id", solicitacao.id);
 

@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, ArrowLeft, Download, Search } from "lucide-react";
+import { FileText, ArrowLeft, Download, Search, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -29,6 +30,7 @@ const AdminLogs = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAcao, setFilterAcao] = useState("all");
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   useEffect(() => {
     fetchLogs();
@@ -187,6 +189,7 @@ const AdminLogs = () => {
                   <TableHead>Usuário</TableHead>
                   <TableHead>Solicitação</TableHead>
                   <TableHead>Detalhes</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -205,6 +208,17 @@ const AdminLogs = () => {
                     <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
                       {log.detalhes || "—"}
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedLog(log)}
+                        className="h-7 w-7 p-0"
+                        title="Ver detalhes"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -212,6 +226,69 @@ const AdminLogs = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Detalhes do Log */}
+      <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Detalhes do Registro
+            </DialogTitle>
+          </DialogHeader>
+          {selectedLog && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-[120px_1fr] gap-y-2 gap-x-3">
+                <span className="font-semibold text-muted-foreground">Data/Hora:</span>
+                <span>{format(new Date(selectedLog.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</span>
+                
+                <span className="font-semibold text-muted-foreground">Ação:</span>
+                <span className="font-medium">{selectedLog.acao}</span>
+                
+                <span className="font-semibold text-muted-foreground">Usuário:</span>
+                <span>{profiles[selectedLog.usuario_id] || "—"}</span>
+                
+                <span className="font-semibold text-muted-foreground">ID Usuário:</span>
+                <span className="font-mono text-xs break-all">{selectedLog.usuario_id}</span>
+                
+                <span className="font-semibold text-muted-foreground">Solicitação:</span>
+                <span className="font-mono text-xs break-all">{selectedLog.solicitacao_id}</span>
+
+                {selectedLog.entidade && (
+                  <>
+                    <span className="font-semibold text-muted-foreground">Entidade:</span>
+                    <span>{selectedLog.entidade}</span>
+                  </>
+                )}
+
+                {selectedLog.entidade_id && (
+                  <>
+                    <span className="font-semibold text-muted-foreground">ID Entidade:</span>
+                    <span className="font-mono text-xs break-all">{selectedLog.entidade_id}</span>
+                  </>
+                )}
+              </div>
+
+              {selectedLog.detalhes && (
+                <div className="border-t pt-3 mt-3">
+                  <p className="font-semibold text-muted-foreground mb-1">Detalhes:</p>
+                  <div className="bg-muted/50 rounded-lg p-3 whitespace-pre-wrap break-words text-foreground">
+                    {selectedLog.detalhes}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t pt-3 mt-3">
+                <p className="font-semibold text-muted-foreground mb-1">ID do Registro:</p>
+                <span className="font-mono text-xs text-muted-foreground">{selectedLog.id}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedLog(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

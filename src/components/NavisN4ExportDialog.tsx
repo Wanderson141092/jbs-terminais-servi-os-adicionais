@@ -18,29 +18,36 @@ const NavisN4ExportDialog = ({ open, onClose }: NavisN4ExportDialogProps) => {
   const [exporting, setExporting] = useState(false);
   const [preview, setPreview] = useState<any[] | null>(null);
   const [camposMap, setCamposMap] = useState<Record<string, string>>({});
+  const [servicos, setServicos] = useState<{ id: string; nome: string }[]>([]);
+  const [servicoFilter, setServicoFilter] = useState("todos");
+  const [statusFilter, setStatusFilter] = useState("todos");
 
-  // Load campos_analise IDs for N4 fields
+  // Load campos_analise IDs for N4 fields and services
   useEffect(() => {
     if (!open) return;
-    const fetchCampos = async () => {
-      const { data } = await supabase
-        .from("campos_analise")
-        .select("id, nome")
-        .in("nome", [
-          "Motivo Posicionamento",
-          "Tipo de Inspeção",
-          "Nível de Inspeção",
-          "Doca Refrigerada",
-          "Temperatura Doca",
-          "Informações Adicionais N4",
-        ]);
-      if (data) {
+    const fetchData = async () => {
+      const [camposRes, servicosRes] = await Promise.all([
+        supabase
+          .from("campos_analise")
+          .select("id, nome")
+          .in("nome", [
+            "Motivo Posicionamento",
+            "Tipo de Inspeção",
+            "Nível de Inspeção",
+            "Doca Refrigerada",
+            "Temperatura Doca",
+            "Informações Adicionais N4",
+          ]),
+        supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
+      ]);
+      if (camposRes.data) {
         const map: Record<string, string> = {};
-        data.forEach((c) => (map[c.nome] = c.id));
+        camposRes.data.forEach((c) => (map[c.nome] = c.id));
         setCamposMap(map);
       }
+      if (servicosRes.data) setServicos(servicosRes.data);
     };
-    fetchCampos();
+    fetchData();
   }, [open]);
 
   const handleSearch = async () => {
@@ -51,14 +58,23 @@ const NavisN4ExportDialog = ({ open, onClose }: NavisN4ExportDialogProps) => {
 
     setExporting(true);
     try {
-      // Get Posicionamento solicitations for the date with confirmed statuses
-      const { data: solicitacoes, error } = await supabase
+      // Get solicitations for the date with filters
+      let query = supabase
         .from("solicitacoes")
-        .select("id, numero_conteiner, categoria, protocolo")
-        .eq("tipo_operacao", "Posicionamento")
+        .select("id, numero_conteiner, categoria, protocolo, tipo_operacao, status")
         .eq("data_posicionamento", dataPosicionamento)
-        .in("status", ["confirmado_aguardando_vistoria"] as any)
         .order("created_at", { ascending: true });
+
+      if (servicoFilter !== "todos") {
+        query = query.eq("tipo_operacao", servicoFilter);
+      }
+      if (statusFilter !== "todos") {
+        query = query.eq("status", statusFilter as any);
+      } else {
+        query = query.in("status", ["confirmado_aguardando_vistoria"] as any);
+      }
+
+      const { data: solicitacoes, error } = await query;
 
       if (error) throw error;
       if (!solicitacoes || solicitacoes.length === 0) {
@@ -186,19 +202,34 @@ const NavisN4ExportDialog = ({ open, onClose }: NavisN4ExportDialogProps) => {
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <Label>Data do Posicionamento</Label>
-            <div className="flex gap-3 mt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <Label>Data do Posicionamento</Label>
               <Input
                 type="date"
                 value={dataPosicionamento}
-                onChange={(e) => {
-                  setDataPosicionamento(e.target.value);
-                  setPreview(null);
-                }}
-                className="w-[200px]"
+                onChange={(e) => { setDataPosicionamento(e.target.value); setPreview(null); }}
+                className="mt-1"
               />
-              <Button onClick={handleSearch} disabled={exporting || !dataPosicionamento}>
+            </div>
+            <div>
+              <Label>Serviço</Label>
+              <select value={servicoFilter} onChange={(e) => { setServicoFilter(e.target.value); setPreview(null); }} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1">
+                <option value="todos">Todos</option>
+                {servicos.map(s => <option key={s.id} value={s.nome}>{s.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPreview(null); }} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1">
+                <option value="todos">Todos confirmados</option>
+                <option value="confirmado_aguardando_vistoria">Aguardando Vistoria</option>
+                <option value="vistoria_finalizada">Vistoria Finalizada</option>
+                <option value="vistoriado_com_pendencia">Com Pendência</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button onClick={handleSearch} disabled={exporting || !dataPosicionamento} className="w-full">
                 Consultar
               </Button>
             </div>

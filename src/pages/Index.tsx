@@ -182,20 +182,20 @@ const Index = () => {
             <h2 className="text-lg font-semibold text-primary mb-4 pb-3 border-b-4 border-secondary">
               Solicitação de Serviço
             </h2>
-            <div className="grid gap-4">
+            <div className={`grid gap-3 ${buttons.length >= 4 ? "max-h-[400px] overflow-y-auto pr-1" : ""}`}>
               {buttons.map((button) => (
                 <Card
                   key={button.id}
-                  className="border-2 border-secondary/30 hover:border-secondary transition-colors cursor-pointer"
+                  className="border border-secondary/30 hover:border-secondary transition-colors cursor-pointer"
                   onClick={() => handleButtonClick(button)}
                 >
-                  <CardHeader className="pb-2 text-center">
-                    <div className="w-14 h-14 rounded-xl bg-secondary/20 flex items-center justify-center mb-3 mx-auto">
+                  <CardHeader className="py-3 px-4 text-center">
+                    <div className="w-8 h-8 rounded-lg bg-secondary/20 flex items-center justify-center mb-1.5 mx-auto">
                       {getIcon(button.icone)}
                     </div>
-                    <CardTitle className="text-xl text-primary font-bold">{button.titulo}</CardTitle>
+                    <CardTitle className="text-sm text-primary font-bold">{button.titulo}</CardTitle>
                     {button.descricao && (
-                      <p className="text-sm text-muted-foreground mt-1">{button.descricao}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{button.descricao}</p>
                     )}
                   </CardHeader>
                 </Card>

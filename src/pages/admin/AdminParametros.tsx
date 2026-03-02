@@ -253,7 +253,16 @@ const AdminParametros = () => {
         limite_sab: regra.limite_sab?.toString() || "",
         aplica_dia_anterior: regra.aplica_dia_anterior,
         usar_horario_por_dia: regra.usar_horario_por_dia,
-        horarios_por_dia: regra.horarios_por_dia || {}
+        horarios_por_dia: (() => {
+          const h = regra.horarios_por_dia || {};
+          // If usar_horario_por_dia is on but horarios_por_dia is empty, pre-populate from hora_corte
+          if (regra.usar_horario_por_dia && Object.keys(h).length === 0) {
+            const init: Record<string, string> = {};
+            regra.dias_semana.forEach(d => { init[d] = regra.hora_corte; });
+            return init;
+          }
+          return h;
+        })()
       });
     } else {
       setEditingRegra(null);
@@ -1079,7 +1088,18 @@ const AdminParametros = () => {
                   <div className="flex items-center gap-2">
                     <Switch 
                       checked={regraFormData.usar_horario_por_dia} 
-                      onCheckedChange={(checked) => setRegraFormData(prev => ({ ...prev, usar_horario_por_dia: checked }))} 
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          // Pre-populate horarios_por_dia with hora_corte for all active days
+                          const initialHorarios: Record<string, string> = {};
+                          regraFormData.dias_semana.forEach(dia => {
+                            initialHorarios[dia] = regraFormData.horarios_por_dia?.[dia] || regraFormData.hora_corte;
+                          });
+                          setRegraFormData(prev => ({ ...prev, usar_horario_por_dia: true, horarios_por_dia: initialHorarios }));
+                        } else {
+                          setRegraFormData(prev => ({ ...prev, usar_horario_por_dia: false }));
+                        }
+                      }}
                     />
                     <span className="text-xs text-muted-foreground">Horário diferenciado por dia</span>
                   </div>

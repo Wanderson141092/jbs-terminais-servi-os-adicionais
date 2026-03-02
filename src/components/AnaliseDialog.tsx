@@ -1210,10 +1210,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     const defPendenciasAtivacao = servicoConfig?.deferimento_pendencias_ativacao || [];
                     // Use selectedStatus (local) instead of saved status for reactive toggle visibility
                     const activeStatus = selectedStatus || solicitacao.status;
+                    const isPendenciaStatus = activeStatus === "vistoriado_com_pendencia";
                     const defStatusMatch = defStatusAtivacao.length > 0 && defStatusAtivacao.includes(activeStatus);
                     // Check pendências against LOCAL state (pendenciasSelecionadas) for reactive visibility
                     const defPendenciasMatch = defPendenciasAtivacao.length > 0 && defPendenciasAtivacao.some((p: string) => pendenciasSelecionadas.includes(p));
-                    const showDeferimento = isPosicionamento && (defStatusMatch || defPendenciasMatch);
+                    const showDeferimento = isPosicionamento && (isPendenciaStatus ? defPendenciasMatch : (defStatusMatch || defPendenciasMatch));
                     if (!showDeferimento && !solicitarDeferimento) return null;
                     return (
                       <div className={`flex items-center justify-between border rounded-md p-3 ${showDeferimento ? 'bg-white' : 'bg-muted/50 opacity-60'}`}>
@@ -1243,10 +1244,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     const lacrePendenciasAtivacao = servicoConfig?.lacre_armador_pendencias_ativacao || [];
                     // Use local selectedStatus for reactive visibility
                     const activeStatus = selectedStatus || solicitacao.status;
+                    const isPendenciaStatus = activeStatus === "vistoriado_com_pendencia";
                     const statusMatch = lacreStatusAtivacao.length > 0 && lacreStatusAtivacao.includes(activeStatus);
                     // Check pendências against LOCAL state for reactive visibility
                     const pendenciasMatch = lacrePendenciasAtivacao.length > 0 && lacrePendenciasAtivacao.some((p: string) => pendenciasSelecionadas.includes(p));
-                    const showLacre = isPosicionamento && (statusMatch || pendenciasMatch);
+                    const showLacre = isPosicionamento && (isPendenciaStatus ? pendenciasMatch : (statusMatch || pendenciasMatch));
                     if (!showLacre && !solicitarLacreArmador) return null;
                     // Pendencia billing badge logic
                      const pendenciaConfig = cobrancaConfigs.find((cfg: any) => cfg.tipo === "pendencia");

@@ -441,6 +441,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       return;
     }
 
+    // Validação: status não conforme requer justificativa (motivo)
+    const selectedOpt = statusOptions.find((s: any) => s.value === selectedStatus);
+    if (selectedOpt?.tipo_resultado === "nao_conforme" && !justificativaNaoVistoriado.trim()) {
+      setShowJustificativaNaoVistoriado(true);
+      return;
+    }
+
     if (selectedStatus === solicitacao.status && 
         solicitarDeferimento === solicitacao.solicitar_deferimento && 
         solicitarLacreArmador === solicitacao.solicitar_lacre_armador &&
@@ -614,6 +621,22 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
 
     await logAudit("status_atualizado", details);
+
+    // Save justification as observation for non-conforme statuses
+    const selectedOpt = statusOptions.find((s: any) => s.value === selectedStatus);
+    if (selectedOpt?.tipo_resultado === "nao_conforme" && justificativaNaoVistoriado.trim()) {
+      await supabase.from("observacao_historico").insert({
+        solicitacao_id: solicitacao.id,
+        observacao: justificativaNaoVistoriado.trim(),
+        status_no_momento: selectedStatus,
+        autor_id: userId,
+        autor_nome: profile.nome || profile.email,
+        tipo_observacao: "externa",
+      });
+      await supabase.from("solicitacoes").update({ observacoes: justificativaNaoVistoriado.trim() }).eq("id", solicitacao.id);
+      setJustificativaNaoVistoriado("");
+    }
+
     await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
     
     // Dispatch email/notification via edge function
@@ -1147,11 +1170,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                               variant={isSelected ? "secondary" : "outline"}
                               size="sm"
                               onClick={() => {
-                                if (opt.value === 'nao_vistoriado') {
-                                  setShowJustificativaNaoVistoriado(true);
-                                } else {
-                                  setSelectedStatus(opt.value);
-                                }
+                                setSelectedStatus(opt.value);
                               }}
                               className={`flex items-center gap-1.5 [&_svg]:!text-current ${isSelected ? "ring-2 ring-ring font-semibold" : ""}`}
                             >
@@ -1751,18 +1770,18 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog de justificativa para Não Vistoriado */}
+      {/* Dialog de justificativa para status não conforme */}
       <Dialog open={showJustificativaNaoVistoriado} onOpenChange={setShowJustificativaNaoVistoriado}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Motivo — Não Vistoriado
+              Motivo — {statusOptions.find((s: any) => s.value === selectedStatus)?.label || selectedStatus}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Informe o motivo pelo qual a solicitação não foi vistoriada.
+              Informe o motivo para este status.
             </p>
             <Textarea
               value={justificativaNaoVistoriado}
@@ -1778,28 +1797,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             <Button
               size="sm"
               disabled={!justificativaNaoVistoriado.trim()}
-              onClick={async () => {
-                // Save justification as observation
-                setObservacaoTexto(justificativaNaoVistoriado.trim());
-                setSelectedStatus("nao_vistoriado");
+              onClick={() => {
                 setShowJustificativaNaoVistoriado(false);
-                // Auto-save observation
-                await supabase.from("observacao_historico").insert({
-                  solicitacao_id: solicitacao.id,
-                  observacao: justificativaNaoVistoriado.trim(),
-                  status_no_momento: "nao_vistoriado",
-                  autor_id: userId,
-                  autor_nome: null,
-                });
-                await supabase.from("solicitacoes").update({ observacoes: justificativaNaoVistoriado.trim() }).eq("id", solicitacao.id);
-                const { data: histData } = await supabase
-                  .from("observacao_historico")
-                  .select("*")
-                  .eq("solicitacao_id", solicitacao.id)
-                  .order("created_at", { ascending: false });
-                setObservacaoHistorico((histData as ObservacaoHistorico[]) || []);
-                setJustificativaNaoVistoriado("");
-                toast.success("Motivo registrado. Agora salve as alterações.");
+                // Re-trigger save now that justification is filled
+                handleUpdateStatus();
               }}
             >
               Confirmar

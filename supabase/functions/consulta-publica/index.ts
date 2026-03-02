@@ -109,8 +109,9 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false }),
       supabaseAdmin
         .from("observacao_historico")
-        .select("observacao, status_no_momento, created_at")
+        .select("observacao, status_no_momento, created_at, tipo_observacao")
         .eq("solicitacao_id", solicitacao.id)
+        .eq("tipo_observacao", "externa")
         .order("created_at", { ascending: false })
         .limit(10),
       supabaseAdmin
@@ -164,9 +165,9 @@ Deno.serve(async (req) => {
     ]);
 
     const deferimentoDocs = deferimentoRes.data;
-    // Filter out internal-only observations (status corrections)
+    // Filter: only show external observations (tipo_observacao = 'externa')
     const observacoes = (observacoesRes.data || []).filter(
-      (o: any) => !o.observacao?.startsWith("[Correção de Status]")
+      (o: any) => o.tipo_observacao === "externa"
     );
 
     // Filter status labels by service

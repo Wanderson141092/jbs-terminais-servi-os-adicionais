@@ -144,14 +144,14 @@ Deno.serve(async (req) => {
 
     // Fetch the service for this solicitation
     const servicoNome = solicitacao.tipo_operacao || "Serviço";
-    const { data: servicoData } = await supabaseAdmin
+    const { data: servicoDataRow } = await supabaseAdmin
       .from("servicos")
       .select("id")
       .eq("nome", servicoNome)
       .eq("ativo", true)
       .maybeSingle();
 
-    const servicoId = servicoData?.id;
+    const servicoId = servicoDataRow?.id;
 
     // Fetch notification rules for this status, filtered by service
     const { data: allRules } = await supabaseAdmin
@@ -183,44 +183,69 @@ Deno.serve(async (req) => {
 
     const notificationMessage = buildNotificationMessage();
 
-    // Check if the solicitação has a servico that matches the rules
     for (const rule of rules) {
       const tiposNotificacao = rule.tipos_notificacao || [];
       const setorIds = rule.setor_ids || [];
 
       // Internal notifications - send to users in the specified setores
       if (tiposNotificacao.includes("interna") && setorIds.length > 0) {
-        // Get setor emails for the rule
-        const { data: setorEmails } = await supabaseAdmin
-          .from("setor_emails")
-          .select("email_setor")
-          .in("id", setorIds);
+        // Check if any setor_id is the special "admin" marker
+        const hasAdminTarget = setorIds.includes("admin");
+        const regularSetorIds = setorIds.filter((id: string) => id !== "admin");
 
-        if (setorEmails && setorEmails.length > 0) {
-          const emails = setorEmails.map((s: any) => s.email_setor);
-          
-          // Get profiles with these setor emails (excluding the user who made the change)
-          const { data: profiles } = await supabaseAdmin
-            .from("profiles")
-            .select("id")
-            .in("email_setor", emails)
-            .neq("id", usuario_id);
+        const profileIds: string[] = [];
 
-          if (profiles && profiles.length > 0) {
-            const notifications = profiles.map((p: any) => ({
-              usuario_id: p.id,
-              solicitacao_id,
-              mensagem: notificationMessage,
-              tipo: "status_update",
-            }));
+        // Get profiles from regular setores
+        if (regularSetorIds.length > 0) {
+          const { data: setorEmails } = await supabaseAdmin
+            .from("setor_emails")
+            .select("email_setor")
+            .in("id", regularSetorIds);
 
-            const { error: notifError } = await supabaseAdmin
-              .from("notifications")
-              .insert(notifications);
+          if (setorEmails && setorEmails.length > 0) {
+            const emails = setorEmails.map((s: any) => s.email_setor);
+            const { data: profiles } = await supabaseAdmin
+              .from("profiles")
+              .select("id")
+              .in("email_setor", emails)
+              .neq("id", usuario_id);
 
-            if (!notifError) {
-              results.internal = notifications.length;
+            if (profiles) {
+              profileIds.push(...profiles.map((p: any) => p.id));
             }
+          }
+        }
+
+        // Get admin users if "admin" target is present
+        if (hasAdminTarget) {
+          const { data: adminRoles } = await supabaseAdmin
+            .from("user_roles")
+            .select("user_id")
+            .eq("role", "admin");
+
+          if (adminRoles) {
+            for (const ar of adminRoles) {
+              if (ar.user_id !== usuario_id && !profileIds.includes(ar.user_id)) {
+                profileIds.push(ar.user_id);
+              }
+            }
+          }
+        }
+
+        if (profileIds.length > 0) {
+          const notifications = profileIds.map((uid: string) => ({
+            usuario_id: uid,
+            solicitacao_id,
+            mensagem: notificationMessage,
+            tipo: "status_update",
+          }));
+
+          const { error: notifError } = await supabaseAdmin
+            .from("notifications")
+            .insert(notifications);
+
+          if (!notifError) {
+            results.internal += notifications.length;
           }
         }
       }

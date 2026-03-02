@@ -150,8 +150,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Format: YY + Letter + 6-digit sequence (e.g., 25S000001)
-    const protocolo = `${yearPrefix}${codigoLetra}${String(nextNum).padStart(6, "0")}`;
+    // Format: JBS + Letter + YY + 6-digit sequence (e.g., JBSS25000001)
+    const protocolo = `JBS${codigoLetra}${yearPrefix}${String(nextNum).padStart(6, "0")}`;
 
     // 5. Check cutoff time (hora_corte) - auto-reject if past cutoff
     let autoRecusado = false;

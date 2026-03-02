@@ -240,7 +240,9 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     const prefixo = configData?.prefixo || "JBS";
     const nextNum = (configData?.ultimo_numero || 0) + 1;
     const codigoLetra = solicitacaoData.tipo_operacao?.[0]?.toUpperCase() || "S";
-    const protocolo = `${prefixo}${codigoLetra}${String(nextNum).padStart(5, "0")}`;
+    const now = new Date();
+    const yearPrefix = String(now.getFullYear()).slice(-2);
+    const protocolo = `JBS${codigoLetra}${yearPrefix}${String(nextNum).padStart(6, "0")}`;
 
     // Update protocol counter
     if (configData) {

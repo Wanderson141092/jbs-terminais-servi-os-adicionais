@@ -57,28 +57,29 @@ const BatchBillingDialog = ({ solicitacoes, open, onClose, onSuccess }: BatchBil
       let successCount = 0;
       
       for (const sol of solicitacoes) {
-        // Filter configs applicable to this solicitation
-        // Service check
-        const configsToApply = cobrancaConfigs.filter(cfg => selectedConfigIds.includes(cfg.id));
-        
-        for (const cfg of configsToApply) {
-          // Check if config applies to this service
-          const servicoMatches = !cfg.servico_ids?.length || (sol.servico_id && cfg.servico_ids.includes(sol.servico_id));
-          // For legacy/simple check, we assume solicitacao has service name, we need to match it if we can
-          // Ideally we'd have service_id on solicitation, but we often rely on tipo_operacao name match
-          // Here we'll skip the strict service check if we can't verify, or rely on user selection
+        const configsToApply = cobrancaConfigs.filter(cfg => {
+          if (!selectedConfigIds.includes(cfg.id)) return false;
+          
+          // Check service match
+          if (cfg.servico_ids?.length > 0) {
+            const servicoMatch = sol.servico_id ? cfg.servico_ids.includes(sol.servico_id) : false;
+            if (!servicoMatch) return false;
+          }
           
           // Check status activation
           if (cfg.status_ativacao?.length > 0 && !cfg.status_ativacao.includes(sol.status)) {
-            continue; // Skip if status doesn't match
+            return false;
           }
 
           // Pendencia logic check
-          if (cfg.tipo === "pendencia") {
-            // Only apply if lacre cost accepted
-            if (sol.lacre_armador_aceite_custo !== true) continue;
+          if (cfg.tipo === "pendencia" && sol.lacre_armador_aceite_custo !== true) {
+            return false;
           }
 
+          return true;
+        });
+        
+        for (const cfg of configsToApply) {
           await supabase.from("lancamento_cobranca_registros").upsert({
             solicitacao_id: sol.id,
             cobranca_config_id: cfg.id,

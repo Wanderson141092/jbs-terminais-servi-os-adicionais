@@ -541,7 +541,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
     // If completion status, create individual servico registro and set lancamento based on user confirmation
     if (isCompletionStatus() && selectedStatus !== solicitacao.status) {
-      const servicoCfg = cobrancaConfigs.find((c: any) => c.tipo === "servico");
+      const servicoCfg = cobrancaConfigs.find((c: any) => {
+        if (c.tipo !== "servico") return false;
+        const statusAtivacao = c.status_ativacao || [];
+        if (statusAtivacao.length > 0 && !statusAtivacao.includes(selectedStatus)) return false;
+        return true;
+      });
       if (servicoCfg) {
         await supabase.from("lancamento_cobranca_registros").upsert({
           solicitacao_id: solicitacao.id,
@@ -557,6 +562,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         .select("*")
         .eq("solicitacao_id", solicitacao.id);
       const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
+        const statusAtivacao = cfg.status_ativacao || [];
+        if (statusAtivacao.length > 0 && !statusAtivacao.includes(selectedStatus)) return false;
         if (cfg.tipo === "servico") return true;
         if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true || (solicitarLacreArmador && custoLacreArmador === true);
         return false;
@@ -691,6 +698,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
       // Check if ALL applicable registros are now confirmed
       const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
+        const statusAtivacao = cfg.status_ativacao || [];
+        if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
         if (cfg.tipo === "servico") return true;
         if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true;
         return false;

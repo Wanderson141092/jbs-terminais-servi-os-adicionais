@@ -587,11 +587,35 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
                   </Alert>
                 )}
 
-                {/* Tipo de Aceite do Lacre */}
+                {/* Botão Ciente - apenas quando tipo_aceite é "aceite" ou "aceite_custo" */}
                 {lacreArmadorConfig?.tipo_aceite && lacreArmadorConfig.tipo_aceite !== "informativo" && (
-                  <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2 border border-amber-300">
-                    <strong>Tipo de Aceite:</strong> {lacreArmadorConfig.tipo_aceite === "aceite_custo" ? "Aceite de Custo" : lacreArmadorConfig.tipo_aceite}
-                  </div>
+                  solicitacao.lacre_armador_aceite_custo ? (
+                    <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded px-3 py-2 border border-green-300">
+                      <Check className="h-4 w-4" />
+                      <span className="font-medium">Aceite confirmado</span>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-500 text-amber-700 hover:bg-amber-100"
+                      onClick={async () => {
+                        try {
+                          const { error } = await supabase.functions.invoke("upload-publico", {
+                            body: { action: "aceite_custo_lacre", solicitacao_id: solicitacao.id },
+                          });
+                          if (error) throw error;
+                          toast.success("Aceite registrado com sucesso.");
+                          onRefresh();
+                        } catch {
+                          toast.error("Erro ao registrar aceite.");
+                        }
+                      }}
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Ciente
+                    </Button>
+                  )
                 )}
 
                 {/* Recusa warning */}

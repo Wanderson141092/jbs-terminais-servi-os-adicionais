@@ -283,6 +283,31 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Aceite de custo do lacre armador
+      if (body.action === "aceite_custo_lacre") {
+        const { solicitacao_id } = body;
+        if (!solicitacao_id) {
+          return new Response(
+            JSON.stringify({ error: "Solicitação não informada." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const { error } = await supabaseAdmin
+          .from("solicitacoes")
+          .update({ lacre_armador_aceite_custo: true, updated_at: new Date().toISOString() })
+          .eq("id", solicitacao_id);
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: "Erro ao registrar aceite." }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ success: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: "Ação não reconhecida." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -207,12 +207,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Insert solicitacao
+    // 6. Determine initial status based on service type
+    const tipoOperacao = solicitacaoData.tipo_operacao || null;
+    const isPosicionamento = tipoOperacao && tipoOperacao.toLowerCase().includes("posicionamento");
+
+    let initialStatus: string;
+    if (autoRecusado) {
+      initialStatus = "recusado";
+    } else if (isPosicionamento) {
+      // Posicionamento: aguarda confirmação manual
+      initialStatus = "aguardando_confirmacao";
+    } else {
+      // Outros serviços: vai direto para confirmado_aguardando_servico
+      initialStatus = "confirmado_aguardando_servico";
+    }
+
+    // 7. Insert solicitacao
     const { error: solError } = await supabase.from("solicitacoes").insert({
       protocolo,
       cliente_nome: solicitacaoData.cliente_nome || "Cliente via formulário",
       cliente_email: solicitacaoData.cliente_email || "nao-informado@formulario.local",
-      tipo_operacao: solicitacaoData.tipo_operacao || null,
+      tipo_operacao: tipoOperacao,
       numero_conteiner: solicitacaoData.numero_conteiner || null,
       cnpj: solicitacaoData.cnpj || null,
       lpco: solicitacaoData.lpco || null,
@@ -223,7 +238,7 @@ Deno.serve(async (req) => {
       data_agendamento: solicitacaoData.data_agendamento || null,
       tipo_carga: solicitacaoData.tipo_carga || null,
       categoria: solicitacaoData.categoria || null,
-      status: autoRecusado ? "recusado" : "aguardando_confirmacao",
+      status: initialStatus,
     });
 
     if (solError) throw solError;
@@ -258,7 +273,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           solicitacao_id: solData.id,
-          novo_status: autoRecusado ? "recusado" : "aguardando_confirmacao",
+          novo_status: initialStatus,
           usuario_id: "00000000-0000-0000-0000-000000000000",
         }),
       }).catch((err) => console.error("Error triggering notification:", err));

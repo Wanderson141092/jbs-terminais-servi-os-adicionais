@@ -2203,6 +2203,7 @@ export type Database = {
         | "vistoria_finalizada"
         | "vistoriado_com_pendencia"
         | "nao_vistoriado"
+        | "confirmado_aguardando_servico"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2346,6 +2347,7 @@ export const Constants = {
         "vistoria_finalizada",
         "vistoriado_com_pendencia",
         "nao_vistoriado",
+        "confirmado_aguardando_servico",
       ],
     },
   },

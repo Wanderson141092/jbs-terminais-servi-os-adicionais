@@ -1184,7 +1184,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     const activeStatus = selectedStatus || solicitacao.status;
                     const defStatusMatch = defStatusAtivacao.length > 0 && defStatusAtivacao.includes(activeStatus);
                     // Check pendências against LOCAL state (pendenciasSelecionadas) for reactive visibility
-                    const defPendenciasMatch = defPendenciasAtivacao.length === 0 || defPendenciasAtivacao.some((p: string) => pendenciasSelecionadas.includes(p));
+                    const defPendenciasMatch = defPendenciasAtivacao.length > 0 && defPendenciasAtivacao.some((p: string) => pendenciasSelecionadas.includes(p));
                     const showDeferimento = isPosicionamento && (defStatusMatch || defPendenciasMatch);
                     if (!showDeferimento && !solicitarDeferimento) return null;
                     return (

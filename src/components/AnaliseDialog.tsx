@@ -44,6 +44,7 @@ interface ObservacaoHistorico {
   status_no_momento: string;
   autor_nome: string | null;
   created_at: string;
+  tipo_observacao?: string;
 }
 
 const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
@@ -61,6 +62,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
   const [servicos, setServicos] = useState<any[]>([]);
   const [observacaoTexto, setObservacaoTexto] = useState("");
+  const [observacaoTipo, setObservacaoTipo] = useState<"interna" | "externa">("interna");
   const [observacaoHistorico, setObservacaoHistorico] = useState<ObservacaoHistorico[]>([]);
   const [statusOptions, setStatusOptions] = useState<any[]>([]);
   const [statusOrdemMap, setStatusOrdemMap] = useState<Record<string, number>>({});
@@ -400,6 +402,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setLoading(false);
       return;
     }
+
+    // Gravar motivo da recusa como observação EXTERNA (visível na consulta pública)
+    await supabase.from("observacao_historico").insert({
+      solicitacao_id: solicitacao.id,
+      observacao: cancelJustificativa.trim(),
+      status_no_momento: "recusado",
+      autor_id: userId,
+      autor_nome: profile.nome || profile.email,
+      tipo_observacao: "externa",
+    });
 
     const details = `Status atualizado para: Recusado. Justificativa: ${cancelJustificativa.trim()}`;
     await logAudit("status_atualizado", details);
@@ -755,7 +767,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       observacao: observacaoTexto.trim(),
       status_no_momento: solicitacao.status,
       autor_id: userId,
-      autor_nome: profile.nome || profile.email
+      autor_nome: profile.nome || profile.email,
+      tipo_observacao: observacaoTipo,
     });
 
     if (histError) {
@@ -765,7 +778,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
 
     await supabase.from("solicitacoes").update({ observacoes: observacaoTexto.trim() }).eq("id", solicitacao.id);
-    await logAudit("observacao", `Observação atualizada: ${observacaoTexto.trim()}`);
+    await logAudit("observacao", `Observação ${observacaoTipo === "externa" ? "(externa)" : "(interna)"}: ${observacaoTexto.trim()}`);
 
     const { data: histData } = await supabase
       .from("observacao_historico")
@@ -775,7 +788,47 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setObservacaoHistorico((histData as ObservacaoHistorico[]) || []);
 
     setObservacaoTexto("");
+    setObservacaoTipo("interna");
     toast.success("Observação registrada!");
+    setLoading(false);
+  };
+
+  const handleDesfazerLancamento = async (configId: string) => {
+    setLoading(true);
+    const { error } = await supabase
+      .from("lancamento_cobranca_registros")
+      .update({
+        confirmado: false,
+        confirmado_por: null,
+        confirmado_data: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("solicitacao_id", solicitacao.id)
+      .eq("cobranca_config_id", configId);
+
+    if (error) {
+      toast.error("Erro ao desfazer lançamento");
+      setLoading(false);
+      return;
+    }
+
+    // Update global field
+    await supabase.from("solicitacoes").update({
+      lancamento_confirmado: false,
+      lancamento_confirmado_por: null,
+      lancamento_confirmado_data: null,
+    }).eq("id", solicitacao.id);
+
+    // Refresh registros
+    const { data: updatedRegistros } = await supabase
+      .from("lancamento_cobranca_registros")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+    setLancamentoRegistros(updatedRegistros || []);
+
+    const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
+    await logAudit("lancamento_desfeito", `Lançamento desfeito: ${cfgLabel}. Protocolo: ${solicitacao.protocolo}.`);
+    toast.success(`Lançamento "${cfgLabel}" desfeito!`);
     setLoading(false);
   };
 
@@ -1307,9 +1360,22 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       const isConfirmed = registro?.confirmado === true;
                       return (
                         <div key={cfg.id} className={`border rounded-lg p-4 ${isConfirmed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-                          <div className={`flex items-center gap-2 mb-2 ${isConfirmed ? "text-green-600" : "text-red-600"}`}>
-                            {isConfirmed ? <Check className="h-5 w-5" /> : <DollarSign className="h-5 w-5" />}
-                            <span className="font-semibold">{cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Aguardando confirmação"}</span>
+                          <div className={`flex items-center justify-between mb-2`}>
+                            <div className={`flex items-center gap-2 ${isConfirmed ? "text-green-600" : "text-red-600"}`}>
+                              {isConfirmed ? <Check className="h-5 w-5" /> : <DollarSign className="h-5 w-5" />}
+                              <span className="font-semibold">{cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Aguardando confirmação"}</span>
+                            </div>
+                            {isConfirmed && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDesfazerLancamento(cfg.id)}
+                                disabled={loading}
+                                className="text-xs text-muted-foreground hover:text-destructive h-7"
+                              >
+                                Desfazer
+                              </Button>
+                            )}
                           </div>
                           {!isConfirmed && (
                             <Button 
@@ -1413,16 +1479,43 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 <MessageSquare className="h-4 w-4" />
                 Observações
               </p>
-              <div className="flex gap-2">
-                <Textarea
-                  value={observacaoTexto}
-                  onChange={(e) => setObservacaoTexto(e.target.value)}
-                  placeholder="Adicionar nova observação..."
-                  className="min-h-[60px]"
-                />
-                <Button onClick={handleSaveObservacao} disabled={loading || !observacaoTexto.trim()} size="sm" className="self-end">
-                  Atualizar Observação
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 mb-1">
+                  <button
+                    type="button"
+                    onClick={() => setObservacaoTipo("interna")}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                      observacaoTipo === "interna"
+                        ? "bg-muted border-border text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Lock className="h-3 w-3" />
+                    🔒 Interna
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setObservacaoTipo("externa")}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                      observacaoTipo === "externa"
+                        ? "bg-blue-50 border-blue-200 text-blue-700"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    🌐 Externa (Cliente)
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <Textarea
+                    value={observacaoTexto}
+                    onChange={(e) => setObservacaoTexto(e.target.value)}
+                    placeholder={observacaoTipo === "externa" ? "Esta observação será visível na consulta pública..." : "Adicionar nova observação (uso interno)..."}
+                    className="min-h-[60px]"
+                  />
+                  <Button onClick={handleSaveObservacao} disabled={loading || !observacaoTexto.trim()} size="sm" className="self-end">
+                    Atualizar Observação
+                  </Button>
+                </div>
               </div>
 
               {observacaoHistorico.length > 0 && (
@@ -1433,9 +1526,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   </p>
                   <div className="max-h-[200px] overflow-auto space-y-2">
                     {observacaoHistorico.map((obs) => (
-                      <div key={obs.id} className="bg-muted/50 rounded-lg p-2 text-xs">
+                      <div key={obs.id} className={`rounded-lg p-2 text-xs ${obs.tipo_observacao === "externa" ? "bg-blue-50 border border-blue-100" : "bg-muted/50"}`}>
                         <div className="flex justify-between items-start mb-1">
-                          <span className="font-medium">{obs.autor_nome || "Sistema"}</span>
+                          <span className="font-medium flex items-center gap-1.5">
+                            {obs.autor_nome || "Sistema"}
+                            {obs.tipo_observacao === "externa" ? (
+                              <span className="text-[10px] text-blue-600 font-normal">🌐 Externa</span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground font-normal">🔒 Interna</span>
+                            )}
+                          </span>
                           <span className="text-muted-foreground">
                             {new Date(obs.created_at).toLocaleString("pt-BR")}
                           </span>
@@ -1444,7 +1544,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                           <div className="text-foreground">
                             {(() => {
                               const text = obs.observacao.replace("[Correção de Status] ", "");
-                              // New format: "Status: X.\nObservação: Y."
                               const newMatch = text.match(/^Status:\s*(.+?)\.\s*\n?Observação:\s*(.+?)\.?$/s);
                               if (newMatch) {
                                 return (
@@ -1454,7 +1553,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                                   </>
                                 );
                               }
-                              // Old format: De "X" para "Y": justificativa
                               const oldMatch = text.match(/^De\s+"([^"]+)"\s+para\s+"([^"]+)":\s*(.+)$/s);
                               if (oldMatch) {
                                 return (

@@ -62,12 +62,22 @@ const StatusCorrectionDialog = ({ solicitacao, userId, onClose }: StatusCorrecti
 
     const statusLabel = statusOptions.find(s => s.value === selectedStatus)?.label || selectedStatus;
 
+    // Reset total: limpa campos, pendências e flags ao corrigir status
     const { error } = await supabase
       .from("solicitacoes")
       .update({
         status: selectedStatus as any,
         status_vistoria: statusLabel,
         updated_at: new Date().toISOString(),
+        pendencias_selecionadas: [],
+        solicitar_deferimento: false,
+        solicitar_lacre_armador: false,
+        lacre_armador_aceite_custo: null,
+        lacre_armador_possui: null,
+        custo_posicionamento: null,
+        lancamento_confirmado: null,
+        lancamento_confirmado_por: null,
+        lancamento_confirmado_data: null,
       })
       .eq("id", solicitacao.id);
 
@@ -85,12 +95,13 @@ const StatusCorrectionDialog = ({ solicitacao, userId, onClose }: StatusCorrecti
       p_detalhes: `Correção de status: ${solicitacao.status} → ${statusLabel}. Justificativa: ${justificativa.trim()}`,
     });
 
-    // Save justification in observation history
+    // Save justification in observation history (internal only)
     await supabase.from("observacao_historico").insert({
       solicitacao_id: solicitacao.id,
       autor_id: userId,
       observacao: `[Correção de Status] Status: ${statusLabel}.\nObservação: ${justificativa.trim()}.`,
       status_no_momento: selectedStatus,
+      tipo_observacao: "interna",
     });
 
     toast.success("Status corrigido com sucesso!");

@@ -24,6 +24,7 @@ interface ParametroCampo {
   ativo: boolean;
   servico_ids: string[];
   tipo_resultado?: string | null;
+  grupo_status?: string | null;
 }
 
 interface Servico {
@@ -32,11 +33,17 @@ interface Servico {
 }
 
 const GRUPOS = [
-  { key: "tipo_carga", label: "Tipo Carga", showSigla: true, showServicoIds: false, showTipoResultado: false },
-  { key: "categoria", label: "Categoria", showSigla: false, showServicoIds: false, showTipoResultado: false },
-  { key: "status_deferimento", label: "Status Deferimento", showSigla: false, showServicoIds: false, showTipoResultado: false },
-  { key: "status_processo", label: "Status do Processo", showSigla: false, showServicoIds: true, showTipoResultado: true },
-  { key: "pendencia_opcoes", label: "Opções de Pendência (Vistoria)", showSigla: false, showServicoIds: true, showTipoResultado: false },
+  { key: "tipo_carga", label: "Tipo Carga", showSigla: true, showServicoIds: false, showTipoResultado: false, showGrupoStatus: false },
+  { key: "categoria", label: "Categoria", showSigla: false, showServicoIds: false, showTipoResultado: false, showGrupoStatus: false },
+  { key: "status_deferimento", label: "Status Deferimento", showSigla: false, showServicoIds: false, showTipoResultado: false, showGrupoStatus: false },
+  { key: "status_processo", label: "Status do Processo", showSigla: true, showServicoIds: true, showTipoResultado: true, showGrupoStatus: true },
+  { key: "pendencia_opcoes", label: "Opções de Pendência (Vistoria)", showSigla: false, showServicoIds: true, showTipoResultado: false, showGrupoStatus: false },
+];
+
+const GRUPO_STATUS_OPTIONS = [
+  { value: "posicionamento_vistoria", label: "Posicionamento — Vistoria" },
+  { value: "posicionamento_servico", label: "Posicionamento — Serviço" },
+  { value: "outros_servicos", label: "Outros Serviços" },
 ];
 
 const ParametrosCamposManager = () => {
@@ -45,7 +52,7 @@ const ParametrosCamposManager = () => {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<ParametroCampo | null>(null);
-  const [formData, setFormData] = useState({ grupo: "tipo_carga", valor: "", sigla: "", ordem: 0, servico_ids: [] as string[], tipo_resultado: "" });
+  const [formData, setFormData] = useState({ grupo: "tipo_carga", valor: "", sigla: "", ordem: 0, servico_ids: [] as string[], tipo_resultado: "", grupo_status: "outros_servicos" });
 
   useEffect(() => { fetchItems(); fetchServicos(); }, []);
 
@@ -71,17 +78,23 @@ const ParametrosCamposManager = () => {
   const openDialog = (grupo: string, item?: ParametroCampo) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ grupo: item.grupo, valor: item.valor, sigla: item.sigla || "", ordem: item.ordem, servico_ids: item.servico_ids || [], tipo_resultado: item.tipo_resultado || "" });
+      setFormData({ grupo: item.grupo, valor: item.valor, sigla: item.sigla || "", ordem: item.ordem, servico_ids: item.servico_ids || [], tipo_resultado: item.tipo_resultado || "", grupo_status: item.grupo_status || "outros_servicos" });
     } else {
       setEditingItem(null);
       const maxOrder = items.filter(i => i.grupo === grupo).reduce((max, i) => Math.max(max, i.ordem), 0);
-      setFormData({ grupo, valor: "", sigla: "", ordem: maxOrder + 1, servico_ids: [], tipo_resultado: "" });
+      setFormData({ grupo, valor: "", sigla: "", ordem: maxOrder + 1, servico_ids: [], tipo_resultado: "", grupo_status: "outros_servicos" });
     }
     setShowDialog(true);
   };
 
   const handleSave = async () => {
     if (!formData.valor.trim()) { toast.error("Valor é obrigatório"); return; }
+    
+    // Sigla obrigatória para status_processo
+    if (formData.grupo === "status_processo" && !formData.sigla.trim()) {
+      toast.error("Sigla é obrigatória para Status do Processo");
+      return;
+    }
     
     const data: any = {
       grupo: formData.grupo,
@@ -90,6 +103,7 @@ const ParametrosCamposManager = () => {
       ordem: formData.ordem,
       servico_ids: formData.servico_ids,
       tipo_resultado: formData.tipo_resultado || null,
+      grupo_status: formData.grupo === "status_processo" ? formData.grupo_status : "outros_servicos",
       updated_at: new Date().toISOString(),
     };
 
@@ -149,6 +163,7 @@ const ParametrosCamposManager = () => {
               <TableRow>
                 <TableHead>Valor</TableHead>
                 {grupo.showSigla && <TableHead>Sigla</TableHead>}
+                {grupo.showGrupoStatus && <TableHead>Grupo</TableHead>}
                 {grupo.showServicoIds && <TableHead>Serviços</TableHead>}
                 {grupo.showTipoResultado && <TableHead>Classificação</TableHead>}
                 <TableHead>Ordem</TableHead>
@@ -167,7 +182,14 @@ const ParametrosCamposManager = () => {
                 grupoItems.map(item => (
                   <TableRow key={item.id} className={!item.ativo ? "opacity-50" : ""}>
                     <TableCell className="font-medium">{item.valor}</TableCell>
-                    {grupo.showSigla && <TableCell className="font-mono">{item.sigla || "—"}</TableCell>}
+                    {grupo.showSigla && <TableCell className="font-mono text-xs">{item.sigla || "—"}</TableCell>}
+                    {grupo.showGrupoStatus && (
+                      <TableCell className="text-xs">
+                        <Badge variant="outline" className="text-[10px]">
+                          {GRUPO_STATUS_OPTIONS.find(o => o.value === item.grupo_status)?.label || "Outros Serviços"}
+                        </Badge>
+                      </TableCell>
+                    )}
                     {grupo.showServicoIds && (
                       <TableCell className="text-xs">
                         {item.servico_ids?.length ? (
@@ -253,8 +275,25 @@ const ParametrosCamposManager = () => {
             </div>
             {currentGrupo?.showSigla && (
               <div>
-                <Label>Sigla (abreviação)</Label>
-                <Input value={formData.sigla} onChange={(e) => setFormData({ ...formData, sigla: e.target.value })} placeholder="Ex: Dry, Reefer, IMO" />
+                <Label>Sigla {formData.grupo === "status_processo" ? "(obrigatória — código interno) *" : "(abreviação)"}</Label>
+                <Input value={formData.sigla} onChange={(e) => setFormData({ ...formData, sigla: e.target.value })} placeholder={formData.grupo === "status_processo" ? "Ex: aguardando_confirmacao" : "Ex: Dry, Reefer, IMO"} />
+                {formData.grupo === "status_processo" && <p className="text-[10px] text-muted-foreground mt-1">Usada em regras de negócio. Não altere após criação.</p>}
+              </div>
+            )}
+            {currentGrupo?.showGrupoStatus && (
+              <div>
+                <Label>Grupo do Status *</Label>
+                <p className="text-xs text-muted-foreground mb-2">Define o fluxo semântico do processo</p>
+                <Select value={formData.grupo_status} onValueChange={(v) => setFormData({ ...formData, grupo_status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GRUPO_STATUS_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {currentGrupo?.showServicoIds && (

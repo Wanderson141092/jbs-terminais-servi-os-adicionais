@@ -338,6 +338,115 @@ const DOCUMENTACAO: AbaDoc[] = [
       },
     ],
   },
+  {
+    id: "formularios",
+    titulo: "Formulários",
+    icone: <FileText className="h-5 w-5" />,
+    descricao: "Central de criação e gestão de formulários públicos. Aqui você configura formulários de solicitação, vincula perguntas do banco, define condicionais de exibição e mapeia respostas para os campos do sistema.",
+    secoes: [
+      {
+        titulo: "Aba: Formulários",
+        descricao: "Lista todos os formulários cadastrados. Cada formulário pode ser ativado/desativado, editado, configurado com o construtor ou ter suas respostas visualizadas.",
+        campos: [
+          { nome: "Título", descricao: "Nome de identificação do formulário exibido na listagem e no cabeçalho público.", obrigatorio: true },
+          { nome: "Descrição", descricao: "Texto explicativo exibido abaixo do título no formulário público." },
+          { nome: "Serviço Vinculado", descricao: "Define a qual serviço este formulário pertence. ESSENCIAL para a geração correta do protocolo (usa o código prefixo do serviço) e para preencher automaticamente o campo 'Serviço Adicional' na solicitação, mesmo sem mapeamento manual do campo 'tipo_operacao'." },
+          { nome: "Estilo", descricao: "Estilo visual e funcional do formulário (JBS, Minimal, etc.). Cada estilo tem características próprias de layout e cores." },
+          { nome: "Status (Ativo/Inativo)", descricao: "Controla se o formulário está disponível para preenchimento público." },
+        ],
+        acoes: [
+          { nome: "Novo Formulário", descricao: "Cria um formulário com título, descrição, serviço vinculado e estilo." },
+          { nome: "Construtor (⚙️)", descricao: "Abre o construtor para adicionar/remover perguntas, configurar condicionais e mapeamentos." },
+          { nome: "Ver Respostas (👁️)", descricao: "Visualiza todas as respostas enviadas para o formulário com opção de exportar CSV." },
+          { nome: "Editar (✏️)", descricao: "Altera título, descrição, serviço vinculado e estilo." },
+          { nome: "Excluir (🗑️)", descricao: "Remove permanentemente o formulário." },
+        ],
+      },
+      {
+        titulo: "Construtor do Formulário",
+        descricao: "Tela principal de configuração de perguntas. Aqui você monta o formulário selecionando perguntas do banco, define regras de exibição condicional e mapeia respostas para os campos do sistema.",
+        subsecoes: [
+          {
+            titulo: "Perguntas Vinculadas",
+            descricao: "Lista as perguntas adicionadas ao formulário, em ordem de exibição. Cada pergunta mostra seu tipo, se é obrigatória, suas condicionais e mapeamentos.",
+            campos: [
+              { nome: "Obrigatório (Switch)", descricao: "Se ativado, o usuário não pode enviar o formulário sem preencher esta pergunta." },
+              { nome: "Ordem (Setas ↑↓)", descricao: "Move a pergunta para cima ou para baixo na lista." },
+            ],
+          },
+          {
+            titulo: "Condicionais de Exibição",
+            descricao: "Define regras para exibir/ocultar uma pergunta com base na resposta de outra pergunta. Exemplo: mostrar 'Motivo' somente quando 'Tipo' = 'Posicionamento'.",
+            campos: [
+              { nome: "Pergunta Condicionada", descricao: "Pergunta que será exibida ou ocultada conforme a regra.", obrigatorio: true },
+              { nome: "Pergunta Pai", descricao: "Pergunta cuja resposta determina a exibição. NÃO pode ser a mesma que a condicionada.", obrigatorio: true },
+              { nome: "Operador", descricao: "'É igual a', 'É diferente de' ou 'Contém'.", obrigatorio: true },
+              { nome: "Valor Gatilho", descricao: "Valor da resposta do pai que ativa a exibição da pergunta condicionada.", obrigatorio: true },
+            ],
+          },
+          {
+            titulo: "Mapeamentos (CRÍTICO para não perder dados)",
+            descricao: "Vincula a resposta de uma pergunta a um campo do sistema. Sem mapeamento, a resposta fica salva apenas no registro bruto do formulário e NÃO aparece nos campos padrão da solicitação. ATENÇÃO: É a etapa mais importante para garantir que os dados apareçam corretamente na página interna.",
+            campos: [
+              { nome: "Pergunta", descricao: "Pergunta cujo valor será mapeado.", obrigatorio: true },
+              { nome: "Tipo de Destino", descricao: "'Campo fixo da solicitação' (ex: Nome, E-mail, Contêiner, CNPJ, Tipo de Carga, Observações, Data, Categoria) OU 'Campo dinâmico de análise' (campos customizáveis criados pelo admin).", obrigatorio: true },
+              { nome: "Campo Fixo", descricao: "Se tipo fixo: mapeia para uma coluna direta da solicitação (cliente_nome, cliente_email, numero_conteiner, cnpj, lpco, tipo_carga, data_posicionamento, data_agendamento, observacoes, categoria, tipo_operacao)." },
+              { nome: "Campo Dinâmico", descricao: "Se tipo dinâmico: mapeia para um campo de análise criado na aba 'Campos Dinâmicos'. A resposta será salva em 'campos_analise_valores' e exibida na seção 'Campos de Análise' da visualização interna." },
+            ],
+            acoes: [
+              { nome: "Novo Mapeamento", descricao: "Cria vínculo entre pergunta e campo de destino." },
+              { nome: "Criar Campo (+)", descricao: "Cria um novo campo dinâmico de análise diretamente do construtor." },
+              { nome: "Excluir Mapeamento", descricao: "Remove o vínculo. A resposta continuará salva no registro bruto, mas não será exibida nos campos padrão." },
+            ],
+          },
+        ],
+      },
+      {
+        titulo: "Aba: Perguntas (Banco de Perguntas)",
+        descricao: "Repositório centralizado de perguntas reutilizáveis em múltiplos formulários. Cada pergunta é definida uma vez e pode ser vinculada a vários formulários.",
+        campos: [
+          { nome: "Rótulo", descricao: "Texto da pergunta exibido no formulário público.", obrigatorio: true },
+          { nome: "Tipo", descricao: "Define o componente de entrada: Texto, Área de Texto, Seleção (dropdown), Múltipla Escolha (checkboxes), Data, Upload de Arquivo, Informativo, Subtítulo, Pergunta Condicional, Resposta Conjunta, Contêiner (com validação), CNPJ (com máscara).", obrigatorio: true },
+          { nome: "Placeholder", descricao: "Texto de exemplo exibido dentro do campo quando vazio." },
+          { nome: "Opções", descricao: "Para tipos Seleção e Múltipla Escolha: lista de opções separadas por vírgula." },
+          { nome: "Descrição", descricao: "Texto exibido abaixo do rótulo em fonte menor e itálica." },
+          { nome: "Configurações (Config)", descricao: "Configurações avançadas em JSON: largura do campo (1-100%), aceite obrigatório (informativo), sub-perguntas (pergunta condicional), etc." },
+        ],
+      },
+      {
+        titulo: "Aba: Campos Dinâmicos",
+        descricao: "Gerencia campos de análise customizáveis que podem ser vinculados a perguntas via mapeamento. Os valores preenchidos aparecem na seção 'Campos de Análise' da visualização interna do processo.",
+        campos: [
+          { nome: "Nome", descricao: "Identificador do campo exibido na análise interna.", obrigatorio: true },
+          { nome: "Tipo", descricao: "Tipo de dado: Texto, Número, Data, Checkbox, Seleção.", obrigatorio: true },
+          { nome: "Serviços Vinculados", descricao: "Define para quais serviços este campo é exibido na análise." },
+          { nome: "Obrigatório", descricao: "Se ativado, o campo deve ser preenchido na análise interna." },
+          { nome: "Visível Externamente", descricao: "Se ativado, o valor aparece no portal de consulta externa do cliente." },
+        ],
+      },
+      {
+        titulo: "Aba: Estilos",
+        descricao: "Gerencia os estilos visuais disponíveis para os formulários. Cada estilo define cores, layout e funcionalidades específicas.",
+        campos: [
+          { nome: "Nome", descricao: "Nome do estilo exibido na seleção.", obrigatorio: true },
+          { nome: "Chave", descricao: "Identificador interno do estilo (gerado automaticamente).", obrigatorio: true },
+          { nome: "Features", descricao: "Lista de funcionalidades/características do estilo (exibidas como badges)." },
+          { nome: "Configuração", descricao: "JSON com cores, fontes e outros parâmetros visuais." },
+        ],
+      },
+      {
+        titulo: "⚠️ Guia de Mapeamento (Evitando Perda de Dados)",
+        descricao: "RESUMO CRÍTICO: Para que as respostas do formulário apareçam corretamente na página interna:",
+        campos: [
+          { nome: "1. Vincular Serviço", descricao: "Edite o formulário e selecione o serviço correspondente. Isso garante o protocolo correto (ex: JBSP para Posicionamento) e preenche automaticamente o 'Serviço Adicional'." },
+          { nome: "2. Mapear Campos Fixos", descricao: "No construtor, clique em 'Mapeamento' e vincule perguntas como Nome, E-mail, CNPJ, Contêiner aos seus campos fixos correspondentes." },
+          { nome: "3. Mapear Campos Dinâmicos", descricao: "Para dados adicionais (ex: Motivo, Quadra, Peso), crie campos dinâmicos e mapeie as perguntas a eles. Os valores aparecem em 'Campos de Análise'." },
+          { nome: "4. Respostas Não Mapeadas", descricao: "Perguntas sem mapeamento são exibidas na seção 'Respostas do Formulário' da visualização interna, mas NÃO preenchem campos padrão." },
+          { nome: "5. Anexos", descricao: "Arquivos enviados via Upload de Arquivo são salvos automaticamente e exibidos na seção 'Anexos do Formulário' da visualização interna." },
+        ],
+      },
+    ],
+  },
 ];
 
 const AdminParametrosAjuda = () => {

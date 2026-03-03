@@ -5,13 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import StatusBadge from "./StatusBadge";
 import ProcessStageStepper from "./ProcessStageStepper";
 import ProcessChecklist from "./ProcessChecklist";
-import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw, ClipboardList } from "lucide-react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 
 interface ProcessoViewDialogProps {
@@ -35,12 +34,16 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [aprovacaoOperacional, setAprovacaoOperacional] = useState(false);
   const [deferimentoStatus, setDeferimentoStatus] = useState<"recebido" | "recusado" | "aguardando" | null>(null);
   const [servicoNome, setServicoNome] = useState<string | undefined>(undefined);
+  const [camposDinamicos, setCamposDinamicos] = useState<{ nome: string; valor: string }[]>([]);
+  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
+  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
 
-  // Fetch attachments when dialog opens
   useEffect(() => {
     if (open && solicitacao) {
       fetchAttachments();
       fetchServicoConfig();
+      fetchCamposDinamicos();
+      fetchFormRespostas();
     }
   }, [open, solicitacao]);
 
@@ -52,7 +55,6 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     
     setAttachments(data || []);
 
-    // Calculate deferimento status
     const defDocs = (data || []).filter((d: any) => d.document_type === "deferimento" || !d.document_type);
     if (defDocs.length === 0) {
       setDeferimentoStatus(null);
@@ -76,6 +78,94 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     setAprovacaoAtivada(data?.aprovacao_ativada ?? false);
     setAprovacaoAdministrativo((data as any)?.aprovacao_administrativo ?? false);
     setAprovacaoOperacional((data as any)?.aprovacao_operacional ?? false);
+  };
+
+  const fetchCamposDinamicos = async () => {
+    const { data: valores } = await supabase
+      .from("campos_analise_valores")
+      .select("campo_id, valor, campos_analise(nome)")
+      .eq("solicitacao_id", solicitacao.id);
+
+    if (valores) {
+      setCamposDinamicos(
+        valores.map((v: any) => ({
+          nome: v.campos_analise?.nome || "Campo",
+          valor: v.valor || "—",
+        }))
+      );
+    }
+  };
+
+  const fetchFormRespostas = async () => {
+    // Get the formulario_id from the solicitacao
+    const formularioId = solicitacao.formulario_id;
+    if (!formularioId) {
+      setFormRespostas([]);
+      setFormArquivos([]);
+      return;
+    }
+
+    // Fetch the form response (latest one for this formulario matching by created_at proximity to solicitacao)
+    const { data: respostas } = await supabase
+      .from("formulario_respostas")
+      .select("respostas, arquivos")
+      .eq("formulario_id", formularioId)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    // Get the questions for this form
+    const { data: perguntasData } = await supabase
+      .from("formulario_perguntas")
+      .select("pergunta_id, banco_perguntas(id, rotulo, tipo)")
+      .eq("formulario_id", formularioId)
+      .order("ordem");
+
+    // Get mappings to know which questions are already mapped
+    const { data: mapeamentos } = await supabase
+      .from("pergunta_mapeamento")
+      .select("pergunta_id, campo_solicitacao, campo_analise_id")
+      .eq("formulario_id", formularioId);
+
+    if (!respostas || respostas.length === 0 || !perguntasData) {
+      setFormRespostas([]);
+      setFormArquivos([]);
+      return;
+    }
+
+    // Find the response closest to the solicitacao created_at
+    const solCreatedAt = new Date(solicitacao.created_at).getTime();
+    let bestResponse = respostas[0];
+    // Simple heuristic: use the first response (most recent) if formulario_id matches
+    // In practice, the response created at the same time as solicitacao is the one we want
+
+    const respostasObj = bestResponse.respostas as Record<string, any>;
+    const mappedPerguntaIds = new Set((mapeamentos || []).map(m => m.pergunta_id));
+
+    // Build unmapped responses only (mapped ones already show in fixed/dynamic fields)
+    const unmapped: { rotulo: string; valor: any; tipo: string }[] = [];
+    for (const fp of perguntasData) {
+      const bp = (fp as any).banco_perguntas;
+      if (!bp) continue;
+      // Skip if already mapped to a fixed field or dynamic field
+      if (mappedPerguntaIds.has(bp.id)) continue;
+      // Skip informativo type
+      if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
+
+      const val = respostasObj[bp.id];
+      if (val !== undefined && val !== null && val !== "") {
+        unmapped.push({
+          rotulo: bp.rotulo,
+          valor: val,
+          tipo: bp.tipo,
+        });
+      }
+    }
+
+    setFormRespostas(unmapped);
+
+    // Extract file attachments from response
+    const arquivos = bestResponse.arquivos as any[] | null;
+    setFormArquivos(arquivos || []);
   };
 
   const handleStatusChange = async () => {
@@ -120,7 +210,6 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     if (error) {
       toast.error("Erro ao alterar status");
     } else {
-      // Log the action via SECURITY DEFINER function
       await supabase.rpc("insert_audit_log", {
         p_solicitacao_id: solicitacao.id,
         p_usuario_id: userId,
@@ -128,7 +217,6 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
         p_detalhes: `Status alterado de ${solicitacao.status} para ${newStatus}. Justificativa: ${justificativa}`
       });
 
-      // Dispatch email/notification via edge function
       const finalStatus = newStatus === 'aprovado' ? 'confirmado_aguardando_vistoria' : 'recusado';
       supabase.functions.invoke("notificar-status", {
         body: { solicitacao_id: solicitacao.id, novo_status: finalStatus, usuario_id: userId },
@@ -145,6 +233,17 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
 
   const openPreview = (url: string) => {
     setPreviewUrl(url);
+  };
+
+  const formatResponseValue = (val: any, tipo: string): string => {
+    if (val === null || val === undefined) return "—";
+    if (Array.isArray(val)) return val.join(", ");
+    if (typeof val === "object") {
+      if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
+      return JSON.stringify(val);
+    }
+    if (typeof val === "boolean") return val ? "Sim" : "Não";
+    return String(val);
   };
 
   if (!solicitacao) return null;
@@ -233,7 +332,61 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                 <Label className="text-xs text-muted-foreground">Status Vistoria</Label>
                 <p>{solicitacao.status_vistoria || "—"}</p>
               </div>
+              {solicitacao.cnpj && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">CNPJ</Label>
+                  <p className="font-mono">{solicitacao.cnpj}</p>
+                </div>
+              )}
+              {solicitacao.categoria && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Categoria</Label>
+                  <p>{solicitacao.categoria}</p>
+                </div>
+              )}
             </div>
+
+            {/* Campos Dinâmicos de Análise */}
+            {camposDinamicos.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+                    <ClipboardList className="h-4 w-4" />
+                    Campos de Análise
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {camposDinamicos.map((cd, i) => (
+                      <div key={i}>
+                        <Label className="text-xs text-muted-foreground">{cd.nome}</Label>
+                        <p className="text-sm">{cd.valor}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Respostas do Formulário (não mapeadas) */}
+            {formRespostas.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+                    <FileText className="h-4 w-4" />
+                    Respostas do Formulário
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {formRespostas.map((fr, i) => (
+                      <div key={i}>
+                        <Label className="text-xs text-muted-foreground">{fr.rotulo}</Label>
+                        <p className="text-sm">{formatResponseValue(fr.valor, fr.tipo)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             {solicitacao.observacoes && (
               <div>
@@ -270,7 +423,34 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
 
             <Separator />
 
-            {/* Anexos */}
+            {/* Anexos do Formulário (form-uploads) */}
+            {formArquivos.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4" />
+                  Anexos do Formulário
+                </Label>
+                <div className="grid gap-2">
+                  {formArquivos.map((arq, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 border rounded">
+                      <span className="text-sm">{arq.file_name}</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openPreview(arq.file_url)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Anexos e Documentos (deferimento) */}
             <div>
               <Label className="text-sm font-medium flex items-center gap-2 mb-3">
                 <FileText className="h-4 w-4" />

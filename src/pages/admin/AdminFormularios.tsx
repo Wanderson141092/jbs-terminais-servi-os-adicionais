@@ -88,8 +88,9 @@ const AdminFormularios = () => {
   // Form dialog
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [editingForm, setEditingForm] = useState<Formulario | null>(null);
-  const [formData, setFormData] = useState({ titulo: "", descricao: "", estilo: "jbs" });
+  const [formData, setFormData] = useState({ titulo: "", descricao: "", estilo: "jbs", servico_id: "" });
   const [selectedStyle, setSelectedStyle] = useState("jbs");
+  const [servicos, setServicos] = useState<{ id: string; nome: string }[]>([]);
 
   // Builder dialog
   const [showBuilderDialog, setShowBuilderDialog] = useState(false);
@@ -99,7 +100,12 @@ const AdminFormularios = () => {
   const [showResponsesDialog, setShowResponsesDialog] = useState(false);
   const [selectedFormForResponses, setSelectedFormForResponses] = useState<string | null>(null);
 
-  useEffect(() => { fetchFormularios(); fetchStyles(); }, []);
+  useEffect(() => { fetchFormularios(); fetchStyles(); fetchServicos(); }, []);
+
+  const fetchServicos = async () => {
+    const { data } = await supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome");
+    setServicos(data || []);
+  };
 
   const fetchFormularios = async () => {
     setLoading(true);
@@ -124,15 +130,15 @@ const AdminFormularios = () => {
   };
 
   // Form CRUD
-  const openFormDialog = (form?: Formulario) => {
+  const openFormDialog = (form?: any) => {
     if (form) {
       setEditingForm(form);
       const estilo = form.estilo || "jbs";
-      setFormData({ titulo: form.titulo, descricao: form.descricao || "", estilo });
+      setFormData({ titulo: form.titulo, descricao: form.descricao || "", estilo, servico_id: form.servico_id || "" });
       setSelectedStyle(estilo);
     } else {
       setEditingForm(null);
-      setFormData({ titulo: "", descricao: "", estilo: "jbs" });
+      setFormData({ titulo: "", descricao: "", estilo: "jbs", servico_id: "" });
       setSelectedStyle("jbs");
     }
     setShowFormDialog(true);
@@ -142,13 +148,13 @@ const AdminFormularios = () => {
     if (!formData.titulo.trim()) { toast.error("Título é obrigatório"); return; }
     if (editingForm) {
       const { error } = await supabase.from("formularios").update({
-        titulo: formData.titulo, descricao: formData.descricao || null, estilo: formData.estilo, updated_at: new Date().toISOString(),
+        titulo: formData.titulo, descricao: formData.descricao || null, estilo: formData.estilo, servico_id: formData.servico_id || null, updated_at: new Date().toISOString(),
       }).eq("id", editingForm.id);
       if (error) { toast.error("Erro ao atualizar formulário"); return; }
       toast.success("Formulário atualizado!");
     } else {
       const { error } = await supabase.from("formularios").insert({
-        titulo: formData.titulo, descricao: formData.descricao || null, estilo: formData.estilo,
+        titulo: formData.titulo, descricao: formData.descricao || null, estilo: formData.estilo, servico_id: formData.servico_id || null,
       });
       if (error) { toast.error("Erro ao criar formulário"); return; }
       toast.success("Formulário criado!");
@@ -268,6 +274,7 @@ const AdminFormularios = () => {
                   <TableRow>
                     <TableHead>Título</TableHead>
                     <TableHead>Descrição</TableHead>
+                    <TableHead>Serviço Vinculado</TableHead>
                     <TableHead>Estilo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
@@ -278,6 +285,13 @@ const AdminFormularios = () => {
                     <TableRow key={form.id} className={!form.ativo ? "opacity-50" : ""}>
                       <TableCell className="font-medium">{form.titulo}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{form.descricao || "—"}</TableCell>
+                      <TableCell>
+                        {(form as any).servico_id ? (
+                          <Badge variant="secondary" className="text-xs">{servicos.find(s => s.id === (form as any).servico_id)?.nome || "—"}</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Nenhum</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
                           {formStyles.find((s) => s.chave === (form.estilo || "jbs"))?.nome || form.estilo || "JBS"}
@@ -306,7 +320,7 @@ const AdminFormularios = () => {
                   ))}
                   {formularios.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum formulário cadastrado</TableCell>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum formulário cadastrado</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -343,6 +357,19 @@ const AdminFormularios = () => {
             <div>
               <Label>Descrição</Label>
               <Textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} placeholder="Descrição opcional" />
+            </div>
+            <div>
+              <Label>Serviço Vinculado</Label>
+              <p className="text-xs text-muted-foreground mb-1">Vincule este formulário ao serviço correspondente para geração correta do protocolo e mapeamento automático do "Serviço Adicional".</p>
+              <Select value={formData.servico_id} onValueChange={(v) => setFormData({ ...formData, servico_id: v === "__none__" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o serviço (opcional)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  {servicos.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="border-t pt-4">
               <Label className="text-base font-semibold mb-3 block">Estilo do Formulário</Label>

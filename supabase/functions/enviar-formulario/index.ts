@@ -49,7 +49,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 1. Save form response
+    // 1. Fetch formulario to get linked servico_id
+    const { data: formularioData } = await supabase
+      .from("formularios")
+      .select("servico_id")
+      .eq("id", formulario_id)
+      .maybeSingle();
+
+    const formularioServicoId = formularioData?.servico_id || null;
+
+    // 2. Save form response
     const { error: respError } = await supabase.from("formulario_respostas").insert({
       formulario_id,
       respostas,
@@ -58,7 +67,7 @@ Deno.serve(async (req) => {
 
     if (respError) throw respError;
 
-    // 2. Build solicitacao data from mapeamentos + collect dynamic field mappings
+    // 3. Build solicitacao data from mapeamentos + collect dynamic field mappings
     const solicitacaoData: Record<string, any> = {};
     const dynamicFieldValues: { campo_id: string; valor: string }[] = [];
 
@@ -77,38 +86,51 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Resolve service to get prefixo and generate protocol per-service
-    const tipoOp = solicitacaoData.tipo_operacao || null;
-    let servicoData: any = null;
-    let servicoId: string | null = null;
+    // 4. Resolve service - prefer formulario's linked service, fallback to tipo_operacao name lookup
+    let servicoId: string | null = formularioServicoId;
     let codigoLetra = "S";
+    let servicoNome: string | null = null;
 
-    if (tipoOp) {
+    if (servicoId) {
+      // Fetch service details from linked servico_id
       const { data: svc } = await supabase
         .from("servicos")
-        .select("id, codigo_prefixo")
-        .eq("nome", tipoOp)
-        .eq("ativo", true)
+        .select("id, nome, codigo_prefixo")
+        .eq("id", servicoId)
         .maybeSingle();
-      servicoData = svc;
       if (svc) {
-        servicoId = svc.id;
-        // Use first character (letter) of codigo_prefixo
         codigoLetra = (svc.codigo_prefixo || "S")[0].toUpperCase();
+        servicoNome = svc.nome;
+        // Auto-set tipo_operacao if not mapped
+        if (!solicitacaoData.tipo_operacao) {
+          solicitacaoData.tipo_operacao = svc.nome;
+        }
+      }
+    } else {
+      // Fallback: lookup by tipo_operacao name
+      const tipoOp = solicitacaoData.tipo_operacao || null;
+      if (tipoOp) {
+        const { data: svc } = await supabase
+          .from("servicos")
+          .select("id, nome, codigo_prefixo")
+          .eq("nome", tipoOp)
+          .eq("ativo", true)
+          .maybeSingle();
+        if (svc) {
+          servicoId = svc.id;
+          codigoLetra = (svc.codigo_prefixo || "S")[0].toUpperCase();
+          servicoNome = svc.nome;
+        }
       }
     }
 
-    // 4. Generate protocol number — per-service, with annual reset (YY prefix)
+    // 5. Generate protocol number — per-service, with annual reset (YY prefix)
     const now = new Date();
     const brTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
     const currentYear = brTime.getFullYear();
-    const yearPrefix = String(currentYear).slice(-2); // "25", "26", etc.
+    const yearPrefix = String(currentYear).slice(-2);
 
-    // Try to find existing config for this service+year
-    let configQuery = supabase
-      .from("protocol_config")
-      .select("*");
-
+    let configQuery = supabase.from("protocol_config").select("*");
     if (servicoId) {
       configQuery = configQuery.eq("servico_id", servicoId);
     } else {
@@ -116,19 +138,16 @@ Deno.serve(async (req) => {
     }
 
     const { data: configRows } = await configQuery;
-
     let configData = (configRows || []).find((c: any) => c.ano_referencia === currentYear);
     let nextNum: number;
 
     if (configData) {
-      // Existing config for this service+year
       nextNum = (configData.ultimo_numero || 0) + 1;
       await supabase
         .from("protocol_config")
         .update({ ultimo_numero: nextNum, updated_at: new Date().toISOString() })
         .eq("id", configData.id);
     } else {
-      // Create new config row for this service+year (or reset annual)
       nextNum = 1;
       const { error: insertErr } = await supabase.from("protocol_config").insert({
         prefixo: codigoLetra,
@@ -137,7 +156,6 @@ Deno.serve(async (req) => {
         ano_referencia: currentYear,
       });
       if (insertErr) {
-        // Fallback: maybe another request created it concurrently, try to fetch again
         const { data: retryRows } = await configQuery;
         configData = (retryRows || []).find((c: any) => c.ano_referencia === currentYear);
         if (configData) {
@@ -150,10 +168,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Format: JBS + Letter + YY + 6-digit sequence (e.g., JBSS25000001)
     const protocolo = `JBS${codigoLetra}${yearPrefix}${String(nextNum).padStart(6, "0")}`;
 
-    // 5. Check cutoff time (hora_corte) - auto-reject if past cutoff
+    // 6. Check cutoff time (hora_corte) - auto-reject if past cutoff
     let autoRecusado = false;
     if (servicoId) {
       const { data: regraData } = await supabase
@@ -168,7 +185,6 @@ Deno.serve(async (req) => {
         const currentMinute = brTime.getMinutes();
         const currentMinutes = currentHour * 60 + currentMinute;
 
-        // Determine which cutoff time to use
         let cutoffTime = regraData.hora_corte;
 
         if (regraData.usar_horario_por_dia && regraData.horarios_por_dia) {
@@ -185,8 +201,6 @@ Deno.serve(async (req) => {
           const cutoffMinutes = cutHour * 60 + cutMinute;
 
           if (regraData.aplica_dia_anterior) {
-            // When aplica_dia_anterior is true: check if the scheduled date is tomorrow or earlier
-            // AND the current time is past the cutoff
             const dataPosStr = solicitacaoData.data_posicionamento || solicitacaoData.data_agendamento;
             if (dataPosStr && currentMinutes >= cutoffMinutes) {
               const dataPos = new Date(dataPosStr + "T00:00:00");
@@ -198,7 +212,6 @@ Deno.serve(async (req) => {
               }
             }
           } else {
-            // When aplica_dia_anterior is false: simply check if current time >= cutoff
             if (currentMinutes >= cutoffMinutes) {
               autoRecusado = regraData.recusar_apos_corte === true;
             }
@@ -207,24 +220,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Determine initial status based on service type
-    const tipoOperacao = solicitacaoData.tipo_operacao || null;
+    // 7. Determine initial status based on service type
+    const tipoOperacao = solicitacaoData.tipo_operacao || servicoNome || null;
     const isPosicionamento = tipoOperacao && tipoOperacao.toLowerCase().includes("posicionamento");
 
     let initialStatus: string;
     if (autoRecusado) {
       initialStatus = "recusado";
     } else if (isPosicionamento) {
-      // Posicionamento: aguarda confirmação manual
       initialStatus = "aguardando_confirmacao";
     } else {
-      // Outros serviços: vai direto para confirmado_aguardando_servico
       initialStatus = "confirmado_aguardando_servico";
     }
 
-    // 7. Insert solicitacao
+    // 8. Insert solicitacao (with formulario_id link)
     const { error: solError } = await supabase.from("solicitacoes").insert({
       protocolo,
+      formulario_id: formulario_id,
       cliente_nome: solicitacaoData.cliente_nome || "Cliente via formulário",
       cliente_email: solicitacaoData.cliente_email || "nao-informado@formulario.local",
       tipo_operacao: tipoOperacao,
@@ -250,7 +262,7 @@ Deno.serve(async (req) => {
       .eq("protocolo", protocolo)
       .single();
 
-    // 7. Save dynamic field values
+    // 9. Save dynamic field values
     if (dynamicFieldValues.length > 0 && solData) {
       const inserts = dynamicFieldValues.map((dv) => ({
         solicitacao_id: solData.id,
@@ -260,7 +272,7 @@ Deno.serve(async (req) => {
       await supabase.from("campos_analise_valores").insert(inserts);
     }
 
-    // 8. Trigger notifications
+    // 10. Trigger notifications
     if (solData) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

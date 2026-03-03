@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -19,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Plus, Save, Edit, Trash2, FileText, Eye, Download, Database, Settings2,
+  ArrowLeft, Plus, Save, Edit, Trash2, FileText, Eye, Download, Database, Settings2, HelpCircle, List, Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -66,6 +68,212 @@ interface FormStyle {
   features: string[];
   ativo: boolean;
 }
+
+interface ManualSecao {
+  titulo: string;
+  descricao: string;
+  campos?: { nome: string; descricao: string; obrigatorio?: boolean }[];
+  acoes?: { nome: string; descricao: string }[];
+  subsecoes?: { titulo: string; descricao: string; campos?: { nome: string; descricao: string; obrigatorio?: boolean }[]; acoes?: { nome: string; descricao: string }[] }[];
+}
+
+const FORMULARIOS_MANUAL: ManualSecao[] = [
+  {
+    titulo: "Aba: Formulários",
+    descricao: "Lista todos os formulários cadastrados. Cada formulário pode ser ativado/desativado, editado, configurado com o construtor ou ter suas respostas visualizadas.",
+    campos: [
+      { nome: "Título", descricao: "Nome de identificação do formulário exibido na listagem e no cabeçalho público.", obrigatorio: true },
+      { nome: "Descrição", descricao: "Texto explicativo exibido abaixo do título no formulário público." },
+      { nome: "Serviço Vinculado", descricao: "Define a qual serviço este formulário pertence. ESSENCIAL para a geração correta do protocolo (usa o código prefixo do serviço) e para preencher automaticamente o campo 'Serviço Adicional' na solicitação, mesmo sem mapeamento manual do campo 'tipo_operacao'." },
+      { nome: "Estilo", descricao: "Estilo visual e funcional do formulário (JBS, Minimal, etc.). Cada estilo tem características próprias de layout e cores." },
+      { nome: "Status (Ativo/Inativo)", descricao: "Controla se o formulário está disponível para preenchimento público." },
+    ],
+    acoes: [
+      { nome: "Novo Formulário", descricao: "Cria um formulário com título, descrição, serviço vinculado e estilo." },
+      { nome: "Construtor (⚙️)", descricao: "Abre o construtor para adicionar/remover perguntas, configurar condicionais e mapeamentos." },
+      { nome: "Ver Respostas (👁️)", descricao: "Visualiza todas as respostas enviadas para o formulário com opção de exportar CSV." },
+      { nome: "Editar (✏️)", descricao: "Altera título, descrição, serviço vinculado e estilo." },
+      { nome: "Excluir (🗑️)", descricao: "Remove permanentemente o formulário." },
+    ],
+  },
+  {
+    titulo: "Construtor do Formulário",
+    descricao: "Tela principal de configuração de perguntas. Aqui você monta o formulário selecionando perguntas do banco, define regras de exibição condicional e mapeia respostas para os campos do sistema.",
+    subsecoes: [
+      {
+        titulo: "Perguntas Vinculadas",
+        descricao: "Lista as perguntas adicionadas ao formulário, em ordem de exibição.",
+        campos: [
+          { nome: "Obrigatório (Switch)", descricao: "Se ativado, o usuário não pode enviar o formulário sem preencher esta pergunta." },
+          { nome: "Ordem (Setas ↑↓)", descricao: "Move a pergunta para cima ou para baixo na lista." },
+        ],
+      },
+      {
+        titulo: "Condicionais de Exibição",
+        descricao: "Define regras para exibir/ocultar uma pergunta com base na resposta de outra.",
+        campos: [
+          { nome: "Pergunta Condicionada", descricao: "Pergunta que será exibida ou ocultada conforme a regra.", obrigatorio: true },
+          { nome: "Pergunta Pai", descricao: "Pergunta cuja resposta determina a exibição.", obrigatorio: true },
+          { nome: "Operador", descricao: "'É igual a', 'É diferente de' ou 'Contém'.", obrigatorio: true },
+          { nome: "Valor Gatilho", descricao: "Valor da resposta do pai que ativa a exibição.", obrigatorio: true },
+        ],
+      },
+      {
+        titulo: "Mapeamentos (CRÍTICO para não perder dados)",
+        descricao: "Vincula a resposta de uma pergunta a um campo do sistema. Sem mapeamento, a resposta fica salva apenas no registro bruto do formulário e NÃO aparece nos campos padrão da solicitação.",
+        campos: [
+          { nome: "Pergunta", descricao: "Pergunta cujo valor será mapeado.", obrigatorio: true },
+          { nome: "Tipo de Destino", descricao: "'Campo fixo da solicitação' OU 'Campo dinâmico de análise'.", obrigatorio: true },
+          { nome: "Campo Fixo", descricao: "Mapeia para uma coluna direta da solicitação (cliente_nome, cnpj, numero_conteiner, etc.)." },
+          { nome: "Campo Dinâmico", descricao: "Mapeia para um campo de análise criado na aba 'Campos Dinâmicos'. Exibido na seção 'Campos de Análise'." },
+        ],
+        acoes: [
+          { nome: "Novo Mapeamento", descricao: "Cria vínculo entre pergunta e campo de destino." },
+          { nome: "Criar Campo (+)", descricao: "Cria um novo campo dinâmico de análise diretamente do construtor." },
+          { nome: "Excluir Mapeamento", descricao: "Remove o vínculo." },
+        ],
+      },
+    ],
+  },
+  {
+    titulo: "Aba: Perguntas (Banco de Perguntas)",
+    descricao: "Repositório centralizado de perguntas reutilizáveis em múltiplos formulários.",
+    campos: [
+      { nome: "Rótulo", descricao: "Texto da pergunta exibido no formulário público.", obrigatorio: true },
+      { nome: "Tipo", descricao: "Texto, Área de Texto, Seleção, Múltipla Escolha, Data, Upload, Informativo, Subtítulo, Condicional, Conjunta, Contêiner, CNPJ.", obrigatorio: true },
+      { nome: "Placeholder", descricao: "Texto de exemplo exibido dentro do campo quando vazio." },
+      { nome: "Opções", descricao: "Para tipos Seleção e Múltipla Escolha: lista de opções separadas por vírgula." },
+      { nome: "Descrição", descricao: "Texto exibido abaixo do rótulo em fonte menor e itálica." },
+      { nome: "Configurações (Config)", descricao: "Configurações avançadas em JSON: largura, aceite obrigatório, sub-perguntas, etc." },
+    ],
+  },
+  {
+    titulo: "Aba: Campos Dinâmicos",
+    descricao: "Gerencia campos de análise customizáveis vinculados a perguntas via mapeamento.",
+    campos: [
+      { nome: "Nome", descricao: "Identificador do campo exibido na análise interna.", obrigatorio: true },
+      { nome: "Tipo", descricao: "Tipo de dado: Texto, Número, Data, Checkbox, Seleção.", obrigatorio: true },
+      { nome: "Serviços Vinculados", descricao: "Define para quais serviços este campo é exibido na análise." },
+      { nome: "Obrigatório", descricao: "Se ativado, o campo deve ser preenchido na análise interna." },
+      { nome: "Visível Externamente", descricao: "Se ativado, o valor aparece no portal de consulta externa." },
+    ],
+  },
+  {
+    titulo: "Aba: Estilos",
+    descricao: "Gerencia os estilos visuais disponíveis para os formulários.",
+    campos: [
+      { nome: "Nome", descricao: "Nome do estilo exibido na seleção.", obrigatorio: true },
+      { nome: "Chave", descricao: "Identificador interno do estilo (gerado automaticamente).", obrigatorio: true },
+      { nome: "Features", descricao: "Lista de funcionalidades/características do estilo." },
+      { nome: "Configuração", descricao: "JSON com cores, fontes e outros parâmetros visuais." },
+    ],
+  },
+  {
+    titulo: "⚠️ Guia de Mapeamento (Evitando Perda de Dados)",
+    descricao: "RESUMO CRÍTICO: Para que as respostas do formulário apareçam corretamente na página interna:",
+    campos: [
+      { nome: "1. Vincular Serviço", descricao: "Edite o formulário e selecione o serviço correspondente." },
+      { nome: "2. Mapear Campos Fixos", descricao: "No construtor, vincule perguntas como Nome, E-mail, CNPJ, Contêiner aos campos fixos." },
+      { nome: "3. Mapear Campos Dinâmicos", descricao: "Para dados adicionais, crie campos dinâmicos e mapeie as perguntas. Valores aparecem em 'Campos de Análise'." },
+      { nome: "4. Respostas Não Mapeadas", descricao: "Perguntas sem mapeamento são exibidas na seção 'Respostas do Formulário', mas NÃO preenchem campos padrão." },
+      { nome: "5. Anexos", descricao: "Arquivos enviados via Upload são salvos automaticamente e exibidos na seção 'Anexos do Formulário'." },
+    ],
+  },
+];
+
+const FormulariosManual = () => (
+  <ScrollArea className="h-[calc(100vh-220px)]">
+    <div className="space-y-6 pb-10 pr-4">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+          <HelpCircle className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold">Manual de Formulários</h2>
+          <p className="text-sm text-muted-foreground">Documentação de todas as funcionalidades de criação e gestão de formulários.</p>
+        </div>
+      </div>
+
+      {FORMULARIOS_MANUAL.map((secao, idx) => (
+        <Card key={idx}>
+          <CardHeader>
+            <CardTitle className="text-lg">{secao.titulo}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-muted-foreground">{secao.descricao}</p>
+
+            {secao.campos && secao.campos.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <List className="h-4 w-4 text-primary" />
+                  Campos Disponíveis
+                </h4>
+                <div className="space-y-3">
+                  {secao.campos.map((campo, cIdx) => (
+                    <div key={cIdx} className="border-l-2 border-muted pl-3 py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">{campo.nome}</span>
+                        {campo.obrigatorio && <Badge variant="secondary" className="text-[10px]">Obrigatório</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-0.5">{campo.descricao}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {secao.acoes && secao.acoes.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-primary" />
+                  Ações Disponíveis
+                </h4>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {secao.acoes.map((acao, aIdx) => (
+                    <div key={aIdx} className="bg-muted/30 p-3 rounded-md">
+                      <span className="font-semibold text-sm block mb-1">{acao.nome}</span>
+                      <p className="text-xs text-muted-foreground">{acao.descricao}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {secao.subsecoes && secao.subsecoes.map((sub, sIdx) => (
+              <div key={sIdx} className="mt-6 pt-6 border-t">
+                <h4 className="font-semibold text-base mb-2">{sub.titulo}</h4>
+                <p className="text-sm text-muted-foreground mb-4">{sub.descricao}</p>
+                {sub.campos && (
+                  <div className="space-y-2">
+                    {sub.campos.map((campo, scIdx) => (
+                      <div key={scIdx} className="border-l-2 border-muted pl-3 py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm">{campo.nome}</span>
+                          {campo.obrigatorio && <Badge variant="secondary" className="text-[10px]">Obrigatório</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-0.5">{campo.descricao}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {sub.acoes && (
+                  <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                    {sub.acoes.map((acao, aIdx) => (
+                      <div key={aIdx} className="bg-muted/30 p-3 rounded-md">
+                        <span className="font-semibold text-sm block mb-1">{acao.nome}</span>
+                        <p className="text-xs text-muted-foreground">{acao.descricao}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  </ScrollArea>
+);
 
 const AdminFormularios = () => {
   const navigate = useNavigate();
@@ -254,6 +462,10 @@ const AdminFormularios = () => {
             <Eye className="h-4 w-4" />
             Estilos
           </TabsTrigger>
+          <TabsTrigger value="manual" className="flex items-center gap-2">
+            <HelpCircle className="h-4 w-4" />
+            Manual
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="formularios">
@@ -339,6 +551,10 @@ const AdminFormularios = () => {
 
         <TabsContent value="estilos">
           <EstilosFormularioManager />
+        </TabsContent>
+
+        <TabsContent value="manual">
+          <FormulariosManual />
         </TabsContent>
       </Tabs>
 

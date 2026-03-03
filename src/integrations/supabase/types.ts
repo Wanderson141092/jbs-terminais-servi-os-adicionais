@@ -699,6 +699,7 @@ export type Database = {
           descricao: string | null
           estilo: string
           id: string
+          servico_id: string | null
           titulo: string
           updated_at: string
         }
@@ -708,6 +709,7 @@ export type Database = {
           descricao?: string | null
           estilo?: string
           id?: string
+          servico_id?: string | null
           titulo: string
           updated_at?: string
         }
@@ -717,10 +719,19 @@ export type Database = {
           descricao?: string | null
           estilo?: string
           id?: string
+          servico_id?: string | null
           titulo?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "formularios_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integracoes: {
         Row: {
@@ -1739,6 +1750,7 @@ export type Database = {
           custo_posicionamento: boolean | null
           data_agendamento: string | null
           data_posicionamento: string | null
+          formulario_id: string | null
           id: string
           lacre_armador_aceite_custo: boolean | null
           lacre_armador_possui: boolean | null
@@ -1781,6 +1793,7 @@ export type Database = {
           custo_posicionamento?: boolean | null
           data_agendamento?: string | null
           data_posicionamento?: string | null
+          formulario_id?: string | null
           id?: string
           lacre_armador_aceite_custo?: boolean | null
           lacre_armador_possui?: boolean | null
@@ -1823,6 +1836,7 @@ export type Database = {
           custo_posicionamento?: boolean | null
           data_agendamento?: string | null
           data_posicionamento?: string | null
+          formulario_id?: string | null
           id?: string
           lacre_armador_aceite_custo?: boolean | null
           lacre_armador_possui?: boolean | null
@@ -1842,7 +1856,15 @@ export type Database = {
           tipo_operacao?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_config: {
         Row: {

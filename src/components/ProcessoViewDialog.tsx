@@ -37,6 +37,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [camposDinamicos, setCamposDinamicos] = useState<{ nome: string; valor: string }[]>([]);
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
+  const [isExternalForm, setIsExternalForm] = useState(false);
 
   useEffect(() => {
     if (open && solicitacao) {
@@ -44,8 +45,23 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       fetchServicoConfig();
       fetchCamposDinamicos();
       fetchFormRespostas();
+      checkIfExternalForm();
     }
   }, [open, solicitacao]);
+
+  const checkIfExternalForm = async () => {
+    const formularioId = solicitacao.formulario_id;
+    if (!formularioId) {
+      setIsExternalForm(false);
+      return;
+    }
+    const { data } = await supabase
+      .from("external_buttons")
+      .select("id, tipo")
+      .eq("formulario_id", formularioId)
+      .maybeSingle();
+    setIsExternalForm(!!data);
+  };
 
   const fetchAttachments = async () => {
     const { data } = await supabase
@@ -347,7 +363,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
             </div>
 
             {/* Campos Dinâmicos de Análise */}
-            {camposDinamicos.length > 0 && (
+            {isExternalForm && camposDinamicos.length > 0 && (
               <>
                 <Separator />
                 <div>

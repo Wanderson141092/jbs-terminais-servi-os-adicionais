@@ -490,7 +490,7 @@ const FormFieldRenderer = ({
           </div>
         )}
 
-        {pergunta.tipo === "anexo" && (
+        {(pergunta.tipo === "anexo" || pergunta.tipo === "arquivo") && (
           <div>
             <Input
               type="file"

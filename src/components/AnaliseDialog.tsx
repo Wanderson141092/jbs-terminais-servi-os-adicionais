@@ -84,6 +84,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [showConclusaoLancamentoDialog, setShowConclusaoLancamentoDialog] = useState(false);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   const [lancamentoRegistros, setLancamentoRegistros] = useState<any[]>([]);
+  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
+  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
+  const [isExternalForm, setIsExternalForm] = useState(false);
 
 
   useEffect(() => {
@@ -164,6 +167,72 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         valor: cv.valor || "",
       })).filter((cv: any) => cv.valor);
       setCamposDinamicos(camposVals);
+
+      // Fetch form responses and attachments
+      const formularioId = solicitacao.formulario_id;
+      if (formularioId) {
+        // Check if external form
+        const { data: extBtn } = await supabase
+          .from("external_buttons")
+          .select("id, tipo")
+          .eq("formulario_id", formularioId)
+          .maybeSingle();
+        setIsExternalForm(!!extBtn);
+
+        // Fetch form responses
+        const { data: respostas } = await supabase
+          .from("formulario_respostas")
+          .select("respostas, arquivos")
+          .eq("formulario_id", formularioId)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        const { data: perguntasData } = await supabase
+          .from("formulario_perguntas")
+          .select("pergunta_id, banco_perguntas(id, rotulo, tipo)")
+          .eq("formulario_id", formularioId)
+          .order("ordem");
+
+        const { data: mapeamentos } = await supabase
+          .from("pergunta_mapeamento")
+          .select("pergunta_id, campo_solicitacao, campo_analise_id")
+          .eq("formulario_id", formularioId);
+
+        if (respostas && respostas.length > 0 && perguntasData) {
+          // Find response closest to solicitacao creation
+          const solCreatedAt = new Date(solicitacao.created_at).getTime();
+          let bestResponse = respostas[0];
+          let bestDiff = Infinity;
+          for (const r of respostas) {
+            // Use first (most recent) as default
+          }
+
+          const respostasObj = bestResponse.respostas as Record<string, any>;
+          const mappedPerguntaIds = new Set((mapeamentos || []).map((m: any) => m.pergunta_id));
+
+          const unmapped: { rotulo: string; valor: any; tipo: string }[] = [];
+          for (const fp of perguntasData) {
+            const bp = (fp as any).banco_perguntas;
+            if (!bp) continue;
+            if (mappedPerguntaIds.has(bp.id)) continue;
+            if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
+
+            const val = respostasObj[bp.id];
+            if (val !== undefined && val !== null && val !== "") {
+              unmapped.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
+            }
+          }
+          setFormRespostas(unmapped);
+          setFormArquivos((bestResponse.arquivos as any[]) || []);
+        } else {
+          setFormRespostas([]);
+          setFormArquivos([]);
+        }
+      } else {
+        setIsExternalForm(false);
+        setFormRespostas([]);
+        setFormArquivos([]);
+      }
     };
     
     fetchData();
@@ -970,12 +1039,47 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
             </div>
 
-            {/* Dynamic analysis fields */}
-            {camposDinamicos.length > 0 && (
+            {/* Dynamic analysis fields - only for external/iframe forms */}
+            {isExternalForm && camposDinamicos.length > 0 && (
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
-                <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos do Formulário</p>
+                <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos de Análise</p>
                 {camposDinamicos.map((cd, idx) => (
                   <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={cd.campo_nome} value={cd.valor} />
+                ))}
+              </div>
+            )}
+
+            {/* Form responses (unmapped questions) */}
+            {formRespostas.length > 0 && (
+              <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
+                <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Respostas do Formulário</p>
+                {formRespostas.map((fr, idx) => (
+                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={fr.rotulo} value={formatFormValue(fr.valor, fr.tipo)} />
+                ))}
+              </div>
+            )}
+
+            {/* Form file attachments */}
+            {formArquivos.length > 0 && (
+              <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
+                <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Anexos do Formulário
+                </p>
+                {formArquivos.map((arq, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 border rounded bg-background">
+                    <span className="text-sm">{arq.file_name}</span>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setPreviewUrl(arq.file_url)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -1987,6 +2091,18 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       </Dialog>
     </>
   );
+};
+
+// Helper Functions
+const formatFormValue = (val: any, tipo: string): string => {
+  if (val === null || val === undefined) return "—";
+  if (Array.isArray(val)) return val.join(", ");
+  if (typeof val === "object") {
+    if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
+    return JSON.stringify(val);
+  }
+  if (typeof val === "boolean") return val ? "Sim" : "Não";
+  return String(val);
 };
 
 // Helper Components

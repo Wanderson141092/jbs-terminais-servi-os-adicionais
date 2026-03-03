@@ -148,7 +148,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
           }
           continue;
         }
-        const val = p.tipo === "anexo" ? files[p.id] : values[p.id];
+        const val = (p.tipo === "anexo" || p.tipo === "arquivo") ? files[p.id] : values[p.id];
         if (!val || (Array.isArray(val) && (val.length === 0 || val.every((v: any) => !v)))) {
           toast.error(`O campo "${p.rotulo}" é obrigatório`);
           return;
@@ -185,7 +185,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
       // Build respostas
       const respostas: Record<string, any> = {};
       for (const p of visiblePerguntas) {
-        if (p.tipo !== "anexo") {
+        if (p.tipo !== "anexo" && p.tipo !== "arquivo") {
           respostas[p.id] = values[p.id];
         }
       }

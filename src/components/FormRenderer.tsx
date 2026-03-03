@@ -139,7 +139,9 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
               }
             });
             if (activeSub) {
-              const val = values[p.id];
+              // For "arquivo" sub-questions, check files state instead of values
+              const isFileType = activeSub.tipo === "arquivo" || activeSub.tipo === "anexo";
+              const val = isFileType ? files[p.id] : values[p.id];
               if (!val || (Array.isArray(val) && val.length === 0)) {
                 toast.error(`O campo "${activeSub.rotulo || p.rotulo}" é obrigatório`);
                 return;

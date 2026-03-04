@@ -121,22 +121,22 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       return;
     }
 
-    // Fetch the form response (latest one for this formulario matching by created_at proximity to solicitacao)
+    // Busca as respostas do formulário
     const { data: respostas } = await supabase
       .from("formulario_respostas")
-      .select("respostas, arquivos")
+      .select("respostas, arquivos, created_at")
       .eq("formulario_id", formularioId)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(50);
 
-    // Get the questions for this form
+    // Busca as perguntas do formulário
     const { data: perguntasData } = await supabase
       .from("formulario_perguntas")
       .select("pergunta_id, banco_perguntas(id, rotulo, tipo)")
       .eq("formulario_id", formularioId)
       .order("ordem");
 
-    // Get mappings to know which questions are already mapped
+    // Busca mapeamentos para filtrar perguntas já mapeadas
     const { data: mapeamentos } = await supabase
       .from("pergunta_mapeamento")
       .select("pergunta_id, campo_solicitacao, campo_analise_id")
@@ -148,11 +148,13 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       return;
     }
 
-    // Find the response closest to the solicitacao created_at
+    // Seleciona a resposta mais próxima da data de criação da solicitação
     const solCreatedAt = new Date(solicitacao.created_at).getTime();
-    let bestResponse = respostas[0];
-    // Simple heuristic: use the first response (most recent) if formulario_id matches
-    // In practice, the response created at the same time as solicitacao is the one we want
+    const bestResponse = respostas.reduce((closest, current) => {
+      const closestDiff = Math.abs(new Date((closest as any).created_at).getTime() - solCreatedAt);
+      const currentDiff = Math.abs(new Date((current as any).created_at).getTime() - solCreatedAt);
+      return currentDiff < closestDiff ? current : closest;
+    }, respostas[0]);
 
     const respostasObj = bestResponse.respostas as Record<string, any>;
     const mappedPerguntaIds = new Set((mapeamentos || []).map(m => m.pergunta_id));

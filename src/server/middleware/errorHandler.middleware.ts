@@ -1,13 +1,13 @@
-type RequestLike = unknown;
-type ResponseLike = { status: (code: number) => { json: (payload: unknown) => void } };
-type NextLike = () => void;
+// Centralized Error Handler Middleware
 
-const errorHandler = (err: unknown, _req: RequestLike, res: ResponseLike, _next: NextLike) => {
-  console.error(err);
-  res.status(500).json({
-    status: "error",
-    message: "An unexpected error occurred",
-  });
+import { Request, Response, NextFunction } from 'express';
+
+const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error(err.stack);
+    res.status(500).json({
+        status: 'error',
+        message: 'An unexpected error occurred',
+    });
 };
 
 export default errorHandler;

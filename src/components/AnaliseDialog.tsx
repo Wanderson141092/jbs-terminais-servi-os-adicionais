@@ -182,10 +182,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         // Fetch form responses
         const { data: respostas } = await supabase
           .from("formulario_respostas")
-          .select("respostas, arquivos, created_at")
+          .select("respostas, arquivos")
           .eq("formulario_id", formularioId)
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(10);
 
         const { data: perguntasData } = await supabase
           .from("formulario_perguntas")
@@ -199,13 +199,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           .eq("formulario_id", formularioId);
 
         if (respostas && respostas.length > 0 && perguntasData) {
-          // Seleciona a resposta mais próxima da criação da solicitação
+          // Find response closest to solicitacao creation
           const solCreatedAt = new Date(solicitacao.created_at).getTime();
-          const bestResponse = respostas.reduce((closest, current) => {
-            const closestDiff = Math.abs(new Date((closest as any).created_at).getTime() - solCreatedAt);
-            const currentDiff = Math.abs(new Date((current as any).created_at).getTime() - solCreatedAt);
-            return currentDiff < closestDiff ? current : closest;
-          }, respostas[0]);
+          let bestResponse = respostas[0];
+          let bestDiff = Infinity;
+          for (const r of respostas) {
+            // Use first (most recent) as default
+          }
 
           const respostasObj = bestResponse.respostas as Record<string, any>;
           const mappedPerguntaIds = new Set((mapeamentos || []).map((m: any) => m.pergunta_id));

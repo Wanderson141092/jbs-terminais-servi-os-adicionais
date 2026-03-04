@@ -1,6 +1,11 @@
-export const createServer = () => {
-  // Placeholder: este projeto roda no frontend + backend integrado da plataforma.
-  return {
-    listen: (_port: number, cb?: () => void) => cb?.(),
-  };
-};
+import express from 'express';
+
+const app = express();
+
+app.use(express.json());
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

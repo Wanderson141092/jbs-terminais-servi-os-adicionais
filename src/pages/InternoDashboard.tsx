@@ -128,6 +128,7 @@ const InternoDashboard = () => {
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   const [userAuthorizedServiceNames, setUserAuthorizedServiceNames] = useState<string[]>([]);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
+  const [billingDialogData, setBillingDialogData] = useState<{ solicitacao: any; config: any } | null>(null);
 
   const { isAdmin } = useAdminCheck(user?.id || null);
   const { isGestor } = useGestorCheck(user?.id || null);
@@ -1080,7 +1081,7 @@ const InternoDashboard = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setSelectedSolicitacao(s)}
+                                onClick={(e) => { e.stopPropagation(); setSelectedSolicitacao(s); }}
                                 className="text-destructive"
                                 title="Aguardando confirmação de lançamento"
                               >
@@ -1098,7 +1099,7 @@ const InternoDashboard = () => {
                                 return (
                                   <button
                                     key={cfg.id}
-                                    onClick={() => setSelectedSolicitacao(s)}
+                                    onClick={(e) => { e.stopPropagation(); setBillingDialogData({ solicitacao: s, config: cfg }); }}
                                     title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : "Pendente"}`}
                                     className="p-0.5 rounded hover:bg-muted/50 transition-colors overflow-visible"
                                   >

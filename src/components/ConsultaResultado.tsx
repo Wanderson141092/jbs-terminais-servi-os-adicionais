@@ -113,10 +113,12 @@ interface ConsultaResultadoProps {
   lacreArmadorConfig?: LacreArmadorConfig | null;
   lacreArmadorDados?: LacreArmadorDados | null;
   deferimentoTitulo?: string | null;
+  formRespostas?: { rotulo: string; valor: any }[];
+  formArquivos?: { file_name: string; file_url: string }[];
   onRefresh: () => void;
 }
 
-const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], lacreArmadorConfig = null, lacreArmadorDados = null, deferimentoTitulo = null, onRefresh }: ConsultaResultadoProps) => {
+const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = null, observacoes = [], statusLabels = [], etapasConfig = [], lacreArmadorConfig = null, lacreArmadorDados = null, deferimentoTitulo = null, formRespostas = [], formArquivos = [], onRefresh }: ConsultaResultadoProps) => {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);

@@ -287,6 +287,39 @@ Deno.serve(async (req) => {
     const tituloForService = deferimentoTitulos.find((t) => !servicoId || !t.servico_ids?.length || t.servico_ids.includes(servicoId));
     const deferimentoTitulo = tituloForService?.titulo || null;
 
+    // Build form responses for external display
+    let formResponsesExternal: { rotulo: string; valor: any }[] = [];
+    if (formRespostasRes.data && formRespostasRes.data.length > 0 && formPerguntasRes.data) {
+      const respostasObj = formRespostasRes.data[0].respostas as Record<string, any>;
+      for (const fp of formPerguntasRes.data) {
+        const bp = (fp as any).banco_perguntas;
+        if (!bp) continue;
+        if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
+        const val = respostasObj[bp.id];
+        if (val !== undefined && val !== null && val !== "") {
+          formResponsesExternal.push({ rotulo: bp.rotulo, valor: val });
+        }
+      }
+    }
+
+    // Generate signed URLs for form attachments
+    let formAttachmentsExternal: { file_name: string; file_url: string }[] = [];
+    if (formRespostasRes.data && formRespostasRes.data.length > 0) {
+      const arquivos = formRespostasRes.data[0].arquivos as any[] | null;
+      if (arquivos && arquivos.length > 0) {
+        for (const arq of arquivos) {
+          let signedUrl = arq.file_url;
+          if (arq.file_url && !arq.file_url.startsWith("http")) {
+            const { data: signedData } = await supabaseAdmin.storage
+              .from("form-uploads")
+              .createSignedUrl(arq.file_url, 3600);
+            if (signedData) signedUrl = signedData.signedUrl;
+          }
+          formAttachmentsExternal.push({ file_name: arq.file_name, file_url: signedUrl });
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         solicitacao: sanitizedSolicitacao,
@@ -316,6 +349,8 @@ Deno.serve(async (req) => {
           periodo_tarde_ativo: lacreConfigMap["lacre_armador_periodo_tarde"] !== "false",
         },
         lacre_armador_dados: lacreArmadorDados,
+        form_respostas: formResponsesExternal,
+        form_arquivos: formAttachmentsExternal,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

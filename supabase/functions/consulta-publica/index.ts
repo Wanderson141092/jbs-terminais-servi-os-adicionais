@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
 
     const servicoId = servicoData?.id || null;
 
-    // Fetch deferimento documents, observations, status labels, field config, dynamic fields, lacre data and external titles in parallel
+    // Fetch deferimento documents, observations, status labels, field config, dynamic fields, lacre data, external titles, and form responses in parallel
+    const formularioId = (solicitacao as any).formulario_id || null;
     const [
       deferimentoRes,
       observacoesRes,
@@ -101,6 +102,8 @@ Deno.serve(async (req) => {
       lacreConfigRes,
       lacreArmadorDadosRes,
       deferimentoTitulosRes,
+      formRespostasRes,
+      formPerguntasRes,
     ] = await Promise.all([
       supabaseAdmin
         .from("deferimento_documents")
@@ -162,6 +165,12 @@ Deno.serve(async (req) => {
         .select("titulo, servico_ids, created_at")
         .eq("ativo", true)
         .order("created_at", { ascending: false }),
+      formularioId
+        ? supabaseAdmin.from("formulario_respostas").select("respostas, arquivos").eq("formulario_id", formularioId).order("created_at", { ascending: false }).limit(5)
+        : Promise.resolve({ data: null }),
+      formularioId
+        ? supabaseAdmin.from("formulario_perguntas").select("pergunta_id, banco_perguntas(id, rotulo, tipo)").eq("formulario_id", formularioId).order("ordem")
+        : Promise.resolve({ data: null }),
     ]);
 
     const deferimentoDocs = deferimentoRes.data;

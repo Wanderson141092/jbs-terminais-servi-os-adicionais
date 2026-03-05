@@ -60,6 +60,7 @@ import SetorSelector from "@/components/SetorSelector";
 import BatchApprovalDialog from "@/components/BatchApprovalDialog";
 import BatchStatusDialog from "@/components/BatchStatusDialog";
 import BatchBillingDialog from "@/components/BatchBillingDialog";
+import BillingConfirmDialog from "@/components/BillingConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
@@ -128,6 +129,7 @@ const InternoDashboard = () => {
   const [deferimentoCounts, setDeferimentoCounts] = useState({ pendente: 0 });
   const [userAuthorizedServiceNames, setUserAuthorizedServiceNames] = useState<string[]>([]);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
+  const [billingDialogData, setBillingDialogData] = useState<{ solicitacao: any; config: any } | null>(null);
 
   const { isAdmin } = useAdminCheck(user?.id || null);
   const { isGestor } = useGestorCheck(user?.id || null);
@@ -1080,7 +1082,7 @@ const InternoDashboard = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setSelectedSolicitacao(s)}
+                                onClick={(e) => { e.stopPropagation(); setSelectedSolicitacao(s); }}
                                 className="text-destructive"
                                 title="Aguardando confirmação de lançamento"
                               >
@@ -1098,7 +1100,7 @@ const InternoDashboard = () => {
                                 return (
                                   <button
                                     key={cfg.id}
-                                    onClick={() => setSelectedSolicitacao(s)}
+                                    onClick={(e) => { e.stopPropagation(); setBillingDialogData({ solicitacao: s, config: cfg }); }}
                                     title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : "Pendente"}`}
                                     className="p-0.5 rounded hover:bg-muted/50 transition-colors overflow-visible"
                                   >
@@ -1244,6 +1246,18 @@ const InternoDashboard = () => {
             fetchSolicitacoes();
             fetchDeferimentoCounts();
           }}
+        />
+      )}
+
+      {/* Billing Confirm Dialog */}
+      {billingDialogData && user && (
+        <BillingConfirmDialog
+          open={!!billingDialogData}
+          onOpenChange={(open) => { if (!open) setBillingDialogData(null); }}
+          solicitacao={billingDialogData.solicitacao}
+          cobrancaConfig={billingDialogData.config}
+          userId={user.id}
+          onUpdate={() => { setBillingDialogData(null); fetchSolicitacoes(); }}
         />
       )}
 

@@ -60,6 +60,7 @@ import SetorSelector from "@/components/SetorSelector";
 import BatchApprovalDialog from "@/components/BatchApprovalDialog";
 import BatchStatusDialog from "@/components/BatchStatusDialog";
 import BatchBillingDialog from "@/components/BatchBillingDialog";
+import BillingConfirmDialog from "@/components/BillingConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
@@ -1245,6 +1246,18 @@ const InternoDashboard = () => {
             fetchSolicitacoes();
             fetchDeferimentoCounts();
           }}
+        />
+      )}
+
+      {/* Billing Confirm Dialog */}
+      {billingDialogData && user && (
+        <BillingConfirmDialog
+          open={!!billingDialogData}
+          onOpenChange={(open) => { if (!open) setBillingDialogData(null); }}
+          solicitacao={billingDialogData.solicitacao}
+          cobrancaConfig={billingDialogData.config}
+          userId={user.id}
+          onUpdate={() => { setBillingDialogData(null); fetchSolicitacoes(); }}
         />
       )}
 

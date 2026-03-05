@@ -1059,7 +1059,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Form file attachments */}
+            {/* Form file attachments - inline preview */}
             {formArquivos.length > 0 && (
               <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
                 <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-2">
@@ -1067,17 +1067,26 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                   Anexos do Formulário
                 </p>
                 {formArquivos.map((arq, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 border rounded bg-background">
-                    <span className="text-sm">{arq.file_name}</span>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => setPreviewUrl(arq.file_url)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
-                          <Download className="h-4 w-4" />
-                        </a>
-                      </Button>
+                  <div key={idx} className="border rounded-lg p-3 space-y-2 bg-background">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{arq.file_name}</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setPreviewUrl(arq.file_url)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="bg-muted/30 rounded overflow-hidden">
+                      {arq.file_url?.toLowerCase().endsWith('.pdf') ? (
+                        <iframe src={arq.file_url} className="w-full h-[200px]" title={arq.file_name} />
+                      ) : (
+                        <img src={arq.file_url} alt={arq.file_name} className="max-w-full max-h-[200px] mx-auto" />
+                      )}
                     </div>
                   </div>
                 ))}

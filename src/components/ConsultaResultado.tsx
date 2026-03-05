@@ -505,6 +505,47 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             ))}
           </div>
 
+          {/* Informações adicionais da solicitação */}
+          {formRespostas.length > 0 && (
+            <>
+              <Separator />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formRespostas.map((fr, i) => {
+                  const formatted = fr.valor === true ? "Sim" : fr.valor === false ? "Não" : Array.isArray(fr.valor) ? fr.valor.join(", ") : typeof fr.valor === "object" ? JSON.stringify(fr.valor) : String(fr.valor);
+                  return <InfoItem key={`fr-${i}`} icon={<FileText className="h-4 w-4" />} label={fr.rotulo} value={formatted} />;
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Anexos da solicitação */}
+          {formArquivos.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                {formArquivos.map((arq, i) => (
+                  <div key={i} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{arq.file_name}</span>
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                    <div className="bg-muted/30 rounded overflow-hidden">
+                      {arq.file_url?.toLowerCase().endsWith('.pdf') ? (
+                        <iframe src={arq.file_url} className="w-full h-[200px]" title={arq.file_name} />
+                      ) : (
+                        <img src={arq.file_url} alt={arq.file_name} className="max-w-full max-h-[200px] mx-auto" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           {/* Acompanhamento removido - uso interno apenas */}
 
           {/* Lacre Armador Section - Mini-form & Sub-timeline */}

@@ -53,6 +53,8 @@ const Index = () => {
   const [lacreArmadorConfig, setLacreArmadorConfig] = useState<any>(null);
   const [lacreArmadorDados, setLacreArmadorDados] = useState<any>(null);
   const [deferimentoTitulo, setDeferimentoTitulo] = useState<string | null>(null);
+  const [formRespostas, setFormRespostas] = useState<any[]>([]);
+  const [formArquivos, setFormArquivos] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [buttons, setButtons] = useState<ExternalButton[]>([]);
@@ -118,6 +120,8 @@ const Index = () => {
       setLacreArmadorConfig(response?.lacre_armador_config || null);
       setLacreArmadorDados(response?.lacre_armador_dados || null);
       setDeferimentoTitulo(response?.deferimento_titulo || null);
+      setFormRespostas(response?.form_respostas || []);
+      setFormArquivos(response?.form_arquivos || []);
 
       if (!response?.solicitacao) {
         toast.warning("Nenhuma solicitação encontrada para este serviço com os dados informados.");
@@ -241,6 +245,8 @@ const Index = () => {
                   lacreArmadorConfig={lacreArmadorConfig}
                   lacreArmadorDados={lacreArmadorDados}
                   deferimentoTitulo={deferimentoTitulo}
+                  formRespostas={formRespostas}
+                  formArquivos={formArquivos}
                   onRefresh={() => handleSearch(lastSearchValor, lastSearchChave)}
                 />
               )}

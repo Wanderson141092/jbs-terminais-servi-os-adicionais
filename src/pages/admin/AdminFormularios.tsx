@@ -399,23 +399,51 @@ const AdminFormularios = () => {
     setShowResponsesDialog(true);
   };
 
-  const exportCSV = () => {
+  const exportXLSX = async () => {
     if (campos.length === 0 || respostas.length === 0) return;
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Respostas");
+
+    // Headers
     const headers = ["Data", ...campos.map((c) => c.rotulo)];
-    const rows = respostas.map((r) => [
-      new Date(r.created_at).toLocaleString("pt-BR"),
-      ...campos.map((c) => {
-        const val = (r.respostas as Record<string, unknown>)[c.id];
-        if (Array.isArray(val)) return val.join(", ");
-        return (val as string) || "";
-      }),
-    ]);
-    const csvContent = [headers.join(";"), ...rows.map((r) => r.join(";"))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const headerRow = sheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+    });
+
+    // Data rows
+    for (const r of respostas) {
+      const respostasObj = r.respostas as Record<string, unknown>;
+      const row = [
+        new Date(r.created_at).toLocaleString("pt-BR"),
+        ...campos.map((c) => {
+          const val = respostasObj[c.id];
+          if (Array.isArray(val)) return val.join(", ");
+          if (typeof val === "boolean") return val ? "Sim" : "Não";
+          return (val as string) || "";
+        }),
+      ];
+      sheet.addRow(row);
+    }
+
+    // Auto-width columns
+    sheet.columns.forEach((col) => {
+      let maxLen = 10;
+      col.eachCell?.({ includeEmpty: true }, (cell) => {
+        const len = String(cell.value || "").length;
+        if (len > maxLen) maxLen = len;
+      });
+      col.width = Math.min(maxLen + 2, 50);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `respostas_${Date.now()}.csv`;
+    a.download = `respostas_${Date.now()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -649,9 +677,9 @@ const AdminFormularios = () => {
             <DialogTitle className="flex items-center justify-between">
               Respostas ({respostas.length})
               {respostas.length > 0 && (
-                <Button variant="outline" size="sm" onClick={exportCSV}>
+                <Button variant="outline" size="sm" onClick={exportXLSX}>
                   <Download className="h-4 w-4 mr-2" />
-                  Exportar CSV
+                  Exportar Excel
                 </Button>
               )}
             </DialogTitle>

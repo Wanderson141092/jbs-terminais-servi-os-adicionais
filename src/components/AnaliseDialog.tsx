@@ -87,11 +87,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
+  const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
 
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
@@ -102,6 +103,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
         supabase.from("lancamento_cobranca_registros").select("*").eq("solicitacao_id", solicitacao.id),
+        supabase.from("campos_fixos_config").select("campo_chave, campo_label, ordem, servico_ids, visivel_analise").eq("ativo", true).eq("visivel_analise", true).order("ordem"),
       ]);
 
       setAttachments(attachRes.data || []);
@@ -168,6 +170,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       })).filter((cv: any) => cv.valor);
       setCamposDinamicos(camposVals);
 
+      // Filter campos fixos by service
+      const filteredCamposFixos = (camposFixosRes.data || [])
+        .filter((cf: any) => cf.servico_ids.length === 0 || (currentServicoId && cf.servico_ids.includes(currentServicoId)))
+        .map((cf: any) => ({ campo_chave: cf.campo_chave, campo_label: cf.campo_label, ordem: cf.ordem }));
+      setCamposFixos(filteredCamposFixos);
+
       // Fetch form responses and attachments
       const formularioId = solicitacao.formulario_id;
       if (formularioId) {
@@ -182,14 +190,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         // Fetch form responses
         const { data: respostas } = await supabase
           .from("formulario_respostas")
-          .select("respostas, arquivos")
+          .select("respostas, arquivos, created_at")
           .eq("formulario_id", formularioId)
           .order("created_at", { ascending: false })
           .limit(10);
 
         const { data: perguntasData } = await supabase
           .from("formulario_perguntas")
-          .select("pergunta_id, banco_perguntas(id, rotulo, tipo)")
+          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
           .eq("formulario_id", formularioId)
           .order("ordem");
 
@@ -199,31 +207,66 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           .eq("formulario_id", formularioId);
 
         if (respostas && respostas.length > 0 && perguntasData) {
-          // Find response closest to solicitacao creation
+          // Find response closest to solicitacao creation time
           const solCreatedAt = new Date(solicitacao.created_at).getTime();
           let bestResponse = respostas[0];
-          let bestDiff = Infinity;
+          let bestDiff = Math.abs(new Date(respostas[0].created_at).getTime() - solCreatedAt);
           for (const r of respostas) {
-            // Use first (most recent) as default
+            const diff = Math.abs(new Date(r.created_at).getTime() - solCreatedAt);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              bestResponse = r;
+            }
           }
 
           const respostasObj = bestResponse.respostas as Record<string, any>;
           const mappedPerguntaIds = new Set((mapeamentos || []).map((m: any) => m.pergunta_id));
 
-          const unmapped: { rotulo: string; valor: any; tipo: string }[] = [];
+          // For internal forms: show ALL responses (unmapped)
+          // For external/iframe forms: mapped ones go to dynamic fields, show unmapped here
+          const allResponses: { rotulo: string; valor: any; tipo: string }[] = [];
           for (const fp of perguntasData) {
             const bp = (fp as any).banco_perguntas;
             if (!bp) continue;
-            if (mappedPerguntaIds.has(bp.id)) continue;
             if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
+            // For external forms, skip mapped questions (they show in Campos de Análise)
+            if (!!extBtn && mappedPerguntaIds.has(bp.id)) continue;
 
             const val = respostasObj[bp.id];
             if (val !== undefined && val !== null && val !== "") {
-              unmapped.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
+              allResponses.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
             }
           }
-          setFormRespostas(unmapped);
-          setFormArquivos((bestResponse.arquivos as any[]) || []);
+          setFormRespostas(allResponses);
+
+          // Process attachments with signed URLs
+          const rawArquivos = (bestResponse.arquivos as any[]) || [];
+          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string }[] = [];
+          for (const arq of rawArquivos) {
+            let signedUrl = arq.file_url;
+            // Generate signed URL if it's a storage path (not already a full URL)
+            if (arq.file_url && !arq.file_url.startsWith("http")) {
+              const { data: signedData } = await supabase.storage
+                .from("form-uploads")
+                .createSignedUrl(arq.file_url, 3600);
+              if (signedData) signedUrl = signedData.signedUrl;
+            } else if (arq.file_url && arq.file_url.includes("/storage/v1/object/public/form-uploads/")) {
+              const pathMatch = arq.file_url.split("/storage/v1/object/public/form-uploads/");
+              if (pathMatch.length === 2) {
+                const storagePath = decodeURIComponent(pathMatch[1]);
+                const { data: signedData } = await supabase.storage
+                  .from("form-uploads")
+                  .createSignedUrl(storagePath, 3600);
+                if (signedData) signedUrl = signedData.signedUrl;
+              }
+            }
+            signedArquivos.push({
+              pergunta_id: arq.pergunta_id || arq.campo_id || "",
+              file_url: signedUrl,
+              file_name: arq.file_name || "Arquivo",
+            });
+          }
+          setFormArquivos(signedArquivos);
         } else {
           setFormRespostas([]);
           setFormArquivos([]);
@@ -1039,6 +1082,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
             </div>
 
+            {/* Campos Fixos da Solicitação */}
+            {camposFixos.length > 0 && (
+              <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
+                <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos do Processo</p>
+                {camposFixos.map((cf) => {
+                  const val = (solicitacao as any)[cf.campo_chave];
+                  if (val === undefined || val === null || val === "") return null;
+                  const displayVal = typeof val === "boolean" ? (val ? "Sim" : "Não") : String(val);
+                  return (
+                    <InfoItem key={cf.campo_chave} icon={<FileText className="h-4 w-4" />} label={cf.campo_label} value={displayVal} />
+                  );
+                })}
+              </div>
+            )}
+
             {/* Dynamic analysis fields - only for external/iframe forms */}
             {isExternalForm && camposDinamicos.length > 0 && (
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
@@ -1049,7 +1107,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Form responses (unmapped questions) */}
+            {/* Form responses */}
             {formRespostas.length > 0 && (
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
                 <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Respostas do Formulário</p>

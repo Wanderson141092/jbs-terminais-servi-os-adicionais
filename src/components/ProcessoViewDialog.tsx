@@ -113,7 +113,6 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   };
 
   const fetchFormRespostas = async () => {
-    // Get the formulario_id from the solicitacao
     const formularioId = solicitacao.formulario_id;
     if (!formularioId) {
       setFormRespostas([]);
@@ -121,22 +120,19 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       return;
     }
 
-    // Fetch the form response (latest one for this formulario matching by created_at proximity to solicitacao)
     const { data: respostas } = await supabase
       .from("formulario_respostas")
-      .select("respostas, arquivos")
+      .select("respostas, arquivos, created_at")
       .eq("formulario_id", formularioId)
       .order("created_at", { ascending: false })
       .limit(10);
 
-    // Get the questions for this form
     const { data: perguntasData } = await supabase
       .from("formulario_perguntas")
       .select("pergunta_id, banco_perguntas(id, rotulo, tipo)")
       .eq("formulario_id", formularioId)
       .order("ordem");
 
-    // Get mappings to know which questions are already mapped
     const { data: mapeamentos } = await supabase
       .from("pergunta_mapeamento")
       .select("pergunta_id, campo_solicitacao, campo_analise_id")
@@ -148,40 +144,45 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       return;
     }
 
-    // Find the response closest to the solicitacao created_at
+    // Find response closest to solicitacao creation
     const solCreatedAt = new Date(solicitacao.created_at).getTime();
     let bestResponse = respostas[0];
-    // Simple heuristic: use the first response (most recent) if formulario_id matches
-    // In practice, the response created at the same time as solicitacao is the one we want
+    let bestDiff = Math.abs(new Date(respostas[0].created_at).getTime() - solCreatedAt);
+    for (const r of respostas) {
+      const diff = Math.abs(new Date(r.created_at).getTime() - solCreatedAt);
+      if (diff < bestDiff) { bestDiff = diff; bestResponse = r; }
+    }
 
     const respostasObj = bestResponse.respostas as Record<string, any>;
     const mappedPerguntaIds = new Set((mapeamentos || []).map(m => m.pergunta_id));
 
-    // Build unmapped responses only (mapped ones already show in fixed/dynamic fields)
     const unmapped: { rotulo: string; valor: any; tipo: string }[] = [];
     for (const fp of perguntasData) {
       const bp = (fp as any).banco_perguntas;
       if (!bp) continue;
-      // Skip if already mapped to a fixed field or dynamic field
-      if (mappedPerguntaIds.has(bp.id)) continue;
-      // Skip informativo type
       if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
+      // For external forms, skip mapped; for internal show all
+      if (isExternalForm && mappedPerguntaIds.has(bp.id)) continue;
 
       const val = respostasObj[bp.id];
       if (val !== undefined && val !== null && val !== "") {
-        unmapped.push({
-          rotulo: bp.rotulo,
-          valor: val,
-          tipo: bp.tipo,
-        });
+        unmapped.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
       }
     }
-
     setFormRespostas(unmapped);
 
-    // Extract file attachments from response
-    const arquivos = bestResponse.arquivos as any[] | null;
-    setFormArquivos(arquivos || []);
+    // Process attachments with signed URLs
+    const rawArquivos = (bestResponse.arquivos as any[]) || [];
+    const signedArquivos: { pergunta_id: string; file_url: string; file_name: string }[] = [];
+    for (const arq of rawArquivos) {
+      let signedUrl = arq.file_url;
+      if (arq.file_url && !arq.file_url.startsWith("http")) {
+        const { data: signedData } = await supabase.storage.from("form-uploads").createSignedUrl(arq.file_url, 3600);
+        if (signedData) signedUrl = signedData.signedUrl;
+      }
+      signedArquivos.push({ pergunta_id: arq.pergunta_id || "", file_url: signedUrl, file_name: arq.file_name || "Arquivo" });
+    }
+    setFormArquivos(signedArquivos);
   };
 
   const handleStatusChange = async () => {
@@ -439,31 +440,43 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
 
             <Separator />
 
-            {/* Anexos do Formulário (form-uploads) */}
+            {/* Anexos do Formulário (form-uploads) - inline preview */}
             {formArquivos.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium flex items-center gap-2 mb-3">
-                  <FileText className="h-4 w-4" />
-                  Anexos do Formulário
-                </Label>
-                <div className="grid gap-2">
-                  {formArquivos.map((arq, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 border rounded">
-                      <span className="text-sm">{arq.file_name}</span>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openPreview(arq.file_url)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
+              <>
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+                    <FileText className="h-4 w-4" />
+                    Anexos do Formulário
+                  </Label>
+                  <div className="space-y-2">
+                    {formArquivos.map((arq, i) => (
+                      <div key={i} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{arq.file_name}</span>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openPreview(arq.file_url)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" asChild>
+                              <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="bg-muted/30 rounded overflow-hidden">
+                          {arq.file_url?.toLowerCase().endsWith('.pdf') ? (
+                            <iframe src={arq.file_url} className="w-full h-[200px]" title={arq.file_name} />
+                          ) : (
+                            <img src={arq.file_url} alt={arq.file_name} className="max-w-full max-h-[200px] mx-auto" />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* Anexos e Documentos (deferimento) */}

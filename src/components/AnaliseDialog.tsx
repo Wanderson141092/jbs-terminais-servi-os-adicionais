@@ -1701,13 +1701,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     Histórico de Observações
                   </p>
                   <div className="max-h-[200px] overflow-auto space-y-2">
-                    {observacaoHistorico.map((obs) => (
-                      <div key={obs.id} className={`rounded-lg p-2 text-xs ${obs.tipo_observacao === "externa" ? "bg-blue-50 border border-blue-100" : "bg-muted/50"}`}>
+                    {observacaoHistorico.map((obs) => {
+                      const isExterna = obs.tipo_observacao === "externa";
+                      const isAutoRecusaCorte = obs.tipo_observacao === "sistema_auto_recusa_corte";
+
+                      return (
+                      <div key={obs.id} className={`rounded-lg p-2 text-xs ${isExterna ? "bg-blue-50 border border-blue-100" : isAutoRecusaCorte ? "bg-amber-50 border border-amber-200" : "bg-muted/50"}`}>
                         <div className="flex justify-between items-start mb-1">
                           <span className="font-medium flex items-center gap-1.5">
                             {obs.autor_nome || "Sistema"}
-                            {obs.tipo_observacao === "externa" ? (
+                            {isExterna ? (
                               <span className="text-[10px] text-blue-600 font-normal">🌐 Externa</span>
+                            ) : isAutoRecusaCorte ? (
+                              <span className="text-[10px] text-amber-700 font-normal">⚠️ Recusado automaticamente</span>
                             ) : (
                               <span className="text-[10px] text-muted-foreground font-normal">🔒 Interna</span>
                             )}
@@ -1746,7 +1752,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                         )}
                         <StatusBadge status={obs.status_no_momento} />
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

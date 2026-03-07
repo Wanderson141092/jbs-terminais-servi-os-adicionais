@@ -242,6 +242,8 @@ Deno.serve(async (req) => {
       initialStatus = "confirmado_aguardando_servico";
     }
 
+    const observacoesLimpas = solicitacaoData.observacoes?.trim() || null;
+
     // 8. Insert solicitacao (with formulario_id link)
     const { error: solError } = await supabase.from("solicitacoes").insert({
       protocolo,
@@ -252,9 +254,7 @@ Deno.serve(async (req) => {
       numero_conteiner: solicitacaoData.numero_conteiner || null,
       cnpj: solicitacaoData.cnpj || null,
       lpco: solicitacaoData.lpco || null,
-      observacoes: autoRecusado
-        ? `${solicitacaoData.observacoes || ""}\nPedido realizado após o horário de corte`.trim()
-        : (solicitacaoData.observacoes || null),
+      observacoes: observacoesLimpas,
       data_posicionamento: solicitacaoData.data_posicionamento || null,
       data_agendamento: solicitacaoData.data_agendamento || null,
       tipo_carga: solicitacaoData.tipo_carga || null,
@@ -279,6 +279,17 @@ Deno.serve(async (req) => {
         valor: dv.valor,
       }));
       await supabase.from("campos_analise_valores").insert(inserts);
+    }
+
+    if (autoRecusado && solData) {
+      await supabase.from("observacao_historico").insert({
+        solicitacao_id: solData.id,
+        observacao: "Pedido recusado automaticamente por envio após o horário de corte.",
+        status_no_momento: initialStatus,
+        autor_id: "00000000-0000-0000-0000-000000000000",
+        autor_nome: "Sistema",
+        tipo_observacao: "sistema_auto_recusa_corte",
+      });
     }
 
     // 10. Trigger notifications

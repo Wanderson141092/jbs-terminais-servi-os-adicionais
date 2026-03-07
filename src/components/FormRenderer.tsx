@@ -7,6 +7,7 @@ import FormRendererSuccess from "@/components/form-renderer/FormRendererSuccess"
 import FormRendererBody from "@/components/form-renderer/FormRendererBody";
 import FormRendererHeader from "@/components/form-renderer/FormRendererHeader";
 import { getStyleClasses } from "@/components/form-renderer/formStyles";
+import { invokeBackendEndpoint } from "@/lib/backendEndpoints";
 import type { Formulario, PerguntaComCondicao, FormRendererProps } from "@/components/form-renderer/types";
 
 const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
@@ -176,7 +177,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
         formData.append("bucket", "form-uploads");
         formData.append("formulario_id", formularioId);
 
-        const { data: uploadResponse, error: uploadError } = await supabase.functions.invoke("upload-publico", {
+        const { data: uploadResponse, error: uploadError } = await invokeBackendEndpoint("uploadPublico", {
           body: formData,
         });
 
@@ -200,7 +201,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
       }
 
       // Submit via edge function (bypasses RLS for public users)
-      const { data: submitResponse, error: submitError } = await supabase.functions.invoke("enviar-formulario", {
+      const { data: submitResponse, error: submitError } = await invokeBackendEndpoint("enviarFormulario", {
         body: {
           formulario_id: formularioId,
           respostas,
@@ -287,7 +288,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
       return;
     }
     try {
-      const { data, error } = await supabase.functions.invoke("enviar-formulario", {
+      const { data, error } = await invokeBackendEndpoint("enviarFormulario", {
         body: {
           action: "save_email",
           protocolo,

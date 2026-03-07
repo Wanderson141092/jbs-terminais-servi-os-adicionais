@@ -13,6 +13,7 @@ import ConsultaResultado from "@/components/ConsultaResultado";
 import FormRenderer from "@/components/FormRenderer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invokeBackendEndpoint } from "@/lib/backendEndpoints";
 
 interface ExternalButton {
   id: string;
@@ -85,7 +86,7 @@ const Index = () => {
     setLastSearchValor(valor);
     setLastSearchChave(chave);
     try {
-      const { data: response, error } = await supabase.functions.invoke("consulta-publica", {
+      const { data: response, error } = await invokeBackendEndpoint("consultaPublica", {
         body: { valor, chave },
       });
 

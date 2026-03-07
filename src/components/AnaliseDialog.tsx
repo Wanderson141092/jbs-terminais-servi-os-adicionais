@@ -92,24 +92,20 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
-        supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
+      const [servicoRes, allServicosRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
-        supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false }),
         supabase.from("parametros_campos").select("*").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
         supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
-        supabase.from("campos_analise_valores").select("campo_id, valor, campos_analise(nome)").eq("solicitacao_id", solicitacao.id),
+        supabase.from("process_campos_view" as any).select("campo_id, campo_valor, campo_nome").eq("solicitacao_id", solicitacao.id),
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
         supabase.from("lancamento_cobranca_registros").select("*").eq("solicitacao_id", solicitacao.id),
         supabase.from("campos_fixos_config").select("campo_chave, campo_label, ordem, servico_ids, visivel_analise").eq("ativo", true).eq("visivel_analise", true).order("ordem"),
       ]);
 
-      setAttachments(attachRes.data || []);
       if (servicoRes.data) setServicoConfig(servicoRes.data);
       setServicos(allServicosRes.data || []);
-      setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
       setSolicitarDeferimento(solicitacao.solicitar_deferimento || false);
       setSolicitarLacreArmador(solicitacao.solicitar_lacre_armador || false);
       setCustoLacreArmador(solicitacao.lacre_armador_aceite_custo ?? null);
@@ -165,8 +161,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
       // Build dynamic fields display
       const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
-        campo_nome: cv.campos_analise?.nome || "Campo",
-        valor: cv.valor || "",
+        campo_nome: cv.campo_nome || "Campo",
+        valor: cv.campo_valor || "",
       })).filter((cv: any) => cv.valor);
       setCamposDinamicos(camposVals);
 
@@ -175,6 +171,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         .filter((cf: any) => cf.servico_ids.length === 0 || (currentServicoId && cf.servico_ids.includes(currentServicoId)))
         .map((cf: any) => ({ campo_chave: cf.campo_chave, campo_label: cf.campo_label, ordem: cf.ordem }));
       setCamposFixos(filteredCamposFixos);
+
+
+      // Consultas auxiliares: anexos e histórico somente após a carga principal
+      const [attachRes, histRes] = await Promise.all([
+        supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
+        supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false }),
+      ]);
+      setAttachments(attachRes.data || []);
+      setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
 
       // Fetch form responses and attachments
       const formularioId = solicitacao.formulario_id;

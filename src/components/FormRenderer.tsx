@@ -118,8 +118,18 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
 
       if (formRes.data) setFormulario(formRes.data);
       if (mapeamentoRes.data) setMapeamentos(mapeamentoRes.data);
-      // Default to true if no config exists
-      setShowEmailField(emailToggleRes.data?.is_active !== false);
+
+      // Default seguro: exibir campo quando config não existir ou falhar leitura.
+      const safeEmailToggleDefault = true;
+      if (emailToggleRes.error) {
+        console.error("[FormRenderer] Falha ao ler page_config.solicitar_email_acompanhamento:", emailToggleRes.error);
+        setShowEmailField(safeEmailToggleDefault);
+      } else if (!emailToggleRes.data) {
+        console.warn("[FormRenderer] Config solicitar_email_acompanhamento ausente; aplicando fallback seguro (true).");
+        setShowEmailField(safeEmailToggleDefault);
+      } else {
+        setShowEmailField(emailToggleRes.data.is_active !== false);
+      }
 
       // Build questions with conditional info
       if (perguntasRes.data) {

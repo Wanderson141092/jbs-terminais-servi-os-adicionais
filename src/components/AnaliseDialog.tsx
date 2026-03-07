@@ -47,6 +47,99 @@ interface ObservacaoHistorico {
   tipo_observacao?: string;
 }
 
+interface CampoFixoConfig {
+  campo_chave: string;
+  campo_label: string;
+  ordem: number;
+  servico_ids: string[];
+  visivel_analise: boolean;
+}
+
+interface CampoAnaliseConfig {
+  id: string;
+  nome: string;
+  ordem: number;
+  servico_ids: string[];
+  visivel_externo: boolean;
+}
+
+interface CampoAnaliseValor {
+  campo_id: string;
+  valor: string | null;
+}
+
+interface PerguntaMapeamento {
+  pergunta_id: string;
+  campo_solicitacao: string;
+  campo_analise_id?: string | null;
+}
+
+interface CampoResolvido {
+  key: string;
+  label: string;
+  valor: string;
+  ordem: number;
+}
+
+const toDisplayValue = (valor: unknown) => {
+  if (valor === undefined || valor === null || valor === "") return "—";
+  if (typeof valor === "boolean") return valor ? "Sim" : "Não";
+  return String(valor);
+};
+
+const resolveCamposExibicao = ({
+  solicitacao,
+  servicoId,
+  isExternalForm,
+  camposFixosConfig,
+  camposAnaliseConfig,
+  camposAnaliseValores,
+  mapeamentos,
+}: {
+  solicitacao: any;
+  servicoId?: string;
+  isExternalForm: boolean;
+  camposFixosConfig: CampoFixoConfig[];
+  camposAnaliseConfig: CampoAnaliseConfig[];
+  camposAnaliseValores: CampoAnaliseValor[];
+  mapeamentos: PerguntaMapeamento[];
+}): CampoResolvido[] => {
+  const campoAnaliseValorMap = new Map<string, string | null>(
+    camposAnaliseValores.map((cv) => [cv.campo_id, cv.valor])
+  );
+  const camposAnaliseMapeados = new Set(
+    mapeamentos.filter((m) => !!m.campo_analise_id).map((m) => m.campo_analise_id as string)
+  );
+
+  const fixos = camposFixosConfig
+    .filter((cf) => cf.visivel_analise)
+    .filter((cf) => cf.servico_ids.length === 0 || (servicoId && cf.servico_ids.includes(servicoId)))
+    .map((cf) => ({
+      key: `fixo:${cf.campo_chave}`,
+      label: cf.campo_label,
+      valor: toDisplayValue((solicitacao as any)[cf.campo_chave]),
+      ordem: cf.ordem,
+    }));
+
+  const dinamicos = camposAnaliseConfig
+    .filter((ca) => ca.servico_ids.length === 0 || (servicoId && ca.servico_ids.includes(servicoId)))
+    .filter((ca) => {
+      if (!isExternalForm) return true;
+      return camposAnaliseMapeados.has(ca.id) || campoAnaliseValorMap.has(ca.id) || ca.visivel_externo;
+    })
+    .map((ca) => ({
+      key: `dinamico:${ca.id}`,
+      label: ca.nome,
+      valor: toDisplayValue(campoAnaliseValorMap.get(ca.id)),
+      ordem: ca.ordem,
+    }));
+
+  return [...fixos, ...dinamicos].sort((a, b) => {
+    if (a.ordem !== b.ordem) return a.ordem - b.ordem;
+    return a.label.localeCompare(b.label);
+  });
+};
+
 const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
@@ -75,7 +168,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [justificativaNaoVistoriado, setJustificativaNaoVistoriado] = useState("");
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
-  const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
+  const [camposExibicao, setCamposExibicao] = useState<CampoResolvido[]>([]);
   const [custoposicionamento, setCustoposicionamento] = useState<boolean | null>(solicitacao.custo_posicionamento ?? null);
   const [cancelRecusaConfig, setCancelRecusaConfig] = useState<any[]>([]);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -87,12 +180,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
-  const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
-
-
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes, camposAnaliseRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
@@ -104,6 +194,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
         supabase.from("lancamento_cobranca_registros").select("*").eq("solicitacao_id", solicitacao.id),
         supabase.from("campos_fixos_config").select("campo_chave, campo_label, ordem, servico_ids, visivel_analise").eq("ativo", true).eq("visivel_analise", true).order("ordem"),
+        supabase.from("campos_analise").select("id, nome, ordem, servico_ids, visivel_externo").eq("ativo", true).order("ordem"),
       ]);
 
       setAttachments(attachRes.data || []);
@@ -163,18 +254,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setCobrancaConfigs(serviceCobrancaConfig);
       setLancamentoRegistros(registrosRes.data || []);
 
-      // Build dynamic fields display
-      const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
-        campo_nome: cv.campos_analise?.nome || "Campo",
-        valor: cv.valor || "",
-      })).filter((cv: any) => cv.valor);
-      setCamposDinamicos(camposVals);
-
-      // Filter campos fixos by service
-      const filteredCamposFixos = (camposFixosRes.data || [])
-        .filter((cf: any) => cf.servico_ids.length === 0 || (currentServicoId && cf.servico_ids.includes(currentServicoId)))
-        .map((cf: any) => ({ campo_chave: cf.campo_chave, campo_label: cf.campo_label, ordem: cf.ordem }));
-      setCamposFixos(filteredCamposFixos);
+      let mapeamentosFormulario: PerguntaMapeamento[] = [];
+      let externalForm = false;
 
       // Fetch form responses and attachments
       const formularioId = solicitacao.formulario_id;
@@ -185,7 +266,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           .select("id, tipo")
           .eq("formulario_id", formularioId)
           .maybeSingle();
-        setIsExternalForm(!!extBtn);
+        externalForm = !!extBtn;
+        setIsExternalForm(externalForm);
 
         // Fetch form responses
         const { data: respostas } = await supabase
@@ -205,6 +287,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           .from("pergunta_mapeamento")
           .select("pergunta_id, campo_solicitacao, campo_analise_id")
           .eq("formulario_id", formularioId);
+        mapeamentosFormulario = (mapeamentos || []) as PerguntaMapeamento[];
 
         if (respostas && respostas.length > 0 && perguntasData) {
           // Find response closest to solicitacao creation time
@@ -230,7 +313,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             if (!bp) continue;
             if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
             // For external forms, skip mapped questions (they show in Campos de Análise)
-            if (!!extBtn && mappedPerguntaIds.has(bp.id)) continue;
+            if (externalForm && mappedPerguntaIds.has(bp.id)) continue;
 
             const val = respostasObj[bp.id];
             if (val !== undefined && val !== null && val !== "") {
@@ -276,6 +359,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         setFormRespostas([]);
         setFormArquivos([]);
       }
+
+      const camposResolvidos = resolveCamposExibicao({
+        solicitacao,
+        servicoId: currentServicoId,
+        isExternalForm: externalForm,
+        camposFixosConfig: (camposFixosRes.data || []) as CampoFixoConfig[],
+        camposAnaliseConfig: (camposAnaliseRes.data || []) as CampoAnaliseConfig[],
+        camposAnaliseValores: (camposValoresRes.data || []) as CampoAnaliseValor[],
+        mapeamentos: mapeamentosFormulario,
+      });
+      setCamposExibicao(camposResolvidos);
     };
     
     fetchData();
@@ -1082,27 +1176,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
             </div>
 
-            {/* Campos Fixos da Solicitação */}
-            {camposFixos.length > 0 && (
+            {/* Campos resolvidos para exibição (fixos + análise) */}
+            {camposExibicao.length > 0 && (
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
                 <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos do Processo</p>
-                {camposFixos.map((cf) => {
-                  const val = (solicitacao as any)[cf.campo_chave];
-                  if (val === undefined || val === null || val === "") return null;
-                  const displayVal = typeof val === "boolean" ? (val ? "Sim" : "Não") : String(val);
-                  return (
-                    <InfoItem key={cf.campo_chave} icon={<FileText className="h-4 w-4" />} label={cf.campo_label} value={displayVal} />
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Dynamic analysis fields - only for external/iframe forms */}
-            {isExternalForm && camposDinamicos.length > 0 && (
-              <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
-                <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos de Análise</p>
-                {camposDinamicos.map((cd, idx) => (
-                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={cd.campo_nome} value={cd.valor} />
+                {camposExibicao.map((campo) => (
+                  <InfoItem key={campo.key} icon={<FileText className="h-4 w-4" />} label={campo.label} value={campo.valor} />
                 ))}
               </div>
             )}

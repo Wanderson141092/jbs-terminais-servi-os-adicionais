@@ -1117,37 +1117,27 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Form file attachments - inline preview */}
+            {/* Form file attachments - shown as buttons that open preview modal */}
             {formArquivos.length > 0 && (
               <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
                 <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Anexos do Formulário
                 </p>
-                {formArquivos.map((arq, idx) => (
-                  <div key={idx} className="border rounded-lg p-3 space-y-2 bg-background">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{arq.file_name}</span>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setPreviewUrl(arq.file_url)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="bg-muted/30 rounded overflow-hidden">
-                      {arq.file_url?.toLowerCase().endsWith('.pdf') ? (
-                        <iframe src={arq.file_url} className="w-full h-[200px]" title={arq.file_name} />
-                      ) : (
-                        <img src={arq.file_url} alt={arq.file_name} className="max-w-full max-h-[200px] mx-auto" />
-                      )}
-                    </div>
-                  </div>
-                ))}
+                <div className="flex flex-wrap gap-2">
+                  {formArquivos.map((arq, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => setPreviewUrl(arq.file_url)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      {arq.file_name}
+                    </Button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1161,40 +1151,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             <div className="flex items-center gap-3 flex-wrap">
               <span className="text-sm text-muted-foreground">Status:</span>
               <StatusBadge status={solicitacao.status} />
-
-              {/* Dynamic billing badges from lancamento_cobranca_config */}
-              {cobrancaConfigs.map((cfg: any) => {
-                // Check status_ativacao visibility
-                const statusAtivacao = cfg.status_ativacao || [];
-                if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return null;
-
-                // "servico" type: check individual registro
-                if (cfg.tipo === "servico") {
-                  const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
-                  const isConfirmed = registro?.confirmado === true;
-                  // Only show if registro exists (was created) or global field indicates pending
-                  if (!registro && solicitacao.lancamento_confirmado !== false) return null;
-                  return (
-                    <Badge
-                      key={cfg.id}
-                      variant="outline"
-                      className={`text-[10px] px-2 py-0.5 gap-1 font-semibold ${
-                        isConfirmed
-                          ? "border-green-500 text-green-700 bg-green-50"
-                          : "border-red-500 text-red-700 bg-red-50"
-                      }`}
-                    >
-                      <DollarSign className="h-3 w-3" />
-                      {cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Aguardando confirmação de lançamento do serviço"}
-                    </Badge>
-                  );
-                }
-                // "pendencia" type: now shown next to the lacre toggle, skip here
-                if (cfg.tipo === "pendencia") {
-                  return null;
-                }
-                return null;
-              })}
             </div>
 
             <Separator />
@@ -2163,13 +2119,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 // Helper Functions
 const formatFormValue = (val: any, tipo: string): string => {
   if (val === null || val === undefined) return "—";
-  if (Array.isArray(val)) return val.join(", ");
+  if (Array.isArray(val)) return val.join("\n");
   if (typeof val === "object") {
     if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
     return JSON.stringify(val);
   }
   if (typeof val === "boolean") return val ? "Sim" : "Não";
-  return String(val);
+  // Clean up JSON-like array strings: ["val1","val2"] -> val1\nval2
+  const strVal = String(val);
+  if (strVal.startsWith("[") && strVal.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(strVal);
+      if (Array.isArray(parsed)) return parsed.join("\n");
+    } catch { /* not JSON */ }
+  }
+  return strVal;
 };
 
 // Helper Components
@@ -2178,7 +2142,7 @@ const InfoItem = ({ icon, label, value }: { icon: React.ReactNode; label: string
     <span className="text-muted-foreground mt-0.5">{icon}</span>
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium">{value}</p>
+      <p className="font-medium whitespace-pre-line">{value}</p>
     </div>
   </div>
 );

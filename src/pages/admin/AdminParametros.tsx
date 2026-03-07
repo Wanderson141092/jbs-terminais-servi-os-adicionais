@@ -21,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 import ExternalButtonsManager from "@/components/ExternalButtonsManager";
 import ParametrosCamposManager from "@/components/ParametrosCamposManager";
 import CamposFixosManager from "@/components/admin/CamposFixosManager";
+import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";
 import ConsultaEtapasManager from "@/components/admin/ConsultaEtapasManager";
 import CancelamentoRecusaManager from "@/components/admin/CancelamentoRecusaManager";
 import PaginaExternaConfigManager from "@/components/admin/PaginaExternaConfigManager";
@@ -643,9 +644,9 @@ const AdminParametros = () => {
                 <List className="h-4 w-4" />
                 Campos
               </TabsTrigger>
-              <TabsTrigger value="campos-fixos" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Campos Fixos
+              <TabsTrigger value="mapeamento-campos" className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                Mapeamento de Campos
               </TabsTrigger>
               <TabsTrigger value="consulta-etapas" className="flex items-center gap-2">
                 <GitBranch className="h-4 w-4" />
@@ -810,9 +811,20 @@ const AdminParametros = () => {
           </Card>
         </TabsContent>
 
-        {/* ============= CAMPOS FIXOS ============= */}
-        <TabsContent value="campos-fixos">
-          <CamposFixosManager />
+        {/* ============= MAPEAMENTO DE CAMPOS — Fixo & Dinâmico ============= */}
+        <TabsContent value="mapeamento-campos">
+          <Tabs defaultValue="fixo" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="fixo">Campo Fixo</TabsTrigger>
+              <TabsTrigger value="dinamico">Campo Dinâmico</TabsTrigger>
+            </TabsList>
+            <TabsContent value="fixo">
+              <CamposFixosManager />
+            </TabsContent>
+            <TabsContent value="dinamico">
+              <CamposDinamicosManager />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         {/* ============= CONSULTA ETAPAS ============= */}

@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
       cnpj: solicitacaoData.cnpj || null,
       lpco: solicitacaoData.lpco || null,
       observacoes: autoRecusado
-        ? `${solicitacaoData.observacoes || ""}\n[RECUSADO AUTOMATICAMENTE - Pedido realizado após o horário de corte]`.trim()
+        ? `${solicitacaoData.observacoes || ""}\nPedido realizado após o horário de corte`.trim()
         : (solicitacaoData.observacoes || null),
       data_posicionamento: solicitacaoData.data_posicionamento || null,
       data_agendamento: solicitacaoData.data_agendamento || null,

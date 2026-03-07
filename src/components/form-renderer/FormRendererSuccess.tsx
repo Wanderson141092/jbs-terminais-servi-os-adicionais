@@ -8,6 +8,7 @@ interface FormRendererSuccessProps {
   chaveConsulta?: string;
   emailParaNotificacao: string;
   emailSalvo: boolean;
+  showEmailField?: boolean;
   onEmailChange: (email: string) => void;
   onSaveEmail: () => void;
 }
@@ -17,6 +18,7 @@ const FormRendererSuccess = ({
   chaveConsulta,
   emailParaNotificacao,
   emailSalvo,
+  showEmailField = true,
   onEmailChange,
   onSaveEmail,
 }: FormRendererSuccessProps) => (
@@ -49,7 +51,7 @@ const FormRendererSuccess = ({
       </div>
     )}
 
-    {!emailSalvo ? (
+    {showEmailField && !emailSalvo ? (
       <div className="space-y-3 text-left">
         <p className="text-sm text-muted-foreground text-center">
           Informe seu e-mail para receber atualizações e a chave de consulta:
@@ -67,13 +69,13 @@ const FormRendererSuccess = ({
           </Button>
         </div>
       </div>
-    ) : (
+    ) : showEmailField && emailSalvo ? (
       <div className="bg-secondary/10 rounded-lg p-3">
         <p className="text-sm text-secondary font-medium">
           ✓ E-mail registrado! Você receberá notificações em {emailParaNotificacao}
         </p>
       </div>
-    )}
+    ) : null}
   </div>
 );
 

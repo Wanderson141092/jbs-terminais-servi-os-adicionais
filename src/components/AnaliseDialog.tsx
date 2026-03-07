@@ -89,6 +89,36 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [isExternalForm, setIsExternalForm] = useState(false);
   const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
 
+  const fetchCobrancaRegistros = async () => {
+    const { data: newRegistros } = await supabase
+      .from("cobrancas")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+
+    if (newRegistros && newRegistros.length > 0) {
+      return newRegistros;
+    }
+
+    const { data: legacyRegistros } = await supabase
+      .from("lancamento_cobranca_registros")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+
+    return legacyRegistros || [];
+  };
+
+  const upsertCobrancaRegistro = async (payload: any) => {
+    await supabase.from("cobrancas").upsert(
+      {
+        ...payload,
+        status_financeiro: payload.confirmado ? "confirmado" : "pendente",
+      },
+      { onConflict: "solicitacao_id,cobranca_config_id" }
+    );
+
+    await supabase.from("lancamento_cobranca_registros").upsert(payload, { onConflict: "solicitacao_id,cobranca_config_id" });
+  };
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -102,7 +132,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         supabase.from("campos_analise_valores").select("campo_id, valor, campos_analise(nome)").eq("solicitacao_id", solicitacao.id),
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
-        supabase.from("lancamento_cobranca_registros").select("*").eq("solicitacao_id", solicitacao.id),
+        fetchCobrancaRegistros(),
         supabase.from("campos_fixos_config").select("campo_chave, campo_label, ordem, servico_ids, visivel_analise").eq("ativo", true).eq("visivel_analise", true).order("ordem"),
       ]);
 
@@ -188,18 +218,35 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         setIsExternalForm(!!extBtn);
 
         // Fetch form responses
-        const { data: respostas } = await supabase
-          .from("formulario_respostas")
+        const { data: respostasData } = await supabase
+          .from("form_data")
           .select("respostas, arquivos, created_at")
           .eq("formulario_id", formularioId)
           .order("created_at", { ascending: false })
           .limit(10);
 
-        const { data: perguntasData } = await supabase
-          .from("formulario_perguntas")
-          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
+        const respostas = (respostasData && respostasData.length > 0)
+          ? respostasData
+          : (await supabase
+            .from("formulario_respostas")
+            .select("respostas, arquivos, created_at")
+            .eq("formulario_id", formularioId)
+            .order("created_at", { ascending: false })
+            .limit(10)).data;
+
+        const { data: perguntasNewData } = await supabase
+          .from("form_field_mapping")
+          .select("form_field_id, ordem, form_fields(id, rotulo, tipo)")
           .eq("formulario_id", formularioId)
           .order("ordem");
+
+        const perguntasData = (perguntasNewData && perguntasNewData.length > 0)
+          ? perguntasNewData.map((p: any) => ({ pergunta_id: p.form_field_id, ordem: p.ordem, banco_perguntas: p.form_fields }))
+          : (await supabase
+            .from("formulario_perguntas")
+            .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
+            .eq("formulario_id", formularioId)
+            .order("ordem")).data;
 
         const { data: mapeamentos } = await supabase
           .from("pergunta_mapeamento")
@@ -650,11 +697,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       updatePayload.lancamento_confirmado = false;
       const pendenciaCfg = cobrancaConfigs.find((c: any) => c.tipo === "pendencia");
       if (pendenciaCfg) {
-        await supabase.from("lancamento_cobranca_registros").upsert({
+        await upsertCobrancaRegistro({
           solicitacao_id: solicitacao.id,
           cobranca_config_id: pendenciaCfg.id,
           confirmado: false,
-        }, { onConflict: "solicitacao_id,cobranca_config_id" });
+        });
       }
     }
 
@@ -667,19 +714,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         return true;
       });
       if (servicoCfg) {
-        await supabase.from("lancamento_cobranca_registros").upsert({
+        await upsertCobrancaRegistro({
           solicitacao_id: solicitacao.id,
           cobranca_config_id: servicoCfg.id,
           confirmado: lancamentoConfirmado,
           confirmado_por: lancamentoConfirmado ? userId : null,
           confirmado_data: lancamentoConfirmado ? new Date().toISOString() : null,
-        }, { onConflict: "solicitacao_id,cobranca_config_id" });
+        });
       }
       // Check if ALL registros are confirmed for global field
-      const { data: allRegs } = await supabase
-        .from("lancamento_cobranca_registros")
-        .select("*")
-        .eq("solicitacao_id", solicitacao.id);
+      const allRegs = await fetchCobrancaRegistros();
       const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
         const statusAtivacao = cfg.status_ativacao || [];
         if (statusAtivacao.length > 0 && !statusAtivacao.includes(selectedStatus)) return false;
@@ -808,15 +852,18 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     
     if (configId) {
       // Confirm individual registro
-      const { error } = await supabase
-        .from("lancamento_cobranca_registros")
-        .upsert({
+      let error: any = null;
+      try {
+        await upsertCobrancaRegistro({
           solicitacao_id: solicitacao.id,
           cobranca_config_id: configId,
           confirmado: true,
           confirmado_por: userId,
           confirmado_data: new Date().toISOString(),
-        }, { onConflict: "solicitacao_id,cobranca_config_id" });
+        });
+      } catch (err) {
+        error = err;
+      }
 
       if (error) {
         toast.error("Erro ao confirmar lançamento");
@@ -825,10 +872,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       }
 
       // Refresh registros
-      const { data: updatedRegistros } = await supabase
-        .from("lancamento_cobranca_registros")
-        .select("*")
-        .eq("solicitacao_id", solicitacao.id);
+      const updatedRegistros = await fetchCobrancaRegistros();
       setLancamentoRegistros(updatedRegistros || []);
 
       // Check if ALL applicable registros are now confirmed
@@ -942,16 +986,32 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const handleDesfazerLancamento = async (configId: string) => {
     setLoading(true);
-    const { error } = await supabase
-      .from("lancamento_cobranca_registros")
-      .update({
-        confirmado: false,
-        confirmado_por: null,
-        confirmado_data: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("solicitacao_id", solicitacao.id)
-      .eq("cobranca_config_id", configId);
+    const nowIso = new Date().toISOString();
+    const [{ error: newError }, { error: legacyError }] = await Promise.all([
+      supabase
+        .from("cobrancas")
+        .update({
+          confirmado: false,
+          status_financeiro: "pendente",
+          confirmado_por: null,
+          confirmado_data: null,
+          updated_at: nowIso,
+        })
+        .eq("solicitacao_id", solicitacao.id)
+        .eq("cobranca_config_id", configId),
+      supabase
+        .from("lancamento_cobranca_registros")
+        .update({
+          confirmado: false,
+          confirmado_por: null,
+          confirmado_data: null,
+          updated_at: nowIso,
+        })
+        .eq("solicitacao_id", solicitacao.id)
+        .eq("cobranca_config_id", configId),
+    ]);
+
+    const error = newError || legacyError;
 
     if (error) {
       toast.error("Erro ao desfazer lançamento");
@@ -967,10 +1027,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }).eq("id", solicitacao.id);
 
     // Refresh registros
-    const { data: updatedRegistros } = await supabase
-      .from("lancamento_cobranca_registros")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
+    const updatedRegistros = await fetchCobrancaRegistros();
     setLancamentoRegistros(updatedRegistros || []);
 
     const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";

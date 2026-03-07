@@ -21,6 +21,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
   const [chaveConsulta, setChaveConsulta] = useState("");
   const [emailParaNotificacao, setEmailParaNotificacao] = useState("");
   const [emailSalvo, setEmailSalvo] = useState(false);
+  const [showEmailField, setShowEmailField] = useState(true);
   const [mapeamentos, setMapeamentos] = useState<{ pergunta_id: string; campo_solicitacao: string; campo_analise_id?: string | null }[]>([]);
 
   useEffect(() => {
@@ -28,7 +29,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
       setLoading(true);
 
       // Fetch form, questions (from banco_perguntas via formulario_perguntas), and conditionals
-      const [formRes, perguntasRes, condicionaisRes, mapeamentoRes] = await Promise.all([
+      const [formRes, perguntasRes, condicionaisRes, mapeamentoRes, emailToggleRes] = await Promise.all([
         supabase.from("formularios").select("id, titulo, descricao, estilo").eq("id", formularioId).single(),
         supabase.from("formulario_perguntas")
           .select("id, ordem, obrigatorio, pergunta_id, banco_perguntas(id, tipo, rotulo, placeholder, opcoes, config, descricao)")
@@ -40,10 +41,16 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
         supabase.from("pergunta_mapeamento")
           .select("pergunta_id, campo_solicitacao, campo_analise_id")
           .eq("formulario_id", formularioId),
+        supabase.from("page_config")
+          .select("is_active")
+          .eq("config_key", "solicitar_email_acompanhamento")
+          .maybeSingle(),
       ]);
 
       if (formRes.data) setFormulario(formRes.data);
       if (mapeamentoRes.data) setMapeamentos(mapeamentoRes.data);
+      // Default to true if no config exists
+      setShowEmailField(emailToggleRes.data?.is_active !== false);
 
       // Build questions with conditional info
       if (perguntasRes.data) {
@@ -309,6 +316,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
         chaveConsulta={chaveConsulta}
         emailParaNotificacao={emailParaNotificacao}
         emailSalvo={emailSalvo}
+        showEmailField={showEmailField}
         onEmailChange={setEmailParaNotificacao}
         onSaveEmail={handleSaveEmail}
       />

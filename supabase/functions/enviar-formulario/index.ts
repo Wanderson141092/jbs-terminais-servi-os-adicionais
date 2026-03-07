@@ -74,13 +74,22 @@ Deno.serve(async (req) => {
     if (mapeamentos && Array.isArray(mapeamentos)) {
       for (const map of mapeamentos) {
         if (respostas[map.pergunta_id] !== undefined) {
+          // Format value: arrays become newline-separated strings
+          let rawVal = respostas[map.pergunta_id];
+          let formattedVal: string;
+          if (Array.isArray(rawVal)) {
+            formattedVal = rawVal.join("\n");
+          } else {
+            formattedVal = String(rawVal);
+          }
+
           if (map.campo_analise_id) {
             dynamicFieldValues.push({
               campo_id: map.campo_analise_id,
-              valor: String(respostas[map.pergunta_id]),
+              valor: formattedVal,
             });
           } else if (map.campo_solicitacao && map.campo_solicitacao !== "__dinamico__") {
-            solicitacaoData[map.campo_solicitacao] = respostas[map.pergunta_id];
+            solicitacaoData[map.campo_solicitacao] = formattedVal;
           }
         }
       }
@@ -244,7 +253,7 @@ Deno.serve(async (req) => {
       cnpj: solicitacaoData.cnpj || null,
       lpco: solicitacaoData.lpco || null,
       observacoes: autoRecusado
-        ? `${solicitacaoData.observacoes || ""}\n[RECUSADO AUTOMATICAMENTE - Pedido realizado após o horário de corte]`.trim()
+        ? `${solicitacaoData.observacoes || ""}\nPedido realizado após o horário de corte`.trim()
         : (solicitacaoData.observacoes || null),
       data_posicionamento: solicitacaoData.data_posicionamento || null,
       data_agendamento: solicitacaoData.data_agendamento || null,

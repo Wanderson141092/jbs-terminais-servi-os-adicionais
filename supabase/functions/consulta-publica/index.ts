@@ -36,9 +36,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const selectFields = "id, protocolo, status, tipo_operacao, tipo_carga, data_agendamento, data_posicionamento, created_at, updated_at, comex_aprovado, armazem_aprovado, status_vistoria, numero_conteiner, categoria, lpco, solicitar_deferimento, solicitar_lacre_armador, lacre_armador_possui, lacre_armador_aceite_custo, pendencias_selecionadas";
+    const selectFields = "id, protocolo, tipo_operacao, numero_conteiner, lpco, chave_consulta, formulario_id";
 
-    let solicitacao = null;
+    let solicitacaoRef = null;
 
     // By protocolo
     const { data: byProtocolo } = await supabaseAdmin
@@ -48,36 +48,50 @@ Deno.serve(async (req) => {
       .eq("chave_consulta", chaveUpper)
       .maybeSingle();
 
-    solicitacao = byProtocolo;
+    solicitacaoRef = byProtocolo;
 
     // By container
-    if (!solicitacao) {
+    if (!solicitacaoRef) {
       const { data: byContainer } = await supabaseAdmin
         .from("solicitacoes")
         .select(selectFields)
         .eq("numero_conteiner", valorUpper)
         .eq("chave_consulta", chaveUpper)
         .maybeSingle();
-      solicitacao = byContainer;
+      solicitacaoRef = byContainer;
     }
 
     // By LPCO
-    if (!solicitacao) {
+    if (!solicitacaoRef) {
       const { data: byLpco } = await supabaseAdmin
         .from("solicitacoes")
         .select(selectFields)
         .eq("lpco", valorUpper)
         .eq("chave_consulta", chaveUpper)
         .maybeSingle();
-      solicitacao = byLpco;
+      solicitacaoRef = byLpco;
     }
 
-    if (!solicitacao) {
+    if (!solicitacaoRef) {
       return new Response(
         JSON.stringify({ solicitacao: null, deferimento_docs: [] }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const { data: snapshotData } = await supabaseAdmin.rpc("get_process_snapshot_safe", {
+      p_solicitacao_id: solicitacaoRef.id,
+    });
+
+    const snapshot = (snapshotData || {}) as Record<string, any>;
+    const snapshotSolicitacao = (snapshot.solicitacao || {}) as Record<string, any>;
+    const solicitacao = {
+      ...solicitacaoRef,
+      ...snapshotSolicitacao,
+      pendencias_selecionadas: Array.isArray(snapshotSolicitacao.pendencias_selecionadas)
+        ? snapshotSolicitacao.pendencias_selecionadas
+        : [],
+    };
 
     // Resolve servico from tipo_operacao to get config
     const { data: servicoData } = await supabaseAdmin
@@ -225,11 +239,18 @@ Deno.serve(async (req) => {
     // Build visible fields config
     const visibleFixedFields = (camposFixosRes.data || []).map((c: any) => c.campo_chave);
     
+    const snapshotCamposDinamicos = Array.isArray(snapshot.campos_dinamicos)
+      ? snapshot.campos_dinamicos
+      : [];
+    const dynamicFieldsSource = snapshotCamposDinamicos.length > 0
+      ? snapshotCamposDinamicos
+      : (camposValoresRes.data || []);
+
     // Build visible dynamic field values
-    const dynamicFieldsForExternal = (camposValoresRes.data || [])
-      .filter((cv: any) => cv.campos_analise?.visivel_externo === true && cv.valor)
+    const dynamicFieldsForExternal = dynamicFieldsSource
+      .filter((cv: any) => (cv.campos_analise?.visivel_externo === true || cv.visivel_externo === true) && cv.valor)
       .map((cv: any) => ({
-        campo_nome: cv.campos_analise?.nome || "Campo",
+        campo_nome: cv.campos_analise?.nome || cv.nome || "Campo",
         valor: cv.valor,
       }));
 
@@ -288,9 +309,16 @@ Deno.serve(async (req) => {
     const deferimentoTitulo = tituloForService?.titulo || null;
 
     // Build form responses for external display
+    const snapshotFormResponses = Array.isArray(snapshot.formulario_respostas)
+      ? snapshot.formulario_respostas
+      : [];
+    const formResponsesSource = snapshotFormResponses.length > 0
+      ? snapshotFormResponses
+      : (formRespostasRes.data || []);
+
     let formResponsesExternal: { rotulo: string; valor: any }[] = [];
-    if (formRespostasRes.data && formRespostasRes.data.length > 0 && formPerguntasRes.data) {
-      const respostasObj = formRespostasRes.data[0].respostas as Record<string, any>;
+    if (formResponsesSource.length > 0 && formPerguntasRes.data) {
+      const respostasObj = (formResponsesSource[0].respostas || {}) as Record<string, any>;
       for (const fp of formPerguntasRes.data) {
         const bp = (fp as any).banco_perguntas;
         if (!bp) continue;
@@ -304,8 +332,8 @@ Deno.serve(async (req) => {
 
     // Generate signed URLs for form attachments
     let formAttachmentsExternal: { file_name: string; file_url: string }[] = [];
-    if (formRespostasRes.data && formRespostasRes.data.length > 0) {
-      const arquivos = formRespostasRes.data[0].arquivos as any[] | null;
+    if (formResponsesSource.length > 0) {
+      const arquivos = formResponsesSource[0].arquivos as any[] | null;
       if (arquivos && arquivos.length > 0) {
         for (const arq of arquivos) {
           let signedUrl = arq.file_url;

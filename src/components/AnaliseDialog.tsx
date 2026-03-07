@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import StatusBadge from "./StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { normalizeFormValue } from "@/lib/normalizeFormValue";
 
 interface AnaliseDialogProps {
   solicitacao: any;
@@ -2118,22 +2119,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 // Helper Functions
 const formatFormValue = (val: any, tipo: string): string => {
-  if (val === null || val === undefined) return "—";
-  if (Array.isArray(val)) return val.join("\n");
-  if (typeof val === "object") {
+  if (val && typeof val === "object" && !Array.isArray(val)) {
     if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
-    return JSON.stringify(val);
+    return normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true });
   }
-  if (typeof val === "boolean") return val ? "Sim" : "Não";
-  // Clean up JSON-like array strings: ["val1","val2"] -> val1\nval2
-  const strVal = String(val);
-  if (strVal.startsWith("[") && strVal.endsWith("]")) {
-    try {
-      const parsed = JSON.parse(strVal);
-      if (Array.isArray(parsed)) return parsed.join("\n");
-    } catch { /* not JSON */ }
-  }
-  return strVal;
+
+  return normalizeFormValue(val, { nullishFallback: "—" });
 };
 
 // Helper Components

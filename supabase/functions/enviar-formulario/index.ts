@@ -74,11 +74,11 @@ Deno.serve(async (req) => {
     if (mapeamentos && Array.isArray(mapeamentos)) {
       for (const map of mapeamentos) {
         if (respostas[map.pergunta_id] !== undefined) {
-          // Format value: arrays become newline-separated strings
+          // Format value: arrays become space-separated strings
           let rawVal = respostas[map.pergunta_id];
           let formattedVal: string;
           if (Array.isArray(rawVal)) {
-            formattedVal = rawVal.join("\n");
+            formattedVal = rawVal.join(" ");
           } else {
             formattedVal = String(rawVal);
           }

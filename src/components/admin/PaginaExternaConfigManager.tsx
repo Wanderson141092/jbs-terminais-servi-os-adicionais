@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Edit, Trash2, Lock, FileText, Plus, AlertTriangle, ExternalLink } from "lucide-react";
+import { Save, Edit, Trash2, Lock, FileText, Plus, AlertTriangle, ExternalLink, Mail } from "lucide-react";
 
 interface SystemConfig {
   id: string;

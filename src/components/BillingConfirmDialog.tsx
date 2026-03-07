@@ -15,7 +15,7 @@ interface BillingConfirmDialogProps {
   onUpdate: () => void;
 }
 
-const BillingConfirmDialog = ({ open, onOpenChange, solicitacao, cobrancaConfig, userId, onUpdate }: BillingConfirmDialogProps) => {
+const BillingConfirmDialog = ({ open, onOpenChange, solicitacao, cobrancaConfig, onUpdate }: BillingConfirmDialogProps) => {
   const [registro, setRegistro] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -37,66 +37,29 @@ const BillingConfirmDialog = ({ open, onOpenChange, solicitacao, cobrancaConfig,
 
   const isConfirmed = registro?.confirmado === true;
 
+  const getStructuredError = (fallback: string, payload: any) => {
+    if (payload?.error?.message) return payload.error.message as string;
+    if (payload?.message) return payload.message as string;
+    return fallback;
+  };
+
   const handleConfirmar = async () => {
     setLoading(true);
-    const { error } = await supabase
-      .from("lancamento_cobranca_registros")
-      .upsert({
+    const { data, error } = await supabase.functions.invoke("confirm_billing", {
+      body: {
         solicitacao_id: solicitacao.id,
         cobranca_config_id: cobrancaConfig.id,
-        confirmado: true,
-        confirmado_por: userId,
-        confirmado_data: new Date().toISOString(),
-      }, { onConflict: "solicitacao_id,cobranca_config_id" });
+        confirm: true,
+      },
+    });
 
-    if (error) {
-      toast.error("Erro ao confirmar lançamento");
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao confirmar lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
 
-    // Check if ALL registros are now confirmed for global field
-    const { data: allRegs } = await supabase
-      .from("lancamento_cobranca_registros")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-
-    const { data: allConfigs } = await supabase
-      .from("lancamento_cobranca_config")
-      .select("*")
-      .eq("ativo", true);
-
-    const applicableConfigs = (allConfigs || []).filter((cfg: any) => {
-      const statusAtivacao = cfg.status_ativacao || [];
-      if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-      const svcIds = cfg.servico_ids || [];
-      if (svcIds.length > 0) {
-        // Would need service ID check - skip for simplicity
-      }
-      if (cfg.tipo === "pendencia" && solicitacao.lacre_armador_aceite_custo !== true) return false;
-      return true;
-    });
-
-    const allConfirmed = applicableConfigs.every((cfg: any) => {
-      const reg = (allRegs || []).find((r: any) => r.cobranca_config_id === cfg.id);
-      return reg?.confirmado === true;
-    });
-
-    if (allConfirmed) {
-      await supabase.from("solicitacoes").update({
-        lancamento_confirmado: true,
-        lancamento_confirmado_por: userId,
-        lancamento_confirmado_data: new Date().toISOString(),
-      }).eq("id", solicitacao.id);
-    }
-
-    await supabase.rpc("insert_audit_log", {
-      p_solicitacao_id: solicitacao.id,
-      p_usuario_id: userId,
-      p_acao: "lancamento_confirmado",
-      p_detalhes: `Lançamento confirmado: ${cobrancaConfig.rotulo_analise}. Protocolo: ${solicitacao.protocolo}.`,
-    });
-
+    await fetchRegistro();
     toast.success(`Lançamento "${cobrancaConfig.rotulo_analise}" confirmado!`);
     setLoading(false);
     onOpenChange(false);
@@ -105,36 +68,21 @@ const BillingConfirmDialog = ({ open, onOpenChange, solicitacao, cobrancaConfig,
 
   const handleDesfazer = async () => {
     setLoading(true);
-    const { error } = await supabase
-      .from("lancamento_cobranca_registros")
-      .update({
-        confirmado: false,
-        confirmado_por: null,
-        confirmado_data: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("solicitacao_id", solicitacao.id)
-      .eq("cobranca_config_id", cobrancaConfig.id);
+    const { data, error } = await supabase.functions.invoke("confirm_billing", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        cobranca_config_id: cobrancaConfig.id,
+        confirm: false,
+      },
+    });
 
-    if (error) {
-      toast.error("Erro ao desfazer lançamento");
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao desfazer lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
 
-    await supabase.from("solicitacoes").update({
-      lancamento_confirmado: false,
-      lancamento_confirmado_por: null,
-      lancamento_confirmado_data: null,
-    }).eq("id", solicitacao.id);
-
-    await supabase.rpc("insert_audit_log", {
-      p_solicitacao_id: solicitacao.id,
-      p_usuario_id: userId,
-      p_acao: "lancamento_desfeito",
-      p_detalhes: `Lançamento desfeito: ${cobrancaConfig.rotulo_analise}. Protocolo: ${solicitacao.protocolo}.`,
-    });
-
+    await fetchRegistro();
     toast.success(`Lançamento "${cobrancaConfig.rotulo_analise}" desfeito!`);
     setLoading(false);
     onOpenChange(false);

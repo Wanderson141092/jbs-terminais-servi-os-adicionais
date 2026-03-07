@@ -89,6 +89,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [isExternalForm, setIsExternalForm] = useState(false);
   const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
 
+  const getStructuredError = (fallback: string, payload: any) => {
+    if (payload?.error?.message) return payload.error.message as string;
+    if (payload?.message) return payload.message as string;
+    return fallback;
+  };
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -340,51 +346,22 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const executeApproval = async (aprovado: boolean) => {
     setLoading(true);
-    
-    const updateData: any = {};
-    const logAction = aprovado 
-      ? (wasRefused ? "Alteração para Aprovado" : "Aprovação")
-      : "Recusa";
-    const setorLabel = isComex ? "Administrativo" : "Operacional";
 
-    if (isComex) {
-      updateData.comex_aprovado = aprovado;
-      updateData.comex_usuario_id = userId;
-      updateData.comex_data = new Date().toISOString();
-      if (!aprovado || wasRefused) {
-        updateData.comex_justificativa = justificativa;
-      }
-    } else {
-      updateData.armazem_aprovado = aprovado;
-      updateData.armazem_usuario_id = userId;
-      updateData.armazem_data = new Date().toISOString();
-      if (!aprovado || wasRefused) {
-        updateData.armazem_justificativa = justificativa;
-      }
-    }
+    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        current_status: solicitacao.status,
+        actor_setor: isAdmin ? adminSelectedSetor : profile.setor,
+        approval_decision: aprovado,
+        approval_justificativa: justificativa.trim() || null,
+      },
+    });
 
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update(updateData)
-      .eq("id", solicitacao.id);
-
-    if (error) {
-      toast.error("Erro ao salvar decisão: " + error.message);
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao salvar decisão.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
-
-    const detalhes = justificativa.trim() 
-      ? `${logAction} pelo setor ${setorLabel}. Justificativa: ${justificativa}`
-      : `${logAction} pelo setor ${setorLabel}`;
-
-    await logAudit(logAction.toLowerCase(), detalhes);
-
-    const notifMsg = aprovado
-      ? `Solicitação ${solicitacao.protocolo} aprovada pelo setor ${setorLabel}`
-      : `Solicitação ${solicitacao.protocolo} recusada pelo setor ${setorLabel}: ${justificativa}`;
-
-    await createNotification(notifMsg, aprovado ? "aprovacao" : "recusa");
 
     toast.success(aprovado ? "Aprovação registrada!" : "Recusa registrada!");
     setLoading(false);
@@ -432,58 +409,28 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   };
 
   const executeCancelamento = async () => {
-    if (canCancelConfirmacao && !canCancelDireto) {
-      // Requires cost validation
-      if (custoposicionamento === null) {
-        toast.error("Informe se há cobrança de posicionamento antes de salvar.");
-        return;
-      }
-    }
-
-    setLoading(true);
-    const updatePayload: any = {
-      status: "cancelado",
-      status_vistoria: "Cancelado",
-      cancelamento_solicitado: false,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (canCancelConfirmacao && custoposicionamento !== null) {
-      updatePayload.custo_posicionamento = custoposicionamento;
-      if (custoposicionamento === true) {
-        updatePayload.lancamento_confirmado = false;
-      }
-    }
-
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update(updatePayload)
-      .eq("id", solicitacao.id);
-
-    if (error) {
-      toast.error("Erro ao cancelar: " + error.message);
-      setLoading(false);
+    if (canCancelConfirmacao && !canCancelDireto && custoposicionamento === null) {
+      toast.error("Informe se há cobrança de posicionamento antes de salvar.");
       return;
     }
 
-    let details = `Status atualizado para: Cancelado`;
-    if (canCancelConfirmacao) {
-      details += `. Cancelamento com confirmação interna. Cobrança de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
-      if (custoposicionamento === true) {
-        details += `. Lançamento financeiro ativado.`;
-      }
-    } else {
-      details += `. Cancelamento direto (pelo cliente).`;
-    }
-    if (cancelJustificativa.trim()) {
-      details += ` Justificativa: ${cancelJustificativa.trim()}`;
-    }
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        current_status: solicitacao.status,
+        target_status: "cancelado",
+        actor_setor: isAdmin ? adminSelectedSetor : profile.setor,
+        custo_posicionamento: canCancelConfirmacao ? custoposicionamento : null,
+        justification: cancelJustificativa.trim() || null,
+      },
+    });
 
-    await logAudit("status_atualizado", details);
-    await createNotification(`Solicitação ${solicitacao.protocolo} cancelada`, "status");
-    supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: "cancelado", usuario_id: userId },
-    }).catch(() => {});
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao cancelar.", data) + (error?.message ? ` ${error.message}` : ""));
+      setLoading(false);
+      return;
+    }
 
     toast.success("Cancelamento realizado!");
     setLoading(false);
@@ -498,39 +445,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
 
     setLoading(true);
-    const updatePayload: any = {
-      status: "recusado",
-      status_vistoria: "Recusado",
-      updated_at: new Date().toISOString(),
-    };
+    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        current_status: solicitacao.status,
+        target_status: "recusado",
+        actor_setor: isAdmin ? adminSelectedSetor : profile.setor,
+        justification: cancelJustificativa.trim(),
+      },
+    });
 
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update(updatePayload)
-      .eq("id", solicitacao.id);
-
-    if (error) {
-      toast.error("Erro ao recusar: " + error.message);
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao recusar.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
-
-    // Gravar motivo da recusa como observação EXTERNA (visível na consulta pública)
-    await supabase.from("observacao_historico").insert({
-      solicitacao_id: solicitacao.id,
-      observacao: cancelJustificativa.trim(),
-      status_no_momento: "recusado",
-      autor_id: userId,
-      autor_nome: profile.nome || profile.email,
-      tipo_observacao: "externa",
-    });
-
-    const details = `Status atualizado para: Recusado. Justificativa: ${cancelJustificativa.trim()}`;
-    await logAudit("status_atualizado", details);
-    await createNotification(`Solicitação ${solicitacao.protocolo} recusada: ${cancelJustificativa.trim()}`, "status");
-    supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: "recusado", usuario_id: userId },
-    }).catch(() => {});
 
     toast.success("Recusa registrada!");
     setLoading(false);
@@ -617,145 +546,35 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const executeSaveStatus = async (lancamentoConfirmado: boolean) => {
     setShowConclusaoLancamentoDialog(false);
     setLoading(true);
-    
-    let statusVistoria: string | null = null;
-    const matchedLabel = statusOptions.find(s => s.value === selectedStatus)?.label;
-    if (matchedLabel) {
-      statusVistoria = matchedLabel;
-    }
 
-    // Build update data
-    const updatePayload: any = {
-      status: selectedStatus,
-      status_vistoria: statusVistoria,
-      solicitar_deferimento: solicitarDeferimento,
-      solicitar_lacre_armador: solicitarLacreArmador,
-      lacre_armador_aceite_custo: solicitarLacreArmador ? custoLacreArmador : null,
-      pendencias_selecionadas: pendenciasSelecionadas,
-      cliente_nome: clienteNome.trim(),
-      cnpj: clienteCnpj.trim() || null,
-      updated_at: new Date().toISOString()
-    };
+    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        current_status: solicitacao.status,
+        target_status: selectedStatus,
+        actor_setor: isAdmin ? adminSelectedSetor : profile.setor,
+        selected_pendencias: pendenciasSelecionadas,
+        solicitar_deferimento: solicitarDeferimento,
+        solicitar_lacre_armador: solicitarLacreArmador,
+        lacre_armador_aceite_custo: solicitarLacreArmador ? custoLacreArmador : null,
+        custo_posicionamento: isLateCancel(selectedStatus) ? custoposicionamento : null,
+        lancamento_confirmado: lancamentoConfirmado,
+        cliente_nome: clienteNome.trim(),
+        cnpj: clienteCnpj.trim() || null,
+        justification: justificativaNaoVistoriado.trim() || null,
+      },
+    });
 
-    // If late cancellation, save custo_posicionamento and trigger lançamento if needed
-    if (isLateCancel(selectedStatus)) {
-      updatePayload.custo_posicionamento = custoposicionamento;
-      if (custoposicionamento === true) {
-        updatePayload.lancamento_confirmado = false;
-      }
-    }
-    
-    // If lacre armador with cost, create individual pendencia registro
-    if (solicitarLacreArmador && custoLacreArmador === true) {
-      updatePayload.lancamento_confirmado = false;
-      const pendenciaCfg = cobrancaConfigs.find((c: any) => c.tipo === "pendencia");
-      if (pendenciaCfg) {
-        await supabase.from("lancamento_cobranca_registros").upsert({
-          solicitacao_id: solicitacao.id,
-          cobranca_config_id: pendenciaCfg.id,
-          confirmado: false,
-        }, { onConflict: "solicitacao_id,cobranca_config_id" });
-      }
-    }
-
-    // If completion status, create individual servico registro and set lancamento based on user confirmation
-    if (isCompletionStatus() && selectedStatus !== solicitacao.status) {
-      const servicoCfg = cobrancaConfigs.find((c: any) => {
-        if (c.tipo !== "servico") return false;
-        const statusAtivacao = c.status_ativacao || [];
-        if (statusAtivacao.length > 0 && !statusAtivacao.includes(selectedStatus)) return false;
-        return true;
-      });
-      if (servicoCfg) {
-        await supabase.from("lancamento_cobranca_registros").upsert({
-          solicitacao_id: solicitacao.id,
-          cobranca_config_id: servicoCfg.id,
-          confirmado: lancamentoConfirmado,
-          confirmado_por: lancamentoConfirmado ? userId : null,
-          confirmado_data: lancamentoConfirmado ? new Date().toISOString() : null,
-        }, { onConflict: "solicitacao_id,cobranca_config_id" });
-      }
-      // Check if ALL registros are confirmed for global field
-      const { data: allRegs } = await supabase
-        .from("lancamento_cobranca_registros")
-        .select("*")
-        .eq("solicitacao_id", solicitacao.id);
-      const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
-        const statusAtivacao = cfg.status_ativacao || [];
-        if (statusAtivacao.length > 0 && !statusAtivacao.includes(selectedStatus)) return false;
-        if (cfg.tipo === "servico") return true;
-        if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true || (solicitarLacreArmador && custoLacreArmador === true);
-        return false;
-      });
-      const allConfirmed = applicableConfigs.every((cfg: any) => {
-        const reg = (allRegs || []).find((r: any) => r.cobranca_config_id === cfg.id);
-        return reg?.confirmado === true;
-      });
-      updatePayload.lancamento_confirmado = allConfirmed;
-      if (allConfirmed) {
-        updatePayload.lancamento_confirmado_por = userId;
-        updatePayload.lancamento_confirmado_data = new Date().toISOString();
-      }
-    }
-    
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update(updatePayload)
-      .eq("id", solicitacao.id);
-
-    if (error) {
-      toast.error("Erro ao atualizar status: " + error.message);
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao atualizar status.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
-    
-    const statusLabel = statusOptions.find(s => s.value === selectedStatus)?.label || selectedStatus;
-    
-    let details = `Status atualizado para: ${statusLabel}`;
-    if (isLateCancel(selectedStatus)) {
-      details += `. Cancelamento tardio (pós-confirmação). Cobrança de posicionamento: ${custoposicionamento ? "Sim" : "Não"}`;
-      if (custoposicionamento === true) {
-        details += `. Lançamento financeiro ativado.`;
-      }
-    }
-    if (solicitarDeferimento !== solicitacao.solicitar_deferimento) {
-      details += `. Solicitar Deferimento: ${solicitarDeferimento ? "Ativado" : "Desativado"}`;
-    }
-    if (solicitarLacreArmador !== solicitacao.solicitar_lacre_armador) {
-      details += `. Lacre Armador: ${solicitarLacreArmador ? "Ativado" : "Desativado"}`;
-      if (solicitarLacreArmador && custoLacreArmador !== null) {
-        details += `. Cobrança de serviço: ${custoLacreArmador ? "Sim" : "Não"}`;
-        if (custoLacreArmador) details += `. Lançamento financeiro ativado.`;
-      }
-    }
-    if (JSON.stringify(pendenciasSelecionadas) !== JSON.stringify(solicitacao.pendencias_selecionadas)) {
-      details += `. Pendências atualizadas.`;
-    }
 
-    await logAudit("status_atualizado", details);
-
-    // Save justification as observation for non-conforme statuses
-    const selectedOpt = statusOptions.find((s: any) => s.value === selectedStatus);
-    if (selectedOpt?.tipo_resultado === "nao_conforme" && justificativaNaoVistoriado.trim()) {
-      await supabase.from("observacao_historico").insert({
-        solicitacao_id: solicitacao.id,
-        observacao: justificativaNaoVistoriado.trim(),
-        status_no_momento: selectedStatus,
-        autor_id: userId,
-        autor_nome: profile.nome || profile.email,
-        tipo_observacao: "externa",
-      });
-      await supabase.from("solicitacoes").update({ observacoes: justificativaNaoVistoriado.trim() }).eq("id", solicitacao.id);
+    if (justificativaNaoVistoriado.trim()) {
       setJustificativaNaoVistoriado("");
     }
 
-    await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
-    
-    // Dispatch email/notification via edge function
-    supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: selectedStatus, usuario_id: userId },
-    }).catch(() => {}); // Fire and forget
-    
     toast.success("Atualização realizada com sucesso!");
     setLoading(false);
     onClose();
@@ -763,40 +582,33 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const handleDeferimentoDecision = async (docId: string, aceito: boolean) => {
     setLoading(true);
-    
-    const updateData: any = { status: aceito ? 'aceito' : 'recusado' };
-    if (!aceito) {
-      updateData.motivo_recusa = motivoRecusaDeferimento;
-    }
-    
-    const { error } = await supabase
-      .from("deferimento_documents")
-      .update(updateData)
-      .eq("id", docId);
 
-    if (error) {
-      toast.error("Erro ao atualizar status do deferimento");
+    const { data, error } = await supabase.functions.invoke("resolve_pendencia", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        deferimento_document_id: docId,
+        accept: aceito,
+        motivo_recusa: aceito ? null : motivoRecusaDeferimento,
+      },
+    });
+
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao atualizar status do deferimento.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
 
-    const logDetalhes = aceito 
-      ? "Deferimento aceito - Status alterado para 'Recebido'" 
-      : `Deferimento recusado: ${motivoRecusaDeferimento}`;
-    await logAudit("deferimento", logDetalhes);
-    await createNotification(`Deferimento ${aceito ? 'aceito' : 'recusado'} para ${solicitacao.protocolo}`, "deferimento");
-    
     toast.success(aceito ? "Deferimento aceito!" : "Deferimento recusado!");
     setShowDeferimentoAction(null);
     setMotivoRecusaDeferimento("");
     setLoading(false);
-    
+
     const { data: deferimentoDocs } = await supabase
       .from("deferimento_documents")
       .select("*")
       .eq("solicitacao_id", solicitacao.id)
       .eq("document_type", "deferimento");
-    
+
     setAttachments(prev => {
       const nonDeferimento = prev.filter(a => a.document_type !== "deferimento");
       return [...nonDeferimento, ...(deferimentoDocs || [])];
@@ -804,80 +616,69 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   };
 
   const handleConfirmarLancamento = async (configId?: string) => {
-    setLoading(true);
-    
-    if (configId) {
-      // Confirm individual registro
-      const { error } = await supabase
-        .from("lancamento_cobranca_registros")
-        .upsert({
-          solicitacao_id: solicitacao.id,
-          cobranca_config_id: configId,
-          confirmado: true,
-          confirmado_por: userId,
-          confirmado_data: new Date().toISOString(),
-        }, { onConflict: "solicitacao_id,cobranca_config_id" });
+    const effectiveConfigId = configId || cobrancaConfigs.find((c: any) => {
+      if (c.tipo !== "servico") return false;
+      const statusAtivacao = c.status_ativacao || [];
+      return statusAtivacao.length === 0 || statusAtivacao.includes(selectedStatus || solicitacao.status);
+    })?.id;
 
-      if (error) {
-        toast.error("Erro ao confirmar lançamento");
-        setLoading(false);
-        return;
-      }
-
-      // Refresh registros
-      const { data: updatedRegistros } = await supabase
-        .from("lancamento_cobranca_registros")
-        .select("*")
-        .eq("solicitacao_id", solicitacao.id);
-      setLancamentoRegistros(updatedRegistros || []);
-
-      // Check if ALL applicable registros are now confirmed
-      const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
-        const statusAtivacao = cfg.status_ativacao || [];
-        if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-        if (cfg.tipo === "servico") return true;
-        if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true;
-        return false;
-      });
-      const allConfirmed = applicableConfigs.every((cfg: any) => {
-        const reg = (updatedRegistros || []).find((r: any) => r.cobranca_config_id === cfg.id);
-        return reg?.confirmado === true;
-      });
-
-      // Update global field for backward compatibility
-      if (allConfirmed) {
-        await supabase.from("solicitacoes").update({
-          lancamento_confirmado: true,
-          lancamento_confirmado_por: userId,
-          lancamento_confirmado_data: new Date().toISOString()
-        }).eq("id", solicitacao.id);
-      }
-
-      const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
-      await logAudit("lancamento_confirmado", `Lançamento confirmado: ${cfgLabel}. Protocolo: ${solicitacao.protocolo}.`);
-      toast.success(`Lançamento "${cfgLabel}" confirmado!`);
-      setShowLancamentoDialog(false);
-      if (allConfirmed) onClose();
-    } else {
-      // Legacy: confirm all via global field
-      const { error } = await supabase
-        .from("solicitacoes")
-        .update({
-          lancamento_confirmado: true,
-          lancamento_confirmado_por: userId,
-          lancamento_confirmado_data: new Date().toISOString()
-        })
-        .eq("id", solicitacao.id);
-
-      if (error) {
-        toast.error("Erro ao confirmar lançamento");
-      } else {
-        await logAudit("lancamento_confirmado", `Lançamento do serviço confirmado. Protocolo: ${solicitacao.protocolo}.`);
-        toast.success("Lançamento confirmado!");
-        setShowLancamentoDialog(false);
-        onClose();
-      }
+    if (!effectiveConfigId) {
+      toast.error("Configuração de cobrança não informada.");
+      return;
     }
+
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("confirm_billing", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        cobranca_config_id: effectiveConfigId,
+        confirm: true,
+      },
+    });
+
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao confirmar lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
+      setLoading(false);
+      return;
+    }
+
+    const { data: updatedRegistros } = await supabase
+      .from("lancamento_cobranca_registros")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+    setLancamentoRegistros(updatedRegistros || []);
+
+    const cfgLabel = cobrancaConfigs.find((c: any) => c.id === effectiveConfigId)?.rotulo_analise || "Cobrança";
+    toast.success(`Lançamento "${cfgLabel}" confirmado!`);
+    setShowLancamentoDialog(false);
+    setLoading(false);
+    if (data?.data?.all_confirmed) onClose();
+  };
+
+  const handleDesfazerLancamento = async (configId: string) => {
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("confirm_billing", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        cobranca_config_id: configId,
+        confirm: false,
+      },
+    });
+
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao desfazer lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
+      setLoading(false);
+      return;
+    }
+
+    const { data: updatedRegistros } = await supabase
+      .from("lancamento_cobranca_registros")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+    setLancamentoRegistros(updatedRegistros || []);
+
+    const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
+    toast.success(`Lançamento "${cfgLabel}" desfeito!`);
     setLoading(false);
   };
 
@@ -937,45 +738,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setObservacaoTexto("");
     setObservacaoTipo("interna");
     toast.success("Observação registrada!");
-    setLoading(false);
-  };
-
-  const handleDesfazerLancamento = async (configId: string) => {
-    setLoading(true);
-    const { error } = await supabase
-      .from("lancamento_cobranca_registros")
-      .update({
-        confirmado: false,
-        confirmado_por: null,
-        confirmado_data: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("solicitacao_id", solicitacao.id)
-      .eq("cobranca_config_id", configId);
-
-    if (error) {
-      toast.error("Erro ao desfazer lançamento");
-      setLoading(false);
-      return;
-    }
-
-    // Update global field
-    await supabase.from("solicitacoes").update({
-      lancamento_confirmado: false,
-      lancamento_confirmado_por: null,
-      lancamento_confirmado_data: null,
-    }).eq("id", solicitacao.id);
-
-    // Refresh registros
-    const { data: updatedRegistros } = await supabase
-      .from("lancamento_cobranca_registros")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-    setLancamentoRegistros(updatedRegistros || []);
-
-    const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
-    await logAudit("lancamento_desfeito", `Lançamento desfeito: ${cfgLabel}. Protocolo: ${solicitacao.protocolo}.`);
-    toast.success(`Lançamento "${cfgLabel}" desfeito!`);
     setLoading(false);
   };
 

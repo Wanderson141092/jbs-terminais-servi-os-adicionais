@@ -45,6 +45,8 @@ const LACRE_CONFIGS = [
   { key: "lacre_armador_periodo_tarde", label: "Período Tarde", description: "Ativa ou desativa a opção de período 'Tarde' no formulário de Lacre Armador" },
 ];
 
+const EMAIL_TOGGLE_KEY = "solicitar_email_acompanhamento";
+
 const PaginaExternaConfigManager = () => {
   const [lacreConfigs, setLacreConfigs] = useState<SystemConfig[]>([]);
   const [deferimentoTitulos, setDeferimentoTitulos] = useState<DeferimentoTitulo[]>([]);
@@ -56,6 +58,11 @@ const PaginaExternaConfigManager = () => {
   const [portalActive, setPortalActive] = useState(true);
   const [portalConfigId, setPortalConfigId] = useState<string | null>(null);
   const [savingPortal, setSavingPortal] = useState(false);
+
+  // Email toggle
+  const [emailToggle, setEmailToggle] = useState(true);
+  const [emailToggleId, setEmailToggleId] = useState<string | null>(null);
+  const [savingEmail, setSavingEmail] = useState(false);
 
   // Edit states
   const [editingConfig, setEditingConfig] = useState<SystemConfig | null>(null);
@@ -72,11 +79,12 @@ const PaginaExternaConfigManager = () => {
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
-    const [lacreRes, titulosRes, svcRes, portalRes] = await Promise.all([
+    const [lacreRes, titulosRes, svcRes, portalRes, emailRes] = await Promise.all([
       supabase.from("system_config").select("*").in("config_key", LACRE_CONFIGS.map(c => c.key)).order("config_key"),
       supabase.from("deferimento_titulos").select("*").order("created_at"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("page_config").select("*").eq("config_key", "portal_cliente_url").maybeSingle(),
+      supabase.from("page_config").select("*").eq("config_key", EMAIL_TOGGLE_KEY).maybeSingle(),
     ]);
     setLacreConfigs(lacreRes.data || []);
     setDeferimentoTitulos(titulosRes.data || []);
@@ -85,6 +93,10 @@ const PaginaExternaConfigManager = () => {
       setPortalUrl(portalRes.data.config_value || "");
       setPortalActive(portalRes.data.is_active ?? true);
       setPortalConfigId(portalRes.data.id);
+    }
+    if (emailRes.data) {
+      setEmailToggle(emailRes.data.is_active ?? true);
+      setEmailToggleId(emailRes.data.id);
     }
     setLoading(false);
   };
@@ -183,6 +195,46 @@ const PaginaExternaConfigManager = () => {
 
   return (
     <div className="space-y-6">
+      {/* Email Toggle */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Mail className="h-5 w-5 text-blue-600" />
+            E-mail de Acompanhamento
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between border rounded-md p-3">
+            <div>
+              <Label className="font-medium">Solicitar e-mail para acompanhamento do processo</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Se ativado, o campo de e-mail será exibido na tela de confirmação após o envio do formulário externo.
+              </p>
+            </div>
+            <Switch checked={emailToggle} onCheckedChange={async (checked) => {
+              setEmailToggle(checked);
+              setSavingEmail(true);
+              const payload = {
+                config_key: EMAIL_TOGGLE_KEY,
+                config_value: checked ? "true" : "false",
+                config_type: "boolean",
+                description: "Solicitar e-mail para acompanhamento do processo na página externa",
+                is_active: checked,
+                updated_at: new Date().toISOString(),
+              };
+              if (emailToggleId) {
+                await supabase.from("page_config").update(payload).eq("id", emailToggleId);
+              } else {
+                const { data } = await supabase.from("page_config").insert(payload).select("id").single();
+                if (data) setEmailToggleId(data.id);
+              }
+              toast.success(checked ? "E-mail ativado!" : "E-mail desativado!");
+              setSavingEmail(false);
+            }} />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Portal do Cliente */}
       <Card>
         <CardHeader>

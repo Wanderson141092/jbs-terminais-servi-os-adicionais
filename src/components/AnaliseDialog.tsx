@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusBadge from "./StatusBadge";
+import BillingConfirmDialog from "./BillingConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -84,6 +85,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [showConclusaoLancamentoDialog, setShowConclusaoLancamentoDialog] = useState(false);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   const [lancamentoRegistros, setLancamentoRegistros] = useState<any[]>([]);
+  const [billingDialogData, setBillingDialogData] = useState<{ config: any } | null>(null);
+  const [blockedBillingConfig, setBlockedBillingConfig] = useState<any | null>(null);
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
@@ -979,6 +982,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setLoading(false);
   };
 
+  const refreshLancamentoRegistros = async () => {
+    const { data: updatedRegistros } = await supabase
+      .from("lancamento_cobranca_registros")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+    setLancamentoRegistros(updatedRegistros || []);
+  };
+
   const togglePendencia = (valor: string) => {
     setPendenciasSelecionadas(prev => 
       prev.includes(valor) ? prev.filter(v => v !== valor) : [...prev, valor]
@@ -1406,39 +1417,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                             />
                           </div>
 
-                          {/* Custo Posic. Lacre - ao lado, 50% */}
+                          {/* Custo Posic. Lacre - indicador visual */}
                           {showPendenciaBadge && (
-                            <div className={`flex-1 basis-1/2 border rounded-md p-2.5 flex flex-col justify-center ${
+                            <div className={`flex-1 basis-1/2 border rounded-md p-2.5 flex items-center ${
                               pendenciaConfirmed
                                 ? "bg-green-50 border-green-200"
                                 : "bg-red-50 border-red-200"
                             }`}>
-                              <div className={`flex items-center gap-1.5 mb-1.5 ${pendenciaConfirmed ? "text-green-600" : "text-red-600"}`}>
+                              <div className={`flex items-center gap-1.5 ${pendenciaConfirmed ? "text-green-600" : "text-red-600"}`}>
                                 <DollarSign className="h-3.5 w-3.5" />
                                 <span className="text-xs font-semibold">
-                                  {pendenciaConfig?.rotulo_analise || "Custo Posic. Lacre"}: {pendenciaConfirmed ? "Confirmado" : "Aguardando confirmação"}
+                                  {pendenciaConfig?.rotulo_analise || "Custo Posic. Lacre"}: {pendenciaConfirmed ? "Confirmado" : "Pendente"}
                                 </span>
                               </div>
-                              {!pendenciaConfirmed ? (
-                                <Button 
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-7 w-full"
-                                  onClick={() => handleConfirmarLancamento(pendenciaConfig?.id)}
-                                >
-                                  Confirmar Lançamento
-                                </Button>
-                              ) : (
-                                <Button 
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-xs text-muted-foreground hover:text-destructive h-7 w-full"
-                                  onClick={() => handleDesfazerLancamento(pendenciaConfig?.id)}
-                                  disabled={loading}
-                                >
-                                  Desfazer
-                                </Button>
-                              )}
                             </div>
                           )}
                         </div>
@@ -1511,77 +1502,55 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 
             {(() => {
-              // Build list of ALL applicable cobranca configs (both servico and pendencia)
               const applicableCobrancas = cobrancaConfigs.filter((cfg: any) => {
                 const statusAtivacao = cfg.status_ativacao || [];
                 if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-                if (cfg.tipo === "pendencia") return false; // pendencia has its own dedicated UI above
                 return true;
               });
 
-              // Also check legacy: if no registros exist but global field is pending
-              const svcConf = servicos.find(sv => sv.nome === (solicitacao.tipo_operacao || ""));
-              const statusLanc = svcConf?.status_confirmacao_lancamento || [];
-              const legacyMatch = statusLanc.includes(solicitacao.status);
-              
-              if (applicableCobrancas.length === 0 && !legacyMatch) return null;
-              if (applicableCobrancas.length === 0 && solicitacao.lancamento_confirmado) return null;
-              
+              if (applicableCobrancas.length === 0) return null;
+
               return (
                 <>
                   <Separator />
-                  <div className="space-y-3">
-                    {applicableCobrancas.map((cfg: any) => {
-                      const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
-                      const isConfirmed = registro?.confirmado === true;
-                      return (
-                        <div key={cfg.id} className={`border rounded-lg p-4 ${isConfirmed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-                          <div className={`flex items-center justify-between mb-2`}>
-                            <div className={`flex items-center gap-2 ${isConfirmed ? "text-green-600" : "text-red-600"}`}>
-                              {isConfirmed ? <Check className="h-5 w-5" /> : <DollarSign className="h-5 w-5" />}
-                              <span className="font-semibold">{cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Aguardando confirmação"}</span>
-                            </div>
-                            {isConfirmed && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDesfazerLancamento(cfg.id)}
-                                disabled={loading}
-                                className="text-xs text-muted-foreground hover:text-destructive h-7"
-                              >
-                                Desfazer
-                              </Button>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Cobrança: ações rápidas</p>
+                    <div className="flex items-center gap-1.5">
+                      {applicableCobrancas.map((cfg: any) => {
+                        const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
+                        const isConfirmed = registro?.confirmado === true;
+                        const isBlocked = cfg.tipo === "pendencia" && solicitacao.lacre_armador_aceite_custo !== true;
+
+                        return (
+                          <button
+                            key={cfg.id}
+                            type="button"
+                            onClick={() => {
+                              if (isConfirmed) return;
+                              if (isBlocked) {
+                                setBlockedBillingConfig(cfg);
+                                return;
+                              }
+                              setBillingDialogData({ config: cfg });
+                            }}
+                            title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : isBlocked ? "Fluxo bloqueado" : "Pendente"}`}
+                            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-60"
+                            disabled={isConfirmed}
+                          >
+                            {isConfirmed ? (
+                              <Check className="h-4 w-4 text-muted-foreground/50" />
+                            ) : isBlocked ? (
+                              <span className="relative inline-flex items-center text-amber-700">
+                                <DollarSign className="h-4 w-4" />
+                                <Lock className="h-2.5 w-2.5 absolute -bottom-0.5 -right-1" />
+                              </span>
+                            ) : (
+                              <DollarSign className="h-4 w-4 text-destructive" />
                             )}
-                          </div>
-                          {!isConfirmed && (
-                            <Button 
-                              onClick={() => handleConfirmarLancamento(cfg.id)} 
-                              variant="outline" 
-                              disabled={loading}
-                              className="border-red-300 text-red-600 hover:bg-red-50 w-full"
-                            >
-                              Confirmar Lançamento — {cfg.rotulo_analise}
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {applicableCobrancas.length === 0 && legacyMatch && !solicitacao.lancamento_confirmado && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-center gap-2 text-red-600 mb-2">
-                          <DollarSign className="h-5 w-5" />
-                          <span className="font-semibold">Aguardando confirmação de lançamento do serviço</span>
-                        </div>
-                        <Button 
-                          onClick={() => handleConfirmarLancamento()} 
-                          variant="outline" 
-                          disabled={loading}
-                          className="border-red-300 text-red-600 hover:bg-red-50 w-full"
-                        >
-                          Confirmar Lançamento
-                        </Button>
-                      </div>
-                    )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               );
@@ -1856,6 +1825,37 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {billingDialogData && (
+        <BillingConfirmDialog
+          open={!!billingDialogData}
+          onOpenChange={(open) => { if (!open) setBillingDialogData(null); }}
+          solicitacao={solicitacao}
+          cobrancaConfig={billingDialogData.config}
+          userId={userId}
+          onUpdate={async () => {
+            setBillingDialogData(null);
+            await refreshLancamentoRegistros();
+          }}
+        />
+      )}
+
+      <AlertDialog open={!!blockedBillingConfig} onOpenChange={(open) => { if (!open) setBlockedBillingConfig(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-amber-700" />
+              Fluxo de cobrança bloqueado
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A cobrança "{blockedBillingConfig?.rotulo_analise || "Pendência"}" será habilitada somente após aceite de custo para lacre armador.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setBlockedBillingConfig(null)}>Fechar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog de confirmação de lançamento ao concluir serviço */}
       <AlertDialog open={showConclusaoLancamentoDialog} onOpenChange={setShowConclusaoLancamentoDialog}>

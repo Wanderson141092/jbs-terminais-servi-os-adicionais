@@ -40,15 +40,9 @@ interface Formulario {
   estilo?: string;
 }
 
-interface Campo {
+interface PerguntaExportavel {
   id: string;
-  formulario_id: string;
-  tipo: string;
   rotulo: string;
-  placeholder: string | null;
-  obrigatorio: boolean;
-  opcoes: unknown;
-  condicao: unknown;
   ordem: number;
 }
 
@@ -289,7 +283,7 @@ const AdminFormularios = () => {
 
   const [loading, setLoading] = useState(true);
   const [formularios, setFormularios] = useState<Formulario[]>([]);
-  const [campos, setCampos] = useState<Campo[]>([]);
+  const [perguntasExportacao, setPerguntasExportacao] = useState<PerguntaExportavel[]>([]);
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [formStyles, setFormStyles] = useState<FormStyle[]>([]);
 
@@ -327,9 +321,22 @@ const AdminFormularios = () => {
     setFormStyles((data as FormStyle[]) || []);
   };
 
-  const fetchCampos = async (formularioId: string) => {
-    const { data } = await supabase.from("formulario_campos").select("*").eq("formulario_id", formularioId).order("ordem");
-    setCampos(data || []);
+  const fetchPerguntasExportacao = async (formularioId: string) => {
+    const { data } = await supabase
+      .from("formulario_perguntas")
+      .select("ordem, pergunta_id, banco_perguntas(id, rotulo)")
+      .eq("formulario_id", formularioId)
+      .order("ordem");
+
+    const perguntas = (data || [])
+      .map((fp: any) => ({
+        id: fp.pergunta_id || fp.banco_perguntas?.id,
+        rotulo: fp.banco_perguntas?.rotulo || fp.pergunta_id || "Pergunta sem rótulo",
+        ordem: fp.ordem || 0,
+      }))
+      .filter((p: PerguntaExportavel) => !!p.id);
+
+    setPerguntasExportacao(perguntas);
   };
 
   const fetchRespostas = async (formularioId: string) => {
@@ -394,19 +401,19 @@ const AdminFormularios = () => {
   // Responses
   const openResponsesDialog = async (formularioId: string) => {
     setSelectedFormForResponses(formularioId);
-    await fetchCampos(formularioId);
+    await fetchPerguntasExportacao(formularioId);
     await fetchRespostas(formularioId);
     setShowResponsesDialog(true);
   };
 
   const exportXLSX = async () => {
-    if (campos.length === 0 || respostas.length === 0) return;
+    if (perguntasExportacao.length === 0 || respostas.length === 0) return;
     const ExcelJS = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Respostas");
 
     // Headers
-    const headers = ["Data", ...campos.map((c) => c.rotulo)];
+    const headers = ["Data", ...perguntasExportacao.map((p) => p.rotulo)];
     const headerRow = sheet.addRow(headers);
     headerRow.eachCell((cell) => {
       cell.font = { bold: true };
@@ -418,8 +425,8 @@ const AdminFormularios = () => {
       const respostasObj = r.respostas as Record<string, unknown>;
       const row = [
         new Date(r.created_at).toLocaleString("pt-BR"),
-        ...campos.map((c) => {
-          const val = respostasObj[c.id];
+        ...perguntasExportacao.map((p) => {
+          const val = respostasObj[p.id];
           if (Array.isArray(val)) return val.join(", ");
           if (typeof val === "boolean") return val ? "Sim" : "Não";
           return (val as string) || "";
@@ -690,27 +697,27 @@ const AdminFormularios = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Data</TableHead>
-                  {campos.map((c) => <TableHead key={c.id}>{c.rotulo}</TableHead>)}
+                  {perguntasExportacao.map((p) => <TableHead key={p.id}>{p.rotulo}</TableHead>)}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {respostas.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
-                    {campos.map((c) => {
+                    {perguntasExportacao.map((p) => {
                       const respostasObj = r.respostas as Record<string, unknown>;
-                      const val = respostasObj[c.id];
-                      const arquivosArr = r.arquivos as { campo_id: string; file_url: string; file_name: string }[] | null;
-                      const arquivo = arquivosArr?.find((a) => a.campo_id === c.id);
+                      const val = respostasObj[p.id];
+                      const arquivosArr = r.arquivos as { pergunta_id?: string; campo_id?: string; file_url: string; file_name: string }[] | null;
+                      const arquivo = arquivosArr?.find((a) => (a.pergunta_id || a.campo_id) === p.id);
                       if (arquivo) {
-                        return <TableCell key={c.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
+                        return <TableCell key={p.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
                       }
-                      return <TableCell key={c.id} className="text-sm">{Array.isArray(val) ? val.join(", ") : (val as string) || "—"}</TableCell>;
+                      return <TableCell key={p.id} className="text-sm">{Array.isArray(val) ? val.join(", ") : (val as string) || "—"}</TableCell>;
                     })}
                   </TableRow>
                 ))}
                 {respostas.length === 0 && (
-                  <TableRow><TableCell colSpan={campos.length + 1} className="text-center text-muted-foreground py-8">Nenhuma resposta recebida</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={perguntasExportacao.length + 1} className="text-center text-muted-foreground py-8">Nenhuma resposta recebida</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

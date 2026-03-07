@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
+import { buildNotificarStatusPayload } from "@/lib/edgePayload";
 import { Input } from "@/components/ui/input";
 import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -580,7 +581,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} cancelada`, "status");
     supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: "cancelado", usuario_id: userId },
+      body: buildNotificarStatusPayload({
+        action: "notificar_status",
+        solicitacao_id: solicitacao.id,
+        novo_status: "cancelado",
+        usuario_id: userId,
+      }),
     }).catch(() => {});
 
     toast.success("Cancelamento realizado!");
@@ -627,7 +633,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} recusada: ${cancelJustificativa.trim()}`, "status");
     supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: "recusado", usuario_id: userId },
+      body: buildNotificarStatusPayload({
+        action: "notificar_status",
+        solicitacao_id: solicitacao.id,
+        novo_status: "recusado",
+        usuario_id: userId,
+      }),
     }).catch(() => {});
 
     toast.success("Recusa registrada!");
@@ -851,7 +862,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     
     // Dispatch email/notification via edge function
     supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: selectedStatus, usuario_id: userId },
+      body: buildNotificarStatusPayload({
+        action: "notificar_status",
+        solicitacao_id: solicitacao.id,
+        novo_status: selectedStatus,
+        usuario_id: userId,
+      }),
     }).catch(() => {}); // Fire and forget
     
     toast.success("Atualização realizada com sucesso!");
@@ -1123,7 +1139,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       e.stopPropagation();
                       try {
                         const { error } = await supabase.functions.invoke("notificar-status", {
-                          body: { action: "reenviar_chave", solicitacao_id: solicitacao.id, usuario_id: userId },
+                          body: buildNotificarStatusPayload({
+                            action: "reenviar_chave",
+                            solicitacao_id: solicitacao.id,
+                            usuario_id: userId,
+                          }),
                         });
                         if (error) throw error;
                         toast.success("Chave reenviada para o e-mail do cliente!");

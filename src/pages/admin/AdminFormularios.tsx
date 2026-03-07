@@ -30,6 +30,7 @@ import BancoPerguntasManager from "@/components/admin/BancoPerguntasManager";
 import FormularioBuilder from "@/components/admin/FormularioBuilder";
 import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";
 import EstilosFormularioManager from "@/components/admin/EstilosFormularioManager";
+import { normalizeFormValue } from "@/lib/normalizeFormValue";
 
 interface Formulario {
   id: string;
@@ -437,9 +438,7 @@ const AdminFormularios = () => {
         new Date(r.created_at).toLocaleString("pt-BR"),
         ...campos.map((c) => {
           const val = respostasObj[c.id];
-          if (Array.isArray(val)) return val.join(", ");
-          if (typeof val === "boolean") return val ? "Sim" : "Não";
-          return (val as string) || "";
+          return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
         }),
       ];
       sheet.addRow(row);
@@ -721,7 +720,7 @@ const AdminFormularios = () => {
                       if (arquivo) {
                         return <TableCell key={c.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
                       }
-                      return <TableCell key={c.id} className="text-sm">{Array.isArray(val) ? val.join(", ") : (val as string) || "—"}</TableCell>;
+                      return <TableCell key={c.id} className="text-sm">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
                     })}
                   </TableRow>
                 ))}

@@ -86,6 +86,14 @@ Deno.serve(async (req) => {
     const solicitacaoData: Record<string, any> = {};
     const dynamicFieldValues: { campo_id: string; valor: string }[] = [];
 
+    const { data: camposFixosRows } = await supabase
+      .from("campos_fixos_config")
+      .select("id, campo_chave");
+
+    const campoChaveById = new Map<string, string>(
+      (camposFixosRows || []).map((campo: any) => [campo.id, campo.campo_chave])
+    );
+
     if (mapeamentos && Array.isArray(mapeamentos)) {
       for (const map of mapeamentos) {
         if (respostas[map.pergunta_id] !== undefined) {
@@ -104,7 +112,12 @@ Deno.serve(async (req) => {
               valor: formattedVal,
             });
           } else if (map.campo_solicitacao && map.campo_solicitacao !== "__dinamico__") {
-            solicitacaoData[map.campo_solicitacao] = formattedVal;
+            let campoDestino = map.campo_solicitacao;
+            if (campoDestino.startsWith("fixo:")) {
+              const [, campoFixoId, campoChaveFallback] = campoDestino.split(":");
+              campoDestino = campoChaveById.get(campoFixoId) || campoChaveFallback || campoDestino;
+            }
+            solicitacaoData[campoDestino] = formattedVal;
           }
         }
       }

@@ -10,7 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
@@ -48,6 +48,15 @@ interface PerguntaMapeamento {
   campo_analise_id?: string | null;
 }
 
+interface CampoFixoConfig {
+  id: string;
+  campo_chave: string;
+  campo_label: string;
+  ordem: number;
+  servico_ids: string[];
+  ativo: boolean;
+}
+
 interface CampoAnalise {
   id: string;
   nome: string;
@@ -64,25 +73,12 @@ interface FormularioBuilderProps {
   onClose: () => void;
 }
 
-const CAMPOS_SOLICITACAO = [
-  { value: "cliente_nome", label: "Nome do Cliente" },
-  { value: "cliente_email", label: "E-mail do Cliente" },
-  { value: "cnpj", label: "CNPJ" },
-  { value: "tipo_operacao", label: "Serviço Adicional" },
-  { value: "numero_conteiner", label: "Número do Contêiner" },
-  { value: "lpco", label: "LPCO" },
-  { value: "tipo_carga", label: "Tipo de Carga" },
-  { value: "data_posicionamento", label: "Data do Serviço" },
-  { value: "data_agendamento", label: "Data/Hora do Agendamento" },
-  { value: "observacoes", label: "Observações" },
-  { value: "categoria", label: "Categoria" },
-];
-
 const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) => {
   const [bancoPerguntas, setBancoPerguntas] = useState<BancoPergunta[]>([]);
   const [vinculadas, setVinculadas] = useState<FormularioPergunta[]>([]);
   const [condicionais, setCondicionais] = useState<PerguntaCondicional[]>([]);
   const [mapeamentos, setMapeamentos] = useState<PerguntaMapeamento[]>([]);
+  const [camposFixos, setCamposFixos] = useState<CampoFixoConfig[]>([]);
   const [camposAnalise, setCamposAnalise] = useState<CampoAnalise[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -97,9 +93,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
   // Mapping dialog
   const [showMapDialog, setShowMapDialog] = useState(false);
   const [mapPergunta, setMapPergunta] = useState<string>("");
-  const [mapCampo, setMapCampo] = useState<string>("");
-  const [mapTipo, setMapTipo] = useState<"fixo" | "dinamico">("fixo");
-  const [mapCampoAnaliseId, setMapCampoAnaliseId] = useState<string>("");
+  const [mapDestino, setMapDestino] = useState<string>("");
 
   // New dynamic field dialog
   const [showNewFieldDialog, setShowNewFieldDialog] = useState(false);
@@ -112,12 +106,14 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
 
   const fetchAll = async () => {
     setLoading(true);
-    const [bancoPerguntasRes, vinculadasRes, condRes, mapRes, camposRes] = await Promise.all([
+    const [bancoPerguntasRes, vinculadasRes, condRes, mapRes, camposRes, camposFixosRes, formularioRes] = await Promise.all([
       supabase.from("banco_perguntas").select("*").eq("ativo", true).order("rotulo"),
       supabase.from("formulario_perguntas").select("*").eq("formulario_id", formularioId).order("ordem"),
       supabase.from("pergunta_condicionais").select("*").eq("formulario_id", formularioId),
       supabase.from("pergunta_mapeamento").select("*").eq("formulario_id", formularioId),
       supabase.from("campos_analise").select("*").eq("ativo", true).order("ordem"),
+      supabase.from("campos_fixos_config").select("id, campo_chave, campo_label, ordem, servico_ids, ativo").eq("ativo", true).order("ordem"),
+      supabase.from("formularios").select("servico_id").eq("id", formularioId).maybeSingle(),
     ]);
 
     const banco = (bancoPerguntasRes.data as BancoPergunta[]) || [];
@@ -134,7 +130,17 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
 
     setCondicionais((condRes.data as PerguntaCondicional[]) || []);
     setMapeamentos((mapRes.data as PerguntaMapeamento[]) || []);
-    setCamposAnalise((camposRes.data as CampoAnalise[]) || []);
+    const servicoId = formularioRes.data?.servico_id || null;
+
+    const camposFixosAtivos = ((camposFixosRes.data as CampoFixoConfig[]) || []).filter((campo) => (
+      campo.servico_ids.length === 0 || (servicoId && campo.servico_ids.includes(servicoId))
+    ));
+    setCamposFixos(camposFixosAtivos);
+
+    const camposAnaliseAtivos = ((camposRes.data as CampoAnalise[]) || []).filter((campo) => (
+      campo.servico_ids.length === 0 || (servicoId && campo.servico_ids.includes(servicoId))
+    ));
+    setCamposAnalise(camposAnaliseAtivos);
     setLoading(false);
   };
 
@@ -210,29 +216,40 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
       toast.error("Selecione a pergunta");
       return;
     }
-    if (mapTipo === "fixo" && !mapCampo) {
+    if (!mapDestino) {
       toast.error("Selecione o campo destino");
       return;
     }
-    if (mapTipo === "dinamico" && !mapCampoAnaliseId) {
-      toast.error("Selecione o campo de análise");
-      return;
-    }
 
-    const insertData: any = {
+    const [tipoDestino, destinoId] = mapDestino.split(":");
+    const insertData: Record<string, string | null> = {
       formulario_id: formularioId,
       pergunta_id: mapPergunta,
-      campo_solicitacao: mapTipo === "fixo" ? mapCampo : "__dinamico__",
+      campo_solicitacao: "",
+      campo_analise_id: null,
     };
-    if (mapTipo === "dinamico") {
-      insertData.campo_analise_id = mapCampoAnaliseId;
+
+    if (tipoDestino === "fixo") {
+      const campoFixo = camposFixos.find((campo) => campo.id === destinoId);
+      if (!campoFixo) {
+        toast.error("Campo fixo não encontrado");
+        return;
+      }
+      // Persistimos o ID como referência principal e a chave como fallback compatível
+      insertData.campo_solicitacao = `fixo:${campoFixo.id}:${campoFixo.campo_chave}`;
+    } else if (tipoDestino === "dinamico") {
+      insertData.campo_solicitacao = "__dinamico__";
+      insertData.campo_analise_id = destinoId;
+    } else {
+      toast.error("Destino inválido");
+      return;
     }
 
     const { error } = await supabase.from("pergunta_mapeamento").insert(insertData);
     if (error) { toast.error("Erro ao salvar mapeamento"); return; }
     toast.success("Mapeamento criado!");
     setShowMapDialog(false);
-    setMapPergunta(""); setMapCampo(""); setMapTipo("fixo"); setMapCampoAnaliseId("");
+    setMapPergunta(""); setMapDestino("");
     fetchAll();
   };
 
@@ -251,7 +268,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
     setNewFieldNome(""); setNewFieldTipo("texto");
     setCamposAnalise(prev => [...prev, data as CampoAnalise]);
     // Auto-select the new field
-    setMapCampoAnaliseId(data.id);
+    setMapDestino(`dinamico:${data.id}`);
   };
 
   const deleteMapeamento = async (id: string) => {
@@ -268,6 +285,22 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
 
   const getPerguntaLabel = (id: string) =>
     bancoPerguntas.find((b) => b.id === id)?.rotulo || vinculadas.find((v) => v.pergunta_id === id)?.pergunta?.rotulo || id;
+
+  const getMapeamentoLabel = (map: PerguntaMapeamento) => {
+    if (map.campo_analise_id) {
+      const campo = camposAnalise.find((c) => c.id === map.campo_analise_id);
+      return campo?.nome || "Campo dinâmico";
+    }
+
+    if (map.campo_solicitacao?.startsWith("fixo:")) {
+      const [, campoId] = map.campo_solicitacao.split(":");
+      const campo = camposFixos.find((c) => c.id === campoId);
+      return campo?.campo_label || map.campo_solicitacao;
+    }
+
+    const campoLegado = camposFixos.find((c) => c.campo_chave === map.campo_solicitacao);
+    return campoLegado?.campo_label || map.campo_solicitacao;
+  };
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><p className="text-muted-foreground">Carregando...</p></div>;
@@ -320,7 +353,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
                             const campo = camposAnalise.find(c => c.id === m.campo_analise_id);
                             return campo?.nome || "Campo dinâmico";
                           }
-                          return CAMPOS_SOLICITACAO.find((c) => c.value === m.campo_solicitacao)?.label || m.campo_solicitacao;
+                          return getMapeamentoLabel(m);
                         }).join(", ")}
                       </Badge>
                     )}
@@ -372,7 +405,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
                   <strong>{getPerguntaLabel(m.pergunta_id)}</strong> → {
                     m.campo_analise_id
                       ? <Badge variant="secondary" className="text-xs ml-1">{camposAnalise.find(c => c.id === m.campo_analise_id)?.nome || "Campo dinâmico"}</Badge>
-                      : (CAMPOS_SOLICITACAO.find((c) => c.value === m.campo_solicitacao)?.label || m.campo_solicitacao)
+                      : getMapeamentoLabel(m)
                   }
                 </span>
                 <Button variant="ghost" size="icon" onClick={() => deleteMapeamento(m.id)} className="text-destructive hover:text-destructive">
@@ -503,49 +536,39 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Tipo de destino</Label>
-              <Select value={mapTipo} onValueChange={(v) => setMapTipo(v as "fixo" | "dinamico")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixo">Campo fixo da solicitação</SelectItem>
-                  <SelectItem value="dinamico">Campo dinâmico de análise</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {mapTipo === "fixo" ? (
-              <div>
-                <Label>Campo da Solicitação</Label>
-                <Select value={mapCampo} onValueChange={setMapCampo}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o campo destino" /></SelectTrigger>
+            <div className="space-y-2">
+              <Label>Campo de destino</Label>
+              <div className="flex gap-2">
+                <Select value={mapDestino} onValueChange={setMapDestino}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione o campo destino" /></SelectTrigger>
                   <SelectContent>
-                    {CAMPOS_SOLICITACAO.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                    ))}
+                    {camposFixos.length > 0 && (
+                      <>
+                        <SelectLabel>Campos fixos</SelectLabel>
+                        {camposFixos.map((c) => (
+                          <SelectItem key={c.id} value={`fixo:${c.id}`}>{c.campo_label}</SelectItem>
+                        ))}
+                        <SelectSeparator />
+                      </>
+                    )}
+                    {camposAnalise.length > 0 && (
+                      <>
+                        <SelectLabel>Campos dinâmicos</SelectLabel>
+                        {camposAnalise.map((c) => (
+                          <SelectItem key={c.id} value={`dinamico:${c.id}`}>{c.nome}</SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
+                <Button variant="outline" size="icon" onClick={() => setShowNewFieldDialog(true)} title="Criar novo campo dinâmico">
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Campo de Análise</Label>
-                <div className="flex gap-2">
-                  <Select value={mapCampoAnaliseId} onValueChange={setMapCampoAnaliseId}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione ou crie um campo" /></SelectTrigger>
-                    <SelectContent>
-                      {camposAnalise.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button variant="outline" size="icon" onClick={() => setShowNewFieldDialog(true)} title="Criar novo campo">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {camposAnalise.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhum campo criado. Clique em + para criar.</p>
-                )}
-              </div>
-            )}
+              {camposFixos.length === 0 && camposAnalise.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum campo disponível para este serviço.</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMapDialog(false)}>Cancelar</Button>

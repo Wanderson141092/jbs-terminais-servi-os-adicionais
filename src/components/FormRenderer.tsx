@@ -231,11 +231,24 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     respostas: Record<string, any>,
     _arquivos: any[]
   ): Promise<string> => {
+    const { data: camposFixosRows } = await supabase
+      .from("campos_fixos_config")
+      .select("id, campo_chave");
+
+    const campoChaveById = new Map<string, string>(
+      (camposFixosRows || []).map((campo: any) => [campo.id, campo.campo_chave])
+    );
+
     // Build solicitacao fields from mapeamentos
     const solicitacaoData: Record<string, any> = {};
     for (const map of mapeamentos) {
       if (respostas[map.pergunta_id] !== undefined) {
-        solicitacaoData[map.campo_solicitacao] = respostas[map.pergunta_id];
+        let campoDestino = map.campo_solicitacao;
+        if (campoDestino?.startsWith("fixo:")) {
+          const [, campoFixoId, campoChaveFallback] = campoDestino.split(":");
+          campoDestino = campoChaveById.get(campoFixoId) || campoChaveFallback || campoDestino;
+        }
+        solicitacaoData[campoDestino] = respostas[map.pergunta_id];
       }
     }
 

@@ -176,10 +176,62 @@ const FormFieldRenderer = ({
   onFileChange,
   allValues,
   allPerguntas,
+  onSiblingValueChange,
 }: FormFieldRendererProps) => {
   const opcoes = pergunta.opcoes as { value: string; label: string }[] | null;
   const config = pergunta.config as Record<string, any> | null;
   const permitirMultiplos = config?.permitir_multiplos === true;
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+
+  // Detect if this field is a CNPJ field (has CNPJ mask or label contains CNPJ)
+  const isCnpjField = (() => {
+    const mascara = config?.mascara as string | undefined;
+    const isCnpjMask = mascara === "99.999.999/9999-99";
+    const isCnpjLabel = pergunta.rotulo?.toUpperCase().includes("CNPJ");
+    return (pergunta.tipo === "texto_formatado" && (isCnpjMask || isCnpjLabel));
+  })();
+
+  // Find sibling "Razão Social" field to auto-fill
+  const razaoSocialField = isCnpjField && allPerguntas
+    ? allPerguntas.find((p) => {
+        const label = p.rotulo?.toLowerCase() || "";
+        return label.includes("razão social") || label.includes("razao social");
+      })
+    : null;
+
+  const handleCnpjBlur = useCallback(async (rawValue: string) => {
+    if (!isCnpjField || !razaoSocialField || !onSiblingValueChange) return;
+    const stripped = stripCnpjMask(rawValue);
+    if (!isValidCnpj(stripped)) return;
+
+    setCnpjLoading(true);
+    try {
+      const data = await fetchCnpjData(stripped);
+      if (data?.razao_social) {
+        onSiblingValueChange(razaoSocialField.id, data.razao_social);
+        toast.success("Razão Social preenchida automaticamente.");
+      } else {
+        toast.error("CNPJ não encontrado na Receita Federal.");
+      }
+    } catch {
+      toast.error("Erro ao consultar CNPJ.");
+    } finally {
+      setCnpjLoading(false);
+    }
+  }, [isCnpjField, razaoSocialField, onSiblingValueChange]);
+
+  // Check if this is the "Razão Social" field linked to a CNPJ field
+  const isRazaoSocialField = (() => {
+    if (!allPerguntas) return false;
+    const label = pergunta.rotulo?.toLowerCase() || "";
+    if (!label.includes("razão social") && !label.includes("razao social")) return false;
+    // Check if there's a CNPJ sibling
+    return allPerguntas.some((p) => {
+      const pConfig = p.config as Record<string, any> | null;
+      const pMascara = pConfig?.mascara as string | undefined;
+      return (p.tipo === "texto_formatado" && (pMascara === "99.999.999/9999-99" || p.rotulo?.toUpperCase().includes("CNPJ")));
+    });
+  })();
   const multiplosMax = config?.multiplos_max as number | undefined;
 
   // Informativo (text/image block with optional accept)

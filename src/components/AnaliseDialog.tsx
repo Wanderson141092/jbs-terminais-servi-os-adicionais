@@ -183,10 +183,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [selectedStatus, setSelectedStatus] = useState(solicitacao.status || "");
   const [loading, setLoading] = useState(false);
   const [adminSelectedSetor, setAdminSelectedSetor] = useState<"COMEX" | "ARMAZEM" | null>(null);
-  const [attachments, setAttachments] = useState<any[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showDeferimentoAction, setShowDeferimentoAction] = useState<string | null>(null);
-  const [motivoRecusaDeferimento, setMotivoRecusaDeferimento] = useState("");
   const [showLancamentoDialog, setShowLancamentoDialog] = useState(false);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
   const [servicos, setServicos] = useState<any[]>([]);

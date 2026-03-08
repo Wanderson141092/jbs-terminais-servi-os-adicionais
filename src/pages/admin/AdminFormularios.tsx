@@ -348,23 +348,6 @@ const AdminFormularios = () => {
       .filter((p: PerguntaExportavel) => !!p.id);
 
     setPerguntasExportacao(perguntas);
-  const fetchCampos = async (formularioId: string) => {
-    const { data } = await supabase
-      .from("formulario_perguntas")
-      .select("id, formulario_id, pergunta_id, obrigatorio, ordem, banco_perguntas(id, rotulo, tipo)")
-      .eq("formulario_id", formularioId)
-      .order("ordem");
-
-    const camposFormatados = ((data || []) as any[]).map((item) => ({
-      id: item.id,
-      formulario_id: item.formulario_id,
-      pergunta_id: item.pergunta_id,
-      obrigatorio: item.obrigatorio,
-      ordem: item.ordem,
-      pergunta: item.banco_perguntas,
-    }));
-
-    setCampos(camposFormatados);
   };
 
   const fetchRespostas = async (formularioId: string) => {

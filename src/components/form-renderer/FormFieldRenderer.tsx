@@ -415,8 +415,10 @@ const FormFieldRenderer = ({
         {pergunta.tipo === "texto" && (
           <Input
             value={fieldValue || ""}
-            onChange={(e) => onFieldChange(e.target.value)}
+            onChange={isRazaoSocialField ? undefined : (e) => onFieldChange(e.target.value)}
             placeholder={pergunta.placeholder || ""}
+            readOnly={isRazaoSocialField}
+            className={isRazaoSocialField ? "bg-muted/50 cursor-default" : ""}
           />
         )}
 

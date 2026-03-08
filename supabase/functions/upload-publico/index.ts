@@ -162,7 +162,14 @@ Deno.serve(async (req) => {
           // Notify sectors
           try {
             await supabaseAdmin.functions.invoke("notificar-status", {
-              body: { solicitacao_id, novo_status: "cancelado", origem: "cliente" },
+              body: {
+                payload_version: "2026-03-07",
+                action: "notificar_status",
+                solicitacao_id,
+                novo_status: "cancelado",
+                usuario_id: "00000000-0000-4000-8000-000000000000",
+                timestamp: new Date().toISOString(),
+              },
             });
           } catch (_) { /* notification failure is non-blocking */ }
 

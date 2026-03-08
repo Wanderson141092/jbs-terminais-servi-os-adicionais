@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { buildNotificarStatusPayload } from "@/lib/edgePayload";
 import StatusBadge from "./StatusBadge";
 import ProcessStageStepper from "./ProcessStageStepper";
 import ProcessChecklist from "./ProcessChecklist";
@@ -236,7 +237,12 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
 
       const finalStatus = newStatus === 'aprovado' ? 'confirmado_aguardando_vistoria' : 'recusado';
       supabase.functions.invoke("notificar-status", {
-        body: { solicitacao_id: solicitacao.id, novo_status: finalStatus, usuario_id: userId },
+        body: buildNotificarStatusPayload({
+          action: "notificar_status",
+          solicitacao_id: solicitacao.id,
+          novo_status: finalStatus,
+          usuario_id: userId,
+        }),
       }).catch(() => {});
 
       toast.success(`Status alterado para ${newStatus === 'aprovado' ? 'Aprovado' : 'Recusado'}`);

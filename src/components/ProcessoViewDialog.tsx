@@ -257,15 +257,23 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     setPreviewUrl(url);
   };
 
-  const formatResponseValue = (val: any, tipo: string): string => {
-    if (val === null || val === undefined) return "—";
-    if (Array.isArray(val)) return val.join(", ");
-    if (typeof val === "object") {
-      if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
-      return JSON.stringify(val);
+  const formatResponseValue = (val: any, tipo: string, config?: any): string => {
+    let result: string;
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      if (val.campo1 && val.campo2) result = `${val.campo1} / ${val.campo2}`;
+      else result = normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true });
+    } else {
+      result = normalizeFormValue(val, { nullishFallback: "—" });
     }
-    if (typeof val === "boolean") return val ? "Sim" : "Não";
-    return String(val);
+    // Apply prefix/suffix from question config when displaying
+    if (config && result !== "—") {
+      const prefixo = config.prefixo || "";
+      const sufixo = config.sufixo || "";
+      if (prefixo || sufixo) {
+        result = `${prefixo}${result}${sufixo ? " " + sufixo : ""}`;
+      }
+    }
+    return result;
   };
 
   if (!solicitacao) return null;

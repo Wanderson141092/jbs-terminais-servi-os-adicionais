@@ -294,6 +294,7 @@ const AdminFormularios = () => {
   const [loading, setLoading] = useState(true);
   const [formularios, setFormularios] = useState<Formulario[]>([]);
   const [perguntasExportacao, setPerguntasExportacao] = useState<PerguntaExportavel[]>([]);
+  const [campos, setCampos] = useState<PerguntaExportavel[]>([]);
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [formStyles, setFormStyles] = useState<FormStyle[]>([]);
 

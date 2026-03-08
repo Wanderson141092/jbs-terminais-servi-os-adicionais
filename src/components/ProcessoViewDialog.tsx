@@ -129,7 +129,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
 
     const { data: perguntasData } = await supabase
       .from("formulario_perguntas")
-      .select("pergunta_id, banco_perguntas(id, rotulo, tipo)")
+      .select("pergunta_id, banco_perguntas(id, rotulo, tipo, config)")
       .eq("formulario_id", formularioId)
       .order("ordem");
 

@@ -272,14 +272,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         ? allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0 || c.servico_ids.includes(currentServicoId))
         : allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0);
       setCobrancaConfigs(serviceCobrancaConfig);
-      setLancamentoRegistros(registrosRes.data || []);
 
-      // Build dynamic fields display
-      const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
-        campo_nome: cv.campo_nome || "Campo",
-        valor: cv.campo_valor || "",
-      })).filter((cv: any) => cv.valor);
-      setCamposDinamicos(camposVals);
+      // Fetch billing registros separately
+      const registrosData = await fetchCobrancaRegistros();
+      setLancamentoRegistros(registrosData);
 
       // Filter campos fixos by service
       const filteredCamposFixos = (camposFixosRes.data || [])

@@ -94,17 +94,36 @@ Deno.serve(async (req) => {
       (camposFixosRows || []).map((campo: any) => [campo.id, campo.campo_chave])
     );
 
+    // Helper: normalize a single response value
+    const normalizeVal = (rawVal: unknown): string => {
+      if (rawVal === true || String(rawVal).toLowerCase() === "true") return "Sim";
+      if (rawVal === false || String(rawVal).toLowerCase() === "false") return "Não";
+      if (Array.isArray(rawVal)) return rawVal.filter((v: any) => v !== "" && v != null).join("\n");
+      const s = String(rawVal);
+      // Detect stringified JSON arrays
+      if (s.startsWith("[") && s.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed)) return parsed.filter((v: any) => v !== "" && v != null).join("\n");
+        } catch { /* noop */ }
+      }
+      return s;
+    };
+
+    // Pre-normalize all respostas before persisting
+    const normalizedRespostas: Record<string, any> = {};
+    for (const [key, val] of Object.entries(respostas)) {
+      if (val === null || val === undefined) { normalizedRespostas[key] = val; continue; }
+      if (typeof val === "object" && !Array.isArray(val)) { normalizedRespostas[key] = val; continue; }
+      normalizedRespostas[key] = normalizeVal(val);
+    }
+
     if (mapeamentos && Array.isArray(mapeamentos)) {
       for (const map of mapeamentos) {
-        if (respostas[map.pergunta_id] !== undefined) {
-          // Format value: arrays become space-separated strings
-          let rawVal = respostas[map.pergunta_id];
-          let formattedVal: string;
-          if (Array.isArray(rawVal)) {
-            formattedVal = rawVal.join("\n");
-          } else {
-            formattedVal = String(rawVal);
-          }
+        if (normalizedRespostas[map.pergunta_id] !== undefined && normalizedRespostas[map.pergunta_id] !== null) {
+          const formattedVal = typeof normalizedRespostas[map.pergunta_id] === "object"
+            ? JSON.stringify(normalizedRespostas[map.pergunta_id])
+            : String(normalizedRespostas[map.pergunta_id]);
 
           if (map.campo_analise_id) {
             dynamicFieldValues.push({

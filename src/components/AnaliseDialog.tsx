@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { buildNotificarStatusPayload } from "@/lib/edgePayload";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ import BillingConfirmDialog from "./BillingConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizeFormValue } from "@/lib/normalizeFormValue";
+import AttachmentViewer from "./AttachmentViewer";
 
 interface AnaliseDialogProps {
   solicitacao: any;
@@ -183,7 +184,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [billingDialogData, setBillingDialogData] = useState<{ config: any } | null>(null);
   const [blockedBillingConfig, setBlockedBillingConfig] = useState<any | null>(null);
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string; config?: any }[]>([]);
-  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
+  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string; label?: string }[]>([]);
+  const [showAttachmentViewer, setShowAttachmentViewer] = useState(false);
   const [isExternalForm, setIsExternalForm] = useState(false);
   const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
 
@@ -360,19 +362,23 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           }
           setFormRespostas(allResponses);
 
+          // Build pergunta_id → label map from perguntasData
+          const perguntaLabelMap = new Map<string, string>();
+          for (const fp of perguntasData) {
+            const bp = (fp as any).banco_perguntas;
+            if (bp) perguntaLabelMap.set(bp.id, bp.rotulo);
+          }
+
           // Process attachments with signed URLs
           const rawArquivos = (bestResponse.arquivos as any[]) || [];
-          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string }[] = [];
+          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string }[] = [];
           for (const arq of rawArquivos) {
             let signedUrl = arq.file_url;
-            // Extract storage path from any URL format and generate fresh signed URL
             let storagePath: string | null = null;
 
             if (arq.file_url && !arq.file_url.startsWith("http")) {
-              // Already a raw storage path
               storagePath = arq.file_url;
             } else if (arq.file_url) {
-              // Extract path from signed or public URLs
               const signMatch = arq.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/form-uploads\/([^?]+)/);
               if (signMatch) {
                 storagePath = decodeURIComponent(signMatch[1]);
@@ -386,10 +392,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               if (signedData) signedUrl = signedData.signedUrl;
             }
 
+            const pid = arq.pergunta_id || arq.campo_id || "";
             signedArquivos.push({
-              pergunta_id: arq.pergunta_id || arq.campo_id || "",
+              pergunta_id: pid,
               file_url: signedUrl,
               file_name: arq.file_name || "Arquivo",
+              label: perguntaLabelMap.get(pid) || undefined,
             });
           }
           setFormArquivos(signedArquivos);
@@ -1117,44 +1125,31 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Anexos da Solicitação — arquivos enviados no formulário de criação */}
+            {/* Anexos da Solicitação — botão para abrir visualizador */}
             {formArquivos.length > 0 && (
-              <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
-                <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Anexos da Solicitação
-                </p>
-                <div className="space-y-1.5">
-                  {formArquivos.map((arq, idx) => {
-                    const isPdf = arq.file_name?.toLowerCase().endsWith('.pdf');
-                    const isImage = /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(arq.file_name || '');
-                    return (
-                      <div key={idx} className="flex items-center justify-between border rounded-md p-2 bg-background">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0">
-                            <p className="text-sm truncate">{arq.file_name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {isPdf ? 'PDF' : isImage ? 'Imagem' : 'Arquivo'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-1.5 shrink-0">
-                          {(isPdf || isImage) && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setPreviewUrl(arq.file_url)}>
-                              <Eye className="h-3.5 w-3.5" />
-                              Visualizar
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                            <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
-                              <Download className="h-3.5 w-3.5" />
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div className="border rounded-lg p-3 bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                    <Paperclip className="h-4 w-4" />
+                    Anexos da Solicitação ({formArquivos.length})
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1.5"
+                    onClick={() => setShowAttachmentViewer(true)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Visualizar Anexos
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {formArquivos.map((arq, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-[10px] cursor-pointer hover:bg-accent" onClick={() => { setShowAttachmentViewer(true); }}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      {arq.label || arq.file_name}
+                    </Badge>
+                  ))}
                 </div>
               </div>
             )}
@@ -1805,6 +1800,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Visualizador de Anexos do Formulário */}
+      <AttachmentViewer
+        open={showAttachmentViewer}
+        onOpenChange={setShowAttachmentViewer}
+        arquivos={formArquivos}
+        title="Anexos da Solicitação"
+      />
 
       {/* Dialog para confirmar lançamento */}
       <Dialog open={showLancamentoDialog} onOpenChange={setShowLancamentoDialog}>

@@ -24,8 +24,7 @@ import {
   ArrowLeft, Plus, Save, Edit, Trash2, FileText, Eye, Download, Database, Settings2, HelpCircle, List, Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
-import { useGestorCheck } from "@/hooks/useGestorCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import BancoPerguntasManager from "@/components/admin/BancoPerguntasManager";
 import FormularioBuilder from "@/components/admin/FormularioBuilder";
 import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";
@@ -282,8 +281,7 @@ const FormulariosManual = () => (
 const AdminFormularios = () => {
   const navigate = useNavigate();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
-  const { isGestor } = useGestorCheck(currentUserId);
+  const { isAdmin: isCurrentUserAdmin, isGestor } = useRoleCheck(currentUserId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

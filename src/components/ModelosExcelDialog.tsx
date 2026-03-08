@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, Download, Trash2, FileSpreadsheet, File, Settings2, Loader2 } from "lucide-react";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import ReportColumnMappingDialog from "@/components/admin/ReportColumnMappingDialog";
 
 interface ModeloRelatorio {
@@ -65,7 +65,7 @@ const ModelosExcelDialog = ({ open, onClose }: ModelosExcelDialogProps) => {
   const [mappingModeloNome, setMappingModeloNome] = useState("");
   const [modeloMappingCounts, setModeloMappingCounts] = useState<Record<string, number>>({});
 
-  const { isAdmin } = useAdminCheck(user?.id || null);
+  const { isAdmin } = useRoleCheck(user?.id || null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {

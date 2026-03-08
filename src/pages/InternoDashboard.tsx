@@ -67,8 +67,7 @@ import type { User, Session } from "@supabase/supabase-js";
 import jbsLogo from "@/assets/jbs-terminais-logo.png";
 import { startOfWeek, addDays, format, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
-import { useGestorCheck } from "@/hooks/useGestorCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import useNotifications from "@/hooks/useNotifications";
 import DeferimentoDialog from "@/components/DeferimentoDialog";
 import LacreArmadorDialog from "@/components/LacreArmadorDialog";
@@ -131,8 +130,7 @@ const InternoDashboard = () => {
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   const [billingDialogData, setBillingDialogData] = useState<{ solicitacao: any; config: any } | null>(null);
 
-  const { isAdmin } = useAdminCheck(user?.id || null);
-  const { isGestor } = useGestorCheck(user?.id || null);
+  const { isAdmin, isGestor } = useRoleCheck(user?.id || null);
   const { statusOptions, statusLabels } = useStatusProcesso();
 
   useNotifications(user?.id || null);

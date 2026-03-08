@@ -14,8 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ClipboardList, ArrowLeft, Plus, Save, Edit, Trash2, Calendar, Eye, ShieldCheck, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
-import { useGestorCheck } from "@/hooks/useGestorCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface Servico {
   id: string;
@@ -43,8 +42,7 @@ interface StatusProcesso {
 const AdminServicos = () => {
   const navigate = useNavigate();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
-  const { isGestor } = useGestorCheck(currentUserId);
+  const { isAdmin: isCurrentUserAdmin, isGestor } = useRoleCheck(currentUserId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

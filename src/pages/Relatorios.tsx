@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Download, Trash2, BarChart3, File, FileSpreadsheet, Settings2, Database } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import jbsLogo from "@/assets/jbs-terminais-logo.png";
 import ReportColumnMappingDialog from "@/components/admin/ReportColumnMappingDialog";
 import ReportDownloadDialog from "@/components/admin/ReportDownloadDialog";
@@ -66,7 +66,7 @@ const Relatorios = () => {
   const [downloadModelo, setDownloadModelo] = useState<ModeloRelatorio | null>(null);
   const [modeloMappingCounts, setModeloMappingCounts] = useState<Record<string, number>>({});
 
-  const { isAdmin } = useAdminCheck(user?.id || null);
+  const { isAdmin } = useRoleCheck(user?.id || null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {

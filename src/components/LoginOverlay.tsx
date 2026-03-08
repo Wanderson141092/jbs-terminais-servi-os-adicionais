@@ -15,7 +15,7 @@ interface LoginOverlayProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
+const LoginOverlay = React.forwardRef<HTMLDivElement, LoginOverlayProps>(({ open, onOpenChange }, _ref) => {
   const navigate = useNavigate();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");

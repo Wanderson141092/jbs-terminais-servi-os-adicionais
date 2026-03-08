@@ -1086,17 +1086,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </AlertDescription>
               </Alert>
             )}
-            {/* Campos editáveis de cliente */}
+            {/* Campos do cliente — somente leitura (dados vêm do formulário) */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <User className="h-3 w-3" /> Nome da Empresa
+                  <User className="h-3 w-3" /> Exportador/Importador
                 </Label>
                 <Input
                   value={clienteNome}
-                  onChange={(e) => setClienteNome(e.target.value)}
-                  placeholder="Nome da empresa"
-                  className="h-9 text-sm"
+                  readOnly
+                  className="h-9 text-sm bg-muted/50 cursor-default"
                 />
               </div>
               <div className="space-y-1">
@@ -1105,9 +1104,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </Label>
                 <Input
                   value={clienteCnpj}
-                  onChange={(e) => setClienteCnpj(e.target.value)}
-                  placeholder="00.000.000/0000-00"
-                  className="h-9 text-sm"
+                  readOnly
+                  className="h-9 text-sm bg-muted/50 cursor-default"
                 />
               </div>
             </div>

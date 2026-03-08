@@ -311,8 +311,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           .from("formulario_respostas")
           .select("respostas, arquivos, created_at")
           .eq("formulario_id", formularioId)
-          .order("created_at", { ascending: false })
-          .limit(10);
+          .order("created_at", { ascending: false });
 
         const respostas = respostasData;
 

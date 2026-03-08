@@ -175,9 +175,16 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     }
     setFormRespostas(unmapped);
 
+    // Build pergunta_id → label map
+    const perguntaLabelMap = new Map<string, string>();
+    for (const fp of perguntasData) {
+      const bp = (fp as any).banco_perguntas;
+      if (bp) perguntaLabelMap.set(bp.id, bp.rotulo);
+    }
+
     // Process attachments with signed URLs
     const rawArquivos = (bestResponse.arquivos as any[]) || [];
-    const signedArquivos: { pergunta_id: string; file_url: string; file_name: string }[] = [];
+    const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string }[] = [];
     for (const arq of rawArquivos) {
       let signedUrl = arq.file_url;
       let storagePath: string | null = null;
@@ -196,7 +203,8 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
         if (signedData) signedUrl = signedData.signedUrl;
       }
 
-      signedArquivos.push({ pergunta_id: arq.pergunta_id || "", file_url: signedUrl, file_name: arq.file_name || "Arquivo" });
+      const pid = arq.pergunta_id || "";
+      signedArquivos.push({ pergunta_id: pid, file_url: signedUrl, file_name: arq.file_name || "Arquivo", label: perguntaLabelMap.get(pid) || undefined });
     }
     setFormArquivos(signedArquivos);
   };

@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       const { data: setorRow } = await admin
         .from("setor_emails")
         .select("id,perfis,ativo")
-        .eq("email_setor", setorEmail.email_setor)
+        .eq("email_setor", profile.email_setor)
         .maybeSingle();
 
       if (!setorRow?.ativo) return fail(403, { code: "FORBIDDEN", message: "Setor inativo." });

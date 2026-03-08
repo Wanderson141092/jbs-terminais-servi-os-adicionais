@@ -145,6 +145,37 @@ const resolveCamposExibicao = ({
   });
 };
 
+const resolveStoragePath = (rawUrl: string | null | undefined, bucket: "form-uploads" | "deferimento") => {
+  if (!rawUrl) return null;
+  if (!rawUrl.startsWith("http")) return rawUrl;
+
+  const match = rawUrl.match(new RegExp(`/storage/v1/object/(?:sign|public)/${bucket}/([^?]+)`));
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+};
+
+const resolveMaskAffixes = (config?: any) => {
+  const legacyPrefix = config?.mask?.prefix || config?.mascara?.prefixo || config?.mascara_prefixo;
+  const legacySuffix = config?.mask?.suffix || config?.mascara?.sufixo || config?.mascara_sufixo;
+
+  return {
+    prefixo: String(config?.prefixo ?? legacyPrefix ?? "").trim(),
+    sufixo: String(config?.sufixo ?? legacySuffix ?? "").trim(),
+  };
+};
+
+const applyAffixSafely = (value: any, prefixo: string, sufixo: string) => {
+  if (typeof value !== "string") return value;
+
+  let next = value;
+  if (prefixo && !next.trimStart().startsWith(prefixo)) {
+    next = `${prefixo}${next}`;
+  }
+  if (sufixo && !next.trimEnd().endsWith(sufixo)) {
+    next = `${next} ${sufixo}`.trim();
+  }
+  return next;
+};
+
 const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);

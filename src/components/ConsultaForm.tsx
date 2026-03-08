@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ interface ConsultaFormProps {
   isLoading: boolean;
 }
 
-const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
+const ConsultaForm = React.forwardRef<HTMLFormElement, ConsultaFormProps>(({ onSearch, isLoading }, ref) => {
   const [valor, setValor] = useState("");
   const [chave, setChave] = useState("");
 
@@ -30,7 +30,7 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form ref={ref} onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label className="text-sm font-semibold text-foreground mb-2 block">
           Consulta de Solicitação
@@ -75,6 +75,8 @@ const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
       </div>
     </form>
   );
-};
+});
+
+ConsultaForm.displayName = "ConsultaForm";
 
 export default ConsultaForm;

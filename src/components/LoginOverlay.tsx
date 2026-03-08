@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ interface LoginOverlayProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
+const LoginOverlay = React.forwardRef<HTMLDivElement, LoginOverlayProps>(({ open, onOpenChange }, _ref) => {
   const navigate = useNavigate();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -157,6 +157,8 @@ const LoginOverlay = ({ open, onOpenChange }: LoginOverlayProps) => {
       </DialogContent>
     </Dialog>
   );
-};
+});
+
+LoginOverlay.displayName = "LoginOverlay";
 
 export default LoginOverlay;

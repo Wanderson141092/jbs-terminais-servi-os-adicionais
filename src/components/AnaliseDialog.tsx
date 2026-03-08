@@ -1058,9 +1058,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               )}
               {/* Ações de Cancelamento / Recusa - ao lado da chave */}
               {(canCancel || canRecusar) && solicitacao.status !== 'cancelado' && solicitacao.status !== 'recusado' && (
-                <div className="ml-auto flex flex-col gap-1 bg-destructive/5 px-2 py-1 rounded-md border border-destructive/20">
-                  <span className="text-[10px] font-semibold text-destructive whitespace-nowrap">Cancelamento / Recusa:</span>
-                  <div className="flex gap-1">
+                <div className="ml-auto flex gap-1 bg-destructive/5 px-2 py-1 rounded-md border border-destructive/20">
                     {canCancel && (
                       <Button
                         variant="outline"

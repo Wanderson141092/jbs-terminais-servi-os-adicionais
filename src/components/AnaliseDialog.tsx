@@ -365,22 +365,27 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           const signedArquivos: { pergunta_id: string; file_url: string; file_name: string }[] = [];
           for (const arq of rawArquivos) {
             let signedUrl = arq.file_url;
-            // Generate signed URL if it's a storage path (not already a full URL)
+            // Extract storage path from any URL format and generate fresh signed URL
+            let storagePath: string | null = null;
+
             if (arq.file_url && !arq.file_url.startsWith("http")) {
-              const { data: signedData } = await supabase.storage
-                .from("form-uploads")
-                .createSignedUrl(arq.file_url, 3600);
-              if (signedData) signedUrl = signedData.signedUrl;
-            } else if (arq.file_url && arq.file_url.includes("/storage/v1/object/public/form-uploads/")) {
-              const pathMatch = arq.file_url.split("/storage/v1/object/public/form-uploads/");
-              if (pathMatch.length === 2) {
-                const storagePath = decodeURIComponent(pathMatch[1]);
-                const { data: signedData } = await supabase.storage
-                  .from("form-uploads")
-                  .createSignedUrl(storagePath, 3600);
-                if (signedData) signedUrl = signedData.signedUrl;
+              // Already a raw storage path
+              storagePath = arq.file_url;
+            } else if (arq.file_url) {
+              // Extract path from signed or public URLs
+              const signMatch = arq.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/form-uploads\/([^?]+)/);
+              if (signMatch) {
+                storagePath = decodeURIComponent(signMatch[1]);
               }
             }
+
+            if (storagePath) {
+              const { data: signedData } = await supabase.storage
+                .from("form-uploads")
+                .createSignedUrl(storagePath, 3600);
+              if (signedData) signedUrl = signedData.signedUrl;
+            }
+
             signedArquivos.push({
               pergunta_id: arq.pergunta_id || arq.campo_id || "",
               file_url: signedUrl,

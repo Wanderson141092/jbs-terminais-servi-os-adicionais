@@ -178,10 +178,22 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     const signedArquivos: { pergunta_id: string; file_url: string; file_name: string }[] = [];
     for (const arq of rawArquivos) {
       let signedUrl = arq.file_url;
+      let storagePath: string | null = null;
+
       if (arq.file_url && !arq.file_url.startsWith("http")) {
-        const { data: signedData } = await supabase.storage.from("form-uploads").createSignedUrl(arq.file_url, 3600);
+        storagePath = arq.file_url;
+      } else if (arq.file_url) {
+        const signMatch = arq.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/form-uploads\/([^?]+)/);
+        if (signMatch) {
+          storagePath = decodeURIComponent(signMatch[1]);
+        }
+      }
+
+      if (storagePath) {
+        const { data: signedData } = await supabase.storage.from("form-uploads").createSignedUrl(storagePath, 3600);
         if (signedData) signedUrl = signedData.signedUrl;
       }
+
       signedArquivos.push({ pergunta_id: arq.pergunta_id || "", file_url: signedUrl, file_name: arq.file_name || "Arquivo" });
     }
     setFormArquivos(signedArquivos);

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
-import { useGestorCheck } from "@/hooks/useGestorCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

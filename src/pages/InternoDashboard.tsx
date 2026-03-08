@@ -225,34 +225,7 @@ const InternoDashboard = () => {
       toast.error("Erro ao carregar solicitações.");
     } else {
       const loadedSolicitacoes = (solRes.data || []) as any[];
-
-      // Fallback sob demanda: se o snapshot estiver ausente/defasado,
-      // tenta reconstruir e recarrega a lista para manter a análise consistente.
-      const staleSnapshotIds = loadedSolicitacoes
-        .filter((s) => {
-          if (!s?.id) return false;
-          if (!s?.snapshot_updated_at) return true;
-          const snapTs = new Date(s.snapshot_updated_at).getTime();
-          const solTs = new Date(s.updated_at || s.created_at).getTime();
-          return Number.isFinite(snapTs) && Number.isFinite(solTs) ? snapTs < solTs : false;
-        })
-        .map((s) => s.id)
-        .slice(0, 50);
-
-      if (staleSnapshotIds.length > 0) {
-        // Snapshot rebuild skipped - function not available
-        // Stale snapshots will be refreshed on next write
-
-        const { data: refreshedData } = await (supabase
-          .from("solicitacoes_v" as any)
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(500) as any);
-
-        setSolicitacoes(refreshedData || loadedSolicitacoes);
-      } else {
-        setSolicitacoes(loadedSolicitacoes);
-      }
+      setSolicitacoes(loadedSolicitacoes);
     }
     setLancamentoRegistros(regRes.data || []);
     setLoading(false);

@@ -732,8 +732,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         lacre_armador_aceite_custo: solicitarLacreArmador ? custoLacreArmador : null,
         custo_posicionamento: isLateCancel(selectedStatus) ? custoposicionamento : null,
         lancamento_confirmado: lancamentoConfirmado,
-        cliente_nome: clienteNome.trim(),
-        cnpj: clienteCnpj.trim() || null,
         justification: justificativaNaoVistoriado.trim() || null,
       },
     });
@@ -752,8 +750,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       solicitar_lacre_armador: solicitarLacreArmador,
       lacre_armador_aceite_custo: solicitarLacreArmador ? custoLacreArmador : null,
       pendencias_selecionadas: pendenciasSelecionadas,
-      cliente_nome: clienteNome.trim(),
-      cnpj: clienteCnpj.trim() || null,
       updated_at: new Date().toISOString()
     };
 
@@ -1086,17 +1082,16 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </AlertDescription>
               </Alert>
             )}
-            {/* Campos editáveis de cliente */}
+            {/* Campos do cliente — somente leitura (dados vêm do formulário) */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <User className="h-3 w-3" /> Nome da Empresa
+                  <User className="h-3 w-3" /> Exportador/Importador
                 </Label>
                 <Input
                   value={clienteNome}
-                  onChange={(e) => setClienteNome(e.target.value)}
-                  placeholder="Nome da empresa"
-                  className="h-9 text-sm"
+                  readOnly
+                  className="h-9 text-sm bg-muted/50 cursor-default"
                 />
               </div>
               <div className="space-y-1">
@@ -1105,9 +1100,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </Label>
                 <Input
                   value={clienteCnpj}
-                  onChange={(e) => setClienteCnpj(e.target.value)}
-                  placeholder="00.000.000/0000-00"
-                  className="h-9 text-sm"
+                  readOnly
+                  className="h-9 text-sm bg-muted/50 cursor-default"
                 />
               </div>
             </div>
@@ -1141,26 +1135,44 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Form file attachments - shown as buttons that open preview modal */}
+            {/* Anexos da Solicitação — arquivos enviados no formulário de criação */}
             {formArquivos.length > 0 && (
               <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
                 <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Anexos do Formulário
+                  Anexos da Solicitação
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {formArquivos.map((arq, idx) => (
-                    <Button
-                      key={idx}
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => setPreviewUrl(arq.file_url)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      {arq.file_name}
-                    </Button>
-                  ))}
+                <div className="space-y-1.5">
+                  {formArquivos.map((arq, idx) => {
+                    const isPdf = arq.file_name?.toLowerCase().endsWith('.pdf');
+                    const isImage = /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(arq.file_name || '');
+                    return (
+                      <div key={idx} className="flex items-center justify-between border rounded-md p-2 bg-background">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0">
+                            <p className="text-sm truncate">{arq.file_name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {isPdf ? 'PDF' : isImage ? 'Imagem' : 'Arquivo'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          {(isPdf || isImage) && (
+                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setPreviewUrl(arq.file_url)}>
+                              <Eye className="h-3.5 w-3.5" />
+                              Visualizar
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                            <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
+                              <Download className="h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

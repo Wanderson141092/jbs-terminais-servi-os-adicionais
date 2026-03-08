@@ -315,72 +315,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     }
   };
 
-  const createSolicitacao = async (
-    respostas: Record<string, any>,
-    _arquivos: any[]
-  ): Promise<string> => {
-    const { data: camposFixosRows } = await supabase
-      .from("campos_fixos_config")
-      .select("id, campo_chave");
-
-    const campoChaveById = new Map<string, string>(
-      (camposFixosRows || []).map((campo: any) => [campo.id, campo.campo_chave])
-    );
-
-    // Build solicitacao fields from mapeamentos
-    const solicitacaoData: Record<string, any> = {};
-    for (const map of mapeamentos) {
-      if (respostas[map.pergunta_id] !== undefined) {
-        let campoDestino = map.campo_solicitacao;
-        if (campoDestino?.startsWith("fixo:")) {
-          const [, campoFixoId, campoChaveFallback] = campoDestino.split(":");
-          campoDestino = campoChaveById.get(campoFixoId) || campoChaveFallback || campoDestino;
-        }
-        solicitacaoData[campoDestino] = respostas[map.pergunta_id];
-      }
-    }
-
-    // Generate protocol number
-    const { data: configData } = await supabase
-      .from("protocol_config")
-      .select("*")
-      .limit(1)
-      .single();
-
-    const prefixo = configData?.prefixo || "JBS";
-    const nextNum = (configData?.ultimo_numero || 0) + 1;
-    const codigoLetra = solicitacaoData.tipo_operacao?.[0]?.toUpperCase() || "S";
-    const now = new Date();
-    const yearPrefix = String(now.getFullYear()).slice(-2);
-    const protocolo = `JBS${codigoLetra}${yearPrefix}${String(nextNum).padStart(6, "0")}`;
-
-    // Update protocol counter
-    if (configData) {
-      await supabase.from("protocol_config")
-        .update({ ultimo_numero: nextNum })
-        .eq("id", configData.id);
-    }
-
-    // Insert solicitacao with mapped fields
-    const { error } = await supabase.from("solicitacoes").insert({
-      protocolo,
-      cliente_nome: solicitacaoData.cliente_nome || "Cliente via formulário",
-      cliente_email: solicitacaoData.cliente_email || "",
-      tipo_operacao: solicitacaoData.tipo_operacao || null,
-      numero_conteiner: solicitacaoData.numero_conteiner || null,
-      cnpj: solicitacaoData.cnpj || null,
-      lpco: solicitacaoData.lpco || null,
-      observacoes: solicitacaoData.observacoes || null,
-      data_posicionamento: solicitacaoData.data_posicionamento || null,
-      data_agendamento: solicitacaoData.data_agendamento || null,
-      tipo_carga: solicitacaoData.tipo_carga || null,
-      categoria: solicitacaoData.categoria || null,
-    });
-
-    if (error) throw error;
-
-    return protocolo;
-  };
+  // createSolicitacao removed — submission handled by edge function enviar-formulario
 
   const handleSaveEmail = async () => {
     if (!emailParaNotificacao || !emailParaNotificacao.includes("@")) {

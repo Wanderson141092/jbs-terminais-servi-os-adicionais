@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
+import { fetchCnpjData, stripCnpjMask, isValidCnpj } from "@/lib/cnpjLookup";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +59,7 @@ interface FormFieldRendererProps {
   onFileChange: (file: File | null) => void;
   allValues?: Record<string, any>;
   allPerguntas?: PerguntaComCondicao[];
+  onSiblingValueChange?: (id: string, value: any) => void;
 }
 
 const SearchableSelect = ({ options, value, onValueChange, placeholder }: {
@@ -174,10 +176,62 @@ const FormFieldRenderer = ({
   onFileChange,
   allValues,
   allPerguntas,
+  onSiblingValueChange,
 }: FormFieldRendererProps) => {
   const opcoes = pergunta.opcoes as { value: string; label: string }[] | null;
   const config = pergunta.config as Record<string, any> | null;
   const permitirMultiplos = config?.permitir_multiplos === true;
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+
+  // Detect if this field is a CNPJ field (has CNPJ mask or label contains CNPJ)
+  const isCnpjField = (() => {
+    const mascara = config?.mascara as string | undefined;
+    const isCnpjMask = mascara === "99.999.999/9999-99";
+    const isCnpjLabel = pergunta.rotulo?.toUpperCase().includes("CNPJ");
+    return (pergunta.tipo === "texto_formatado" && (isCnpjMask || isCnpjLabel));
+  })();
+
+  // Find sibling "Razão Social" field to auto-fill
+  const razaoSocialField = isCnpjField && allPerguntas
+    ? allPerguntas.find((p) => {
+        const label = p.rotulo?.toLowerCase() || "";
+        return label.includes("razão social") || label.includes("razao social");
+      })
+    : null;
+
+  const handleCnpjBlur = useCallback(async (rawValue: string) => {
+    if (!isCnpjField || !razaoSocialField || !onSiblingValueChange) return;
+    const stripped = stripCnpjMask(rawValue);
+    if (!isValidCnpj(stripped)) return;
+
+    setCnpjLoading(true);
+    try {
+      const data = await fetchCnpjData(stripped);
+      if (data?.razao_social) {
+        onSiblingValueChange(razaoSocialField.id, data.razao_social);
+        toast.success("Razão Social preenchida automaticamente.");
+      } else {
+        toast.error("CNPJ não encontrado na Receita Federal.");
+      }
+    } catch {
+      toast.error("Erro ao consultar CNPJ.");
+    } finally {
+      setCnpjLoading(false);
+    }
+  }, [isCnpjField, razaoSocialField, onSiblingValueChange]);
+
+  // Check if this is the "Razão Social" field linked to a CNPJ field
+  const isRazaoSocialField = (() => {
+    if (!allPerguntas) return false;
+    const label = pergunta.rotulo?.toLowerCase() || "";
+    if (!label.includes("razão social") && !label.includes("razao social")) return false;
+    // Check if there's a CNPJ sibling
+    return allPerguntas.some((p) => {
+      const pConfig = p.config as Record<string, any> | null;
+      const pMascara = pConfig?.mascara as string | undefined;
+      return (p.tipo === "texto_formatado" && (pMascara === "99.999.999/9999-99" || p.rotulo?.toUpperCase().includes("CNPJ")));
+    });
+  })();
   const multiplosMax = config?.multiplos_max as number | undefined;
 
   // Informativo (text/image block with optional accept)
@@ -361,8 +415,10 @@ const FormFieldRenderer = ({
         {pergunta.tipo === "texto" && (
           <Input
             value={fieldValue || ""}
-            onChange={(e) => onFieldChange(e.target.value)}
+            onChange={isRazaoSocialField ? undefined : (e) => onFieldChange(e.target.value)}
             placeholder={pergunta.placeholder || ""}
+            readOnly={isRazaoSocialField}
+            className={isRazaoSocialField ? "bg-muted/50 cursor-default" : ""}
           />
         )}
 
@@ -434,21 +490,31 @@ const FormFieldRenderer = ({
           const mascara = config?.mascara as string | undefined;
           const maxChars = config?.max_chars as number | undefined;
           return (
-            <Input
-              value={fieldValue || ""}
-              onChange={(e) => {
-                if (mascara) {
-                  onFieldChange(applyMask(e.target.value, mascara));
-                } else {
-                  let val = e.target.value.toUpperCase();
-                  if (maxChars) val = val.slice(0, maxChars);
-                  onFieldChange(val);
-                }
-              }}
-              placeholder={pergunta.placeholder || ""}
-              maxLength={mascara ? mascara.length : (maxChars || undefined)}
-              className="font-mono"
-            />
+            <div className="relative">
+              <Input
+                value={fieldValue || ""}
+                onChange={(e) => {
+                  if (mascara) {
+                    onFieldChange(applyMask(e.target.value, mascara));
+                  } else {
+                    let val = e.target.value.toUpperCase();
+                    if (maxChars) val = val.slice(0, maxChars);
+                    onFieldChange(val);
+                  }
+                }}
+                onBlur={isCnpjField ? (e) => handleCnpjBlur(e.target.value) : undefined}
+                placeholder={pergunta.placeholder || ""}
+                maxLength={mascara ? mascara.length : (maxChars || undefined)}
+                className="font-mono"
+                readOnly={isRazaoSocialField}
+                disabled={isRazaoSocialField && cnpjLoading}
+              />
+              {isCnpjField && cnpjLoading && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground animate-pulse">
+                  Consultando...
+                </span>
+              )}
+            </div>
           );
         })()}
 

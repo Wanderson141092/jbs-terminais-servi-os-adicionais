@@ -37,7 +37,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [deferimentoStatus, setDeferimentoStatus] = useState<"recebido" | "recusado" | "aguardando" | null>(null);
   const [servicoNome, setServicoNome] = useState<string | undefined>(undefined);
   const [camposDinamicos, setCamposDinamicos] = useState<{ nome: string; valor: string }[]>([]);
-  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
+  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string; config?: any }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
 

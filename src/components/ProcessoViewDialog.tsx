@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { buildNotificarStatusPayload } from "@/lib/edgePayload";
+
 import StatusBadge from "./StatusBadge";
 import ProcessStageStepper from "./ProcessStageStepper";
 import ProcessChecklist from "./ProcessChecklist";

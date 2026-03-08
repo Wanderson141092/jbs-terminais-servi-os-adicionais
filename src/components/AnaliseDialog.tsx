@@ -573,14 +573,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} cancelada`, "status");
-    supabase.functions.invoke("notificar-status", {
-      body: buildNotificarStatusPayload({
-        action: "notificar_status",
-        solicitacao_id: solicitacao.id,
-        novo_status: "cancelado",
-        usuario_id: userId,
-      }),
-    }).catch(() => {});
+    // Notification is now triggered automatically by the edge function
 
     toast.success("Cancelamento realizado!");
     setLoading(false);

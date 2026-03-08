@@ -361,19 +361,23 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           }
           setFormRespostas(allResponses);
 
+          // Build pergunta_id → label map from perguntasData
+          const perguntaLabelMap = new Map<string, string>();
+          for (const fp of perguntasData) {
+            const bp = (fp as any).banco_perguntas;
+            if (bp) perguntaLabelMap.set(bp.id, bp.rotulo);
+          }
+
           // Process attachments with signed URLs
           const rawArquivos = (bestResponse.arquivos as any[]) || [];
-          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string }[] = [];
+          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string }[] = [];
           for (const arq of rawArquivos) {
             let signedUrl = arq.file_url;
-            // Extract storage path from any URL format and generate fresh signed URL
             let storagePath: string | null = null;
 
             if (arq.file_url && !arq.file_url.startsWith("http")) {
-              // Already a raw storage path
               storagePath = arq.file_url;
             } else if (arq.file_url) {
-              // Extract path from signed or public URLs
               const signMatch = arq.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/form-uploads\/([^?]+)/);
               if (signMatch) {
                 storagePath = decodeURIComponent(signMatch[1]);
@@ -387,10 +391,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               if (signedData) signedUrl = signedData.signedUrl;
             }
 
+            const pid = arq.pergunta_id || arq.campo_id || "";
             signedArquivos.push({
-              pergunta_id: arq.pergunta_id || arq.campo_id || "",
+              pergunta_id: pid,
               file_url: signedUrl,
               file_name: arq.file_name || "Arquivo",
+              label: perguntaLabelMap.get(pid) || undefined,
             });
           }
           setFormArquivos(signedArquivos);

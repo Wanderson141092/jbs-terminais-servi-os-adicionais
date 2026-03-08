@@ -160,9 +160,10 @@ Deno.serve(async (req) => {
     }
 
     const isTerminalTransition = ["cancelado", "recusado"].includes(target_status);
+    const isForcedCorrection = force_correction === true && isAdmin;
     const higherOrders = Array.from(map.values()).filter((v) => v > currentOrder);
     const nextOrder = higherOrders.length > 0 ? Math.min(...higherOrders) : null;
-    if (!isTerminalTransition && nextOrder !== null && targetOrder !== nextOrder && target_status !== solicitacao.status) {
+    if (!isForcedCorrection && !isTerminalTransition && nextOrder !== null && targetOrder !== nextOrder && target_status !== solicitacao.status) {
       return fail(409, { code: "TRANSITION_NOT_ALLOWED", message: "Transição de status não permitida." });
     }
 

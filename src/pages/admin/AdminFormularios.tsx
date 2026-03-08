@@ -45,13 +45,14 @@ interface Formulario {
 interface Campo {
   id: string;
   formulario_id: string;
-  tipo: string;
-  rotulo: string;
-  placeholder: string | null;
+  pergunta_id: string;
   obrigatorio: boolean;
-  opcoes: unknown;
-  condicao: unknown;
   ordem: number;
+  pergunta?: {
+    id: string;
+    rotulo: string;
+    tipo: string;
+  } | null;
 }
 
 interface Resposta {
@@ -330,8 +331,22 @@ const AdminFormularios = () => {
   };
 
   const fetchCampos = async (formularioId: string) => {
-    const { data } = await supabase.from("formulario_campos").select("*").eq("formulario_id", formularioId).order("ordem");
-    setCampos(data || []);
+    const { data } = await supabase
+      .from("formulario_perguntas")
+      .select("id, formulario_id, pergunta_id, obrigatorio, ordem, banco_perguntas(id, rotulo, tipo)")
+      .eq("formulario_id", formularioId)
+      .order("ordem");
+
+    const camposFormatados = ((data || []) as any[]).map((item) => ({
+      id: item.id,
+      formulario_id: item.formulario_id,
+      pergunta_id: item.pergunta_id,
+      obrigatorio: item.obrigatorio,
+      ordem: item.ordem,
+      pergunta: item.banco_perguntas,
+    }));
+
+    setCampos(camposFormatados);
   };
 
   const fetchRespostas = async (formularioId: string) => {
@@ -424,7 +439,7 @@ const AdminFormularios = () => {
     const sheet = workbook.addWorksheet("Respostas");
 
     // Headers
-    const headers = ["Data", ...campos.map((c) => c.rotulo)];
+    const headers = ["Data", ...campos.map((c) => c.pergunta?.rotulo || c.pergunta_id)];
     const headerRow = sheet.addRow(headers);
     headerRow.eachCell((cell) => {
       cell.font = { bold: true };
@@ -437,6 +452,10 @@ const AdminFormularios = () => {
       const row = [
         new Date(r.created_at).toLocaleString("pt-BR"),
         ...campos.map((c) => {
+          const val = respostasObj[c.pergunta_id] ?? respostasObj[c.id];
+          if (Array.isArray(val)) return val.join(", ");
+          if (typeof val === "boolean") return val ? "Sim" : "Não";
+          return (val as string) || "";
           const val = respostasObj[c.id];
           return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
         }),
@@ -705,7 +724,7 @@ const AdminFormularios = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Data</TableHead>
-                  {campos.map((c) => <TableHead key={c.id}>{c.rotulo}</TableHead>)}
+                  {campos.map((c) => <TableHead key={c.id}>{c.pergunta?.rotulo || c.pergunta_id}</TableHead>)}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -714,9 +733,9 @@ const AdminFormularios = () => {
                     <TableCell className="whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
                     {campos.map((c) => {
                       const respostasObj = r.respostas as Record<string, unknown>;
-                      const val = respostasObj[c.id];
-                      const arquivosArr = r.arquivos as { campo_id: string; file_url: string; file_name: string }[] | null;
-                      const arquivo = arquivosArr?.find((a) => a.campo_id === c.id);
+                      const val = respostasObj[c.pergunta_id] ?? respostasObj[c.id];
+                      const arquivosArr = r.arquivos as { pergunta_id?: string; campo_id?: string; file_url: string; file_name: string }[] | null;
+                      const arquivo = arquivosArr?.find((a) => a.pergunta_id === c.pergunta_id || a.campo_id === c.id);
                       if (arquivo) {
                         return <TableCell key={c.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
                       }

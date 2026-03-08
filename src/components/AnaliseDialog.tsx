@@ -2094,14 +2094,23 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 // Helper Functions
 const formatFormValue = (val: any, tipo: string, config?: any): string => {
-  const prefixo = config?.prefixo || "";
-  const sufixo = config?.sufixo || "";
+  const { prefixo, sufixo } = resolveMaskAffixes(config);
+  const rawValue = applyAffixSafely(val, prefixo, sufixo);
 
-  if (val && typeof val === "object" && !Array.isArray(val)) {
-    if (val.campo1 && val.campo2) return `${prefixo}${val.campo1} / ${val.campo2}${sufixo ? " " + sufixo : ""}`;
-    return normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true, itemPrefix: prefixo, itemSuffix: sufixo });
+  if (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) {
+    if (rawValue.campo1 && rawValue.campo2) {
+      const pair = `${rawValue.campo1} / ${rawValue.campo2}`;
+      return normalizeFormValue(applyAffixSafely(pair, prefixo, sufixo), { nullishFallback: "—" });
+    }
+    return normalizeFormValue(rawValue, {
+      nullishFallback: "—",
+      preserveObjects: true,
+      itemPrefix: prefixo,
+      itemSuffix: sufixo,
+    });
   }
-  return normalizeFormValue(val, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+
+  return normalizeFormValue(rawValue, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
 };
 
 // Helper Components

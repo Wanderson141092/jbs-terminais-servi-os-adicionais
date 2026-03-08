@@ -130,8 +130,7 @@ const InternoDashboard = () => {
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   const [billingDialogData, setBillingDialogData] = useState<{ solicitacao: any; config: any } | null>(null);
 
-  const { isAdmin } = useAdminCheck(user?.id || null);
-  const { isGestor } = useGestorCheck(user?.id || null);
+  const { isAdmin, isGestor } = useRoleCheck(user?.id || null);
   const { statusOptions, statusLabels } = useStatusProcesso();
 
   useNotifications(user?.id || null);

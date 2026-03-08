@@ -443,47 +443,38 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
           // Process attachments with signed URLs
           const rawArquivos = (bestResponse.arquivos as any[]) || [];
-          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string; error?: boolean }[] = [];
-          let failedCount = 0;
-          for (const arq of rawArquivos) {
-            let signedUrl = arq.file_url;
-            let storagePath: string | null = null;
-            let hasError = false;
+          const signedArquivos = await Promise.all(
+            rawArquivos.map(async (arq) => {
+              const storagePath = resolveStoragePath(arq.file_url, "form-uploads");
+              let signedUrl = arq.file_url || "";
+              let hasError = false;
 
-            if (arq.file_url && !arq.file_url.startsWith("http")) {
-              storagePath = arq.file_url;
-            } else if (arq.file_url) {
-              const signMatch = arq.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/form-uploads\/([^?]+)/);
-              if (signMatch) {
-                storagePath = decodeURIComponent(signMatch[1]);
-              }
-            }
-
-            if (storagePath) {
-              const { data: signedData, error: signError } = await supabase.storage
-                .from("form-uploads")
-                .createSignedUrl(storagePath, 3600);
-              if (signedData) {
-                signedUrl = signedData.signedUrl;
-              } else {
-                console.error("[Anexos] Falha ao gerar URL assinada:", storagePath, signError);
+              if (storagePath) {
+                const { data: signedData, error: signError } = await supabase.storage
+                  .from("form-uploads")
+                  .createSignedUrl(storagePath, 3600);
+                if (signedData?.signedUrl) {
+                  signedUrl = signedData.signedUrl;
+                } else {
+                  console.error("[Anexos] Falha ao gerar URL assinada:", storagePath, signError);
+                  hasError = true;
+                }
+              } else if (!arq.file_url) {
                 hasError = true;
-                failedCount++;
               }
-            } else if (!arq.file_url) {
-              hasError = true;
-              failedCount++;
-            }
 
-            const pid = arq.pergunta_id || arq.campo_id || "";
-            signedArquivos.push({
-              pergunta_id: pid,
-              file_url: signedUrl || "",
-              file_name: arq.file_name || "Arquivo",
-              label: perguntaLabelMap.get(pid) || undefined,
-              error: hasError,
-            });
-          }
+              const pid = arq.pergunta_id || arq.campo_id || "";
+              return {
+                pergunta_id: pid,
+                file_url: signedUrl,
+                file_name: arq.file_name || "Arquivo",
+                label: perguntaLabelMap.get(pid) || undefined,
+                error: hasError,
+              };
+            })
+          );
+
+          const failedCount = signedArquivos.filter((a) => a.error).length;
           if (failedCount > 0) {
             toast.warning(`${failedCount} anexo(s) não puderam ser carregados. Verifique o visualizador de anexos.`);
           }

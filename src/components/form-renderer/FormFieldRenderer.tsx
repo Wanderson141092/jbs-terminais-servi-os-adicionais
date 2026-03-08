@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
+import { fetchCnpjData, stripCnpjMask, isValidCnpj } from "@/lib/cnpjLookup";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";

@@ -1,141 +1,93 @@
 
 
-# Plan: Complete Implementation/Fix of All 25 Items
+## Plano: Reestruturação da Exibição de Anexos na Tela de Análise
 
-Many of these items were partially implemented in Phases 1-7 but have gaps or bugs. This plan addresses every remaining issue.
+### Diagnóstico da Auditoria
 
----
+**Fluxo atual de anexos do formulário:**
+1. Upload via `upload-publico` → salva em bucket `form-uploads` → retorna `storage_path` (relativo)
+2. `enviar-formulario` grava `storage_path` no campo `arquivos` de `formulario_respostas` (JSONB)
+3. `AnaliseDialog` busca `formulario_respostas.arquivos`, gera URLs assinadas via `createSignedUrl`
+4. Exibição: badges clicáveis que abrem o `AttachmentViewer` (modal com sidebar + preview)
 
-## Group A: Already Implemented — Needs Verification/Fixes Only
+**Fluxo de anexos de deferimento:**
+1. Upload via `upload-publico` → bucket `deferimento` → insere em `deferimento_documents`
+2. `AnaliseDialog` busca `deferimento_documents` com `neq("document_type", "deferimento")` para anexos gerais, e filtra por `"deferimento"` para docs de deferimento
+3. Exibição: lista inline com botões Visualizar/Download ou embarcado
 
-These items were implemented but may have bugs based on the code review:
-
-| # | Item | Status | Fix Needed |
-|---|------|--------|------------|
-| 2 | Sigla field missing in status dialog | Code exists (line 276-281 in ParametrosCamposManager) | Verify `showSigla: true` is set for `status_processo` — **already set** on line 39. Should work. |
-| 5 | Status correction reset | Code exists in StatusCorrectionDialog | Already clears fields. Verify it also clears `status_vistoria` to null. |
-| 6 | Desfazer lançamento | `handleDesfazerLancamento` exists (line 796) | Verify UI button renders for each confirmed config. |
-| 8 | Internal/External observation toggle | `observacaoTipo` state exists (line 65) | Verify toggle UI renders and external observations update `solicitacoes.observacoes`. |
-| 9 | Logs detail modal | Code exists in AdminLogs | Already has Eye button + detail modal. |
-| 13 | NavisN4 service/status filters | Already added | Verify functionality. |
-| 15 | Conditional self-reference block | Already added in FormularioBuilder | Verify. |
-| 17 | Prefix validation (3 chars) | Already updated regex | Verify. |
-| 19 | Cutoff by weekday | Already added in GestorRegras | Verify. |
-| 22 | Protocol format JBS+Letter+YY+6digits | Already migrated | Verify. |
-| 24 | External page button sizing | Already reduced | Verify. |
-| 25 | Logoff redirect & /interno redirect | Already updated | Verify. |
+**Problemas identificados:**
+- Anexos do formulário aparecem como badges pequenos, sem preview direto na tela (só via modal)
+- Não há separação visual clara entre anexos do formulário e anexos de deferimento
+- Anexos de deferimento (`attachments`) usam URLs que podem ser `storage_path` sem assinatura
+- O `AttachmentViewer` já tem a UI ideal (sidebar esquerda + preview direita), mas só é usado em modal
 
 ---
 
-## Group B: Needs Implementation or Significant Fixes
+### Plano de Implementação
 
-### B1. Item 1 — Status Group Structure & Validation with Timeline (Moderate)
-**Current state**: `grupo_status` field exists in `ParametrosCamposManager` with 3 options.
-**Missing**: The status group needs to integrate with `consulta_etapas_config` (Timeline). The classification rule (Posicionamento? → Vistoria vs Serviço vs Outros) should be documented in the UI and optionally enforced.
-**Plan**:
-- Add descriptive help text in the `grupo_status` selector explaining the classification tree
-- When creating/editing timeline etapas in `ConsultaEtapasManager`, show which status groups they map to
-- No schema changes needed — `grupo_status` column already exists
+#### 1. Reestruturar seção de anexos do formulário na AnaliseDialog
+**Arquivo:** `src/components/AnaliseDialog.tsx` (linhas ~1173-1200)
 
-### B2. Item 3 — Encrypted name in header (Bug Fix)
-**Current state**: Dashboard uses `profiles_v` view which should decrypt. The `nome` field shows encrypted because `profiles_v` calls `decrypt_pii(nome)`.
-**Root cause**: The view `profiles_v` likely already decrypts. Need to verify the view definition. If `profile?.nome` still shows encrypted text, it could be that the view isn't returning the decrypted value properly.
-**Plan**:
-- Query the view definition to confirm it decrypts `nome`
-- If the view is correct but the name was double-encrypted (encrypted before trigger was added), fix by running a data correction
-- Ensure `AdminLogs` also uses `profiles_v` for display names (it currently does)
+Substituir a seção atual de badges por um componente inline com:
+- Layout de duas colunas dentro de um container `border rounded-lg`
+- **Coluna esquerda** (~200px): lista dos anexos com nome da pergunta (label), clicáveis
+- **Coluna direita**: área de preview que carrega PDF (iframe) ou imagem ao clicar
+- Botões de "Abrir em nova aba" e "Baixar" no toolbar do preview
+- Manter o `AttachmentViewer` modal como opção secundária ("Expandir")
 
-### B3. Item 4 — Recusa requires motivo + show in external page
-**Current state**: `executeRecusa` already saves motivo as `tipo_observacao: "externa"`. The `consulta-publica` edge function filters for `tipo_observacao = 'externa'`.
-**Missing**: Verify that the external `ConsultaResultado` component actually displays the recusa reason when status is `recusado`. Check `consulta-publica` returns observations properly.
-**Plan**:
-- In `ConsultaResultado.tsx`, add a section that shows the refusal reason from `observacoes` when status is `recusado`
-- Verify `consulta-publica` returns `observacoes` array with `tipo_observacao = 'externa'`
+#### 2. Separar visualmente anexos do formulário e deferimento
+- Seção "Anexos da Solicitação" (formulário) com ícone `Paperclip` e fundo `bg-blue-50/30`
+- Seção "Documentos de Deferimento" separada com ícone `FileText` e fundo `bg-amber-50/30`
+- Cada seção com título claro e contagem
 
-### B4. Item 7 — Toggle Activation Logic Fix (Complex)
-**Current state**: Toggles show based on service config status/pendency lists.
-**Missing**: The described rule is: (1) if current status matches config AND service matches → show toggle section; (2) if a pendency checkbox is checked (even before saving) → show the toggle immediately.
-**Plan**:
-- In `AnaliseDialog.tsx`, refactor toggle visibility logic:
-  - Check if `servicoConfig` matches current service
-  - Check if `selectedStatus` is in `deferimento_status_ativacao` or `lacre_armador_status_ativacao`
-  - Additionally, if any `pendenciasSelecionadas` matches `deferimento_pendencias_ativacao` or `lacre_armador_pendencias_ativacao`, show the toggle immediately
-- Ensure the toggle appears reactively when a pendency checkbox is clicked (before save)
+#### 3. Criar componente `InlineAttachmentPreview`
+**Novo arquivo:** `src/components/InlineAttachmentPreview.tsx`
 
-### B5. Item 10 — Batch Billing Registration (New Feature)
-**Plan**:
-- Create `BatchBillingDialog.tsx` component
-- Add batch action button in dashboard when multiple processes are selected
-- For each selected process, create/confirm `lancamento_cobranca_registros` entries
-- Support both service billing and lacre positioning billing
+Props:
+```typescript
+interface InlineAttachmentPreviewProps {
+  arquivos: AttachmentItem[];
+  title: string;
+  onExpandClick?: () => void; // abre AttachmentViewer modal
+}
+```
 
-### B6. Item 11 — Manual Auto-Update + Back Button Fix
-**Current state**: `AdminParametrosAjuda.tsx` uses static `DOCUMENTACAO` array.
-**Plan**:
-- Add "Atualizar Manual" button that fetches current field configs from DB and rebuilds documentation
-- Fix back button to navigate to `/interno/admin/parametros` instead of `/interno/dashboard`
+Layout interno:
+- Container com altura fixa (~350px)
+- Sidebar esquerda com `ScrollArea` listando anexos (nome da pergunta)
+- Item selecionado destacado com borda primária
+- Área principal com preview (iframe para PDF, img para imagens, fallback para outros)
+- Toolbar com botões Download/Abrir/Expandir
+- Indicador de erro para anexos que falharam
 
-### B7. Item 12 — Custom Reports for Deferimento & Billing
-**Plan**:
-- In `ExtrairRelatorioDialog.tsx`, add filter toggles:
-  - "Apenas processos com Deferimento" (filter where `solicitar_deferimento = true`)
-  - "Apenas processos com Lançamento de Cobrança" (filter by `lancamento_cobranca_registros` existence)
+#### 4. Gerar URLs assinadas para anexos de deferimento
+**Arquivo:** `src/components/AnaliseDialog.tsx`
 
-### B8. Item 14 — Conditional sub-questions inherit full config
-**Plan**:
-- In `FormularioBuilder.tsx`, when adding a sub-question to a conditional, render the full field configuration (masks, domain blocking, options import, width control, etc.) exactly like the main question type
-- In `FormFieldRenderer.tsx`, ensure sub-questions pass through all config properties
+Na busca de `deferimento_documents`, adicionar lógica de `createSignedUrl` para o bucket `deferimento` (igual ao que já é feito para `form-uploads`), garantindo que as URLs sempre funcionem.
 
-### B9. Item 16 — Description/subtitle field for form questions
-**Current state**: `banco_perguntas` table has `descricao` column.
-**Plan**:
-- In `FormularioBuilder.tsx`, add `descricao` input field with italic/font-size options
-- In `FormFieldRenderer.tsx`, render description below the label in italic with smaller font
+#### 5. Validação pré-upload no FormRenderer
+**Arquivo:** `src/components/form-renderer/FormFieldRenderer.tsx`
 
-### B10. Item 18 — Lacre Armador External Page Fixes (Complex)
-**Plan**:
-- In `ConsultaResultado.tsx`: respect `is_active` toggle for each lacre config field
-- Show "Mensagem de custo do Lacre" and "Tipo de Aceite do Lacre" when active
-- Add toggle for "Lacre Coletado" field visibility in `PaginaExternaConfigManager`
-- In `LacreArmadorDialog.tsx`: derive "Custo de Serviço" from `solicitacao.lacre_armador_aceite_custo` (Sim/Não/blank mirrors the toggle value)
-- Show "Tipo de Aceite do Lacre" in "Ciente do custo de novo posicionamento" field
+Antes de aceitar o arquivo no campo de upload:
+- Validar tamanho (max 10MB)
+- Validar tipo (PDF, JPG, PNG, DOC permitidos)
+- Validar que o arquivo não está vazio (0 bytes)
+- Exibir toast de erro específico se falhar validação
+- Esses checks já existem parcialmente no backend; replicar no frontend para feedback imediato
 
-### B11. Item 20 — Fix "Aplica Dia Anterior" Logic
-**Current state**: Logic in `enviar-formulario` (line 187-205) already implements the corrected rule.
-**Plan**: Verify the implementation matches the spec:
-- When enabled: cut applies only when time >= cutoff AND date is D+1 or earlier
-- When disabled: cut applies purely on time >= cutoff regardless of date
-- Review and fix if the current `tomorrow` calculation is correct (should compare `dataPos <= tomorrow` meaning the date is today or tomorrow)
-
-### B12. Item 21 — Notification config: add "Administrador" option
-**Current state**: `notificar-status` edge function supports `"admin"` in `setor_ids`.
-**Plan**:
-- In `AdminParametros.tsx` notification section, add "Administrador do Sistema" as a selectable setor option
-
-### B13. Item 23 — Routing rules: add "Administrador" option
-**Plan**:
-- In `AdminParametros.tsx` routing rules section, add "Administrador" to the setor notification dropdown
+#### 6. Toast de alerta para anexos com falha
+Já implementado parcialmente. Reforçar:
+- Se `failedCount > 0`, exibir toast warning com contagem
+- Marcar anexos com erro no `InlineAttachmentPreview` com ícone `AlertTriangle` e texto explicativo
 
 ---
 
-## Implementation Order
+### Arquivos Modificados
 
-1. **Schema fixes**: Verify `profiles_v` view decrypts `nome` correctly (Item 3)
-2. **Edge function fixes**: Verify `aplica_dia_anterior` logic (Item 20)
-3. **ParametrosCamposManager**: Verify grupo_status + sigla display (Items 1, 2)
-4. **AnaliseDialog**: Fix toggle logic (Item 7), verify recusa/observation (Items 4, 8, 6)
-5. **ConsultaResultado**: Show recusa reason, lacre fixes (Items 4, 18)
-6. **LacreArmadorDialog**: Cost derivation fix (Item 18)
-7. **PaginaExternaConfigManager**: Lacre field toggles (Item 18)
-8. **AdminParametros**: Admin notification option (Items 21, 23)
-9. **Dashboard**: Batch billing (Item 10)
-10. **FormularioBuilder + FormFieldRenderer**: Sub-question config + description (Items 14, 16)
-11. **ExtrairRelatorioDialog**: Deferimento/billing filters (Item 12)
-12. **AdminParametrosAjuda**: Auto-update + back button (Item 11)
-
-### Estimated Changes
-- **~12 frontend files** modified
-- **1 new component** (`BatchBillingDialog.tsx`)
-- **1 edge function** potentially updated (`enviar-formulario` if `aplica_dia_anterior` logic needs correction)
-- **Possible 1 data migration** (if `profiles_v` view needs fixing or names need re-encryption)
+| Arquivo | Ação |
+|---|---|
+| `src/components/InlineAttachmentPreview.tsx` | **Novo** - Componente inline de preview |
+| `src/components/AnaliseDialog.tsx` | **Editar** - Substituir badges por InlineAttachmentPreview, separar deferimento, assinar URLs de deferimento |
+| `src/components/form-renderer/FormFieldRenderer.tsx` | **Editar** - Adicionar validação pré-upload (tamanho, tipo, arquivo vazio) |
+| `src/components/AttachmentViewer.tsx` | **Sem alterações** - Já funcional como modal expandido |
 

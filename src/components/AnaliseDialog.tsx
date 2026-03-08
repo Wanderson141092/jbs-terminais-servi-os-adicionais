@@ -372,10 +372,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
           // Process attachments with signed URLs
           const rawArquivos = (bestResponse.arquivos as any[]) || [];
-          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string }[] = [];
+          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string; error?: boolean }[] = [];
+          let failedCount = 0;
           for (const arq of rawArquivos) {
             let signedUrl = arq.file_url;
             let storagePath: string | null = null;
+            let hasError = false;
 
             if (arq.file_url && !arq.file_url.startsWith("http")) {
               storagePath = arq.file_url;
@@ -387,19 +389,32 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             }
 
             if (storagePath) {
-              const { data: signedData } = await supabase.storage
+              const { data: signedData, error: signError } = await supabase.storage
                 .from("form-uploads")
                 .createSignedUrl(storagePath, 3600);
-              if (signedData) signedUrl = signedData.signedUrl;
+              if (signedData) {
+                signedUrl = signedData.signedUrl;
+              } else {
+                console.error("[Anexos] Falha ao gerar URL assinada:", storagePath, signError);
+                hasError = true;
+                failedCount++;
+              }
+            } else if (!arq.file_url) {
+              hasError = true;
+              failedCount++;
             }
 
             const pid = arq.pergunta_id || arq.campo_id || "";
             signedArquivos.push({
               pergunta_id: pid,
-              file_url: signedUrl,
+              file_url: signedUrl || "",
               file_name: arq.file_name || "Arquivo",
               label: perguntaLabelMap.get(pid) || undefined,
+              error: hasError,
             });
+          }
+          if (failedCount > 0) {
+            toast.warning(`${failedCount} anexo(s) não puderam ser carregados. Verifique o visualizador de anexos.`);
           }
           setFormArquivos(signedArquivos);
         } else {

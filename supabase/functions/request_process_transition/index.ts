@@ -220,6 +220,24 @@ Deno.serve(async (req) => {
       await admin.from("solicitacoes").update({ observacoes: justification }).eq("id", solicitacao_id);
     }
 
+    // Fire-and-forget: trigger notifications to linked sectors via notification_rules
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    fetch(`${supabaseUrl}/functions/v1/notificar-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRole}`,
+      },
+      body: JSON.stringify({
+        payload_version: "2026-03-07",
+        action: "notificar_status",
+        solicitacao_id,
+        novo_status: target_status,
+        usuario_id: userId,
+        timestamp: new Date().toISOString(),
+      }),
+    }).catch((err) => console.error("Error triggering notification:", err));
+
     return new Response(JSON.stringify({ ok: true, data: { action: "transition", solicitacao_id, target_status } }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

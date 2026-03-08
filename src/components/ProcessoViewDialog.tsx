@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { buildNotificarStatusPayload } from "@/lib/edgePayload";
+
 import StatusBadge from "./StatusBadge";
 import ProcessStageStepper from "./ProcessStageStepper";
 import ProcessChecklist from "./ProcessChecklist";
@@ -210,14 +210,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       const msg = data?.error?.message || error?.message || "Erro ao alterar status";
       toast.error(msg);
     } else {
-      supabase.functions.invoke("notificar-status", {
-        body: buildNotificarStatusPayload({
-          action: "notificar_status",
-          solicitacao_id: solicitacao.id,
-          novo_status: targetStatus,
-          usuario_id: userId,
-        }),
-      }).catch(() => {});
+      // Notification is now triggered automatically by the edge function
 
       toast.success(`Status alterado para ${newStatus === 'aprovado' ? 'Aprovado' : 'Recusado'}`);
       setShowStatusChangeDialog(false);

@@ -573,14 +573,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} cancelada`, "status");
-    supabase.functions.invoke("notificar-status", {
-      body: buildNotificarStatusPayload({
-        action: "notificar_status",
-        solicitacao_id: solicitacao.id,
-        novo_status: "cancelado",
-        usuario_id: userId,
-      }),
-    }).catch(() => {});
+    // Notification is now triggered automatically by the edge function
 
     toast.success("Cancelamento realizado!");
     setLoading(false);
@@ -624,14 +617,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     const details = `Status atualizado para: Recusado. Justificativa: ${cancelJustificativa.trim()}`;
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} recusada: ${cancelJustificativa.trim()}`, "status");
-    supabase.functions.invoke("notificar-status", {
-      body: buildNotificarStatusPayload({
-        action: "notificar_status",
-        solicitacao_id: solicitacao.id,
-        novo_status: "recusado",
-        usuario_id: userId,
-      }),
-    }).catch(() => {});
+    // Notification is now triggered automatically by the edge function
 
     toast.success("Recusa registrada!");
     setLoading(false);
@@ -828,15 +814,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     const statusLabel = statusOptions.find((s: any) => s.value === selectedStatus)?.label || selectedStatus;
     await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
     
-    // Dispatch email/notification via edge function
-    supabase.functions.invoke("notificar-status", {
-      body: buildNotificarStatusPayload({
-        action: "notificar_status",
-        solicitacao_id: solicitacao.id,
-        novo_status: selectedStatus,
-        usuario_id: userId,
-      }),
-    }).catch(() => {}); // Fire and forget
+    // Notification is now triggered automatically by the edge function
     
     toast.success("Atualização realizada com sucesso!");
     setLoading(false);

@@ -1175,7 +1175,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {formArquivos.map((arq, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-[10px] cursor-pointer hover:bg-accent" onClick={() => { setShowAttachmentViewer(true); }}>
+                    <Badge key={idx} variant="secondary" className="text-[10px] cursor-pointer hover:bg-accent" onClick={() => { setAttachmentInitialIndex(idx); setShowAttachmentViewer(true); }}>
                       <FileText className="h-3 w-3 mr-1" />
                       {arq.label || arq.file_name}
                     </Badge>

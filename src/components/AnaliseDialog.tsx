@@ -1578,16 +1578,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 
             {/* Documentos de Deferimento */}
-            {attachments.length > 0 && (
+            {deferimentoArquivos.length > 0 && (
               <>
                 <Separator />
                 <InlineAttachmentPreview
-                  arquivos={attachments.map((att: any) => ({
-                    pergunta_id: att.id,
-                    file_url: att.file_url,
-                    file_name: att.file_name,
-                    label: att.document_type === "deferimento" ? `Deferimento: ${att.file_name}` : att.file_name,
-                  }))}
+                  arquivos={deferimentoArquivos}
                   title="Documentos de Deferimento"
                   icon={<FileText className="h-4 w-4" />}
                   className="border-amber-200/50"

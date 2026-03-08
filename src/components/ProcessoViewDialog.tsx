@@ -406,7 +406,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                 <div className="flex items-center gap-2 mb-2">
                   {solicitacao.comex_aprovado === true && <CheckCircle className="h-4 w-4 text-green-600" />}
                   {solicitacao.comex_aprovado === false && <XCircle className="h-4 w-4 text-destructive" />}
-                  <span className="font-medium">COMEX</span>
+                  <span className="font-medium">Administrativo</span>
                 </div>
                 {solicitacao.comex_justificativa && (
                   <p className="text-xs text-muted-foreground">{solicitacao.comex_justificativa}</p>
@@ -416,7 +416,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                 <div className="flex items-center gap-2 mb-2">
                   {solicitacao.armazem_aprovado === true && <CheckCircle className="h-4 w-4 text-green-600" />}
                   {solicitacao.armazem_aprovado === false && <XCircle className="h-4 w-4 text-destructive" />}
-                  <span className="font-medium">ARMAZÉM</span>
+                  <span className="font-medium">Operacional</span>
                 </div>
                 {solicitacao.armazem_justificativa && (
                   <p className="text-xs text-muted-foreground">{solicitacao.armazem_justificativa}</p>

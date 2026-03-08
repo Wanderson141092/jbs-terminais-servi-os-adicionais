@@ -40,6 +40,12 @@ export const normalizeFormValue = (
   }
 
   const stringValue = String(value);
+
+  // Normalize string booleans from checkboxes
+  const lower = stringValue.toLowerCase();
+  if (lower === "true") return "Sim";
+  if (lower === "false") return "Não";
+
   if (stringValue.startsWith("[") && stringValue.endsWith("]")) {
     try {
       const parsed = JSON.parse(stringValue);

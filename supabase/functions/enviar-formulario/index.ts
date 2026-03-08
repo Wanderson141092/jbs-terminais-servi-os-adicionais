@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     // 2. Save form response
     const { error: respError } = await supabase.from("formulario_respostas").insert({
       formulario_id,
-      respostas,
+      respostas: normalizedRespostas,
       arquivos: arquivos && arquivos.length > 0 ? arquivos : null,
     });
 

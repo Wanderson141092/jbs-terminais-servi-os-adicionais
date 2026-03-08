@@ -752,8 +752,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       solicitar_lacre_armador: solicitarLacreArmador,
       lacre_armador_aceite_custo: solicitarLacreArmador ? custoLacreArmador : null,
       pendencias_selecionadas: pendenciasSelecionadas,
-      cliente_nome: clienteNome.trim(),
-      cnpj: clienteCnpj.trim() || null,
       updated_at: new Date().toISOString()
     };
 

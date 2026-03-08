@@ -345,7 +345,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
           // For internal forms: show ALL responses (unmapped)
           // For external/iframe forms: mapped ones go to dynamic fields, show unmapped here
-          const allResponses: { rotulo: string; valor: any; tipo: string }[] = [];
+          const allResponses: { rotulo: string; valor: any; tipo: string; config?: any }[] = [];
           for (const fp of perguntasData) {
             const bp = (fp as any).banco_perguntas;
             if (!bp) continue;
@@ -355,7 +355,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
             const val = respostasObj[bp.id];
             if (val !== undefined && val !== null && val !== "") {
-              allResponses.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
+              allResponses.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo, config: bp.config });
             }
           }
           setFormRespostas(allResponses);

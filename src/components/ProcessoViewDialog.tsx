@@ -13,6 +13,7 @@ import ProcessStageStepper from "./ProcessStageStepper";
 import ProcessChecklist from "./ProcessChecklist";
 import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw, ClipboardList } from "lucide-react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
+import { normalizeFormValue } from "@/lib/normalizeFormValue";
 
 interface ProcessoViewDialogProps {
   open: boolean;
@@ -36,7 +37,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [deferimentoStatus, setDeferimentoStatus] = useState<"recebido" | "recusado" | "aguardando" | null>(null);
   const [servicoNome, setServicoNome] = useState<string | undefined>(undefined);
   const [camposDinamicos, setCamposDinamicos] = useState<{ nome: string; valor: string }[]>([]);
-  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
+  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string; config?: any }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
 
@@ -121,22 +122,22 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       return;
     }
 
-    const { data: respostas } = await supabase
-      .from("formulario_respostas")
-      .select("respostas, arquivos, created_at")
-      .eq("formulario_id", formularioId)
-      .order("created_at", { ascending: false });
-
-    const { data: perguntasData } = await supabase
-      .from("formulario_perguntas")
-      .select("pergunta_id, banco_perguntas(id, rotulo, tipo, config)")
-      .eq("formulario_id", formularioId)
-      .order("ordem");
-
-    const { data: mapeamentos } = await supabase
-      .from("pergunta_mapeamento")
-      .select("pergunta_id, campo_solicitacao, campo_analise_id")
-      .eq("formulario_id", formularioId);
+    const [{ data: respostas }, { data: perguntasData }, { data: mapeamentos }] = await Promise.all([
+      supabase
+        .from("formulario_respostas")
+        .select("respostas, arquivos, created_at")
+        .eq("formulario_id", formularioId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("formulario_perguntas")
+        .select("pergunta_id, banco_perguntas(id, rotulo, tipo, config)")
+        .eq("formulario_id", formularioId)
+        .order("ordem"),
+      supabase
+        .from("pergunta_mapeamento")
+        .select("pergunta_id, campo_solicitacao, campo_analise_id")
+        .eq("formulario_id", formularioId),
+    ]);
 
     if (!respostas || respostas.length === 0 || !perguntasData) {
       setFormRespostas([]);
@@ -156,17 +157,16 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     const respostasObj = bestResponse.respostas as Record<string, any>;
     const mappedPerguntaIds = new Set((mapeamentos || []).map(m => m.pergunta_id));
 
-    const unmapped: { rotulo: string; valor: any; tipo: string }[] = [];
+    const unmapped: { rotulo: string; valor: any; tipo: string; config?: any }[] = [];
     for (const fp of perguntasData) {
       const bp = (fp as any).banco_perguntas;
       if (!bp) continue;
       if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
-      // For external forms, skip mapped; for internal show all
       if (isExternalForm && mappedPerguntaIds.has(bp.id)) continue;
 
       const val = respostasObj[bp.id];
       if (val !== undefined && val !== null && val !== "") {
-        unmapped.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
+        unmapped.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo, config: bp.config });
       }
     }
     setFormRespostas(unmapped);
@@ -257,15 +257,23 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     setPreviewUrl(url);
   };
 
-  const formatResponseValue = (val: any, tipo: string): string => {
-    if (val === null || val === undefined) return "—";
-    if (Array.isArray(val)) return val.join(", ");
-    if (typeof val === "object") {
-      if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
-      return JSON.stringify(val);
+  const formatResponseValue = (val: any, tipo: string, config?: any): string => {
+    let result: string;
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      if (val.campo1 && val.campo2) result = `${val.campo1} / ${val.campo2}`;
+      else result = normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true });
+    } else {
+      result = normalizeFormValue(val, { nullishFallback: "—" });
     }
-    if (typeof val === "boolean") return val ? "Sim" : "Não";
-    return String(val);
+    // Apply prefix/suffix from question config when displaying
+    if (config && result !== "—") {
+      const prefixo = config.prefixo || "";
+      const sufixo = config.sufixo || "";
+      if (prefixo || sufixo) {
+        result = `${prefixo}${result}${sufixo ? " " + sufixo : ""}`;
+      }
+    }
+    return result;
   };
 
   if (!solicitacao) return null;
@@ -402,7 +410,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                     {formRespostas.map((fr, i) => (
                       <div key={i}>
                         <Label className="text-xs text-muted-foreground">{fr.rotulo}</Label>
-                        <p className="text-sm">{formatResponseValue(fr.valor, fr.tipo)}</p>
+                        <p className="text-sm">{formatResponseValue(fr.valor, fr.tipo, fr.config)}</p>
                       </div>
                     ))}
                   </div>

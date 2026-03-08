@@ -2,7 +2,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 type Failure = { code: string; message: string; details?: unknown };
@@ -74,10 +75,9 @@ Deno.serve(async (req) => {
       return fail(403, { code: "SERVICE_DISABLED", message: "Serviço não habilitado para esta operação." });
     }
 
-    const [{ data: profile }, { data: roles }, { data: setorEmail }] = await Promise.all([
+    const [{ data: profile }, { data: roles }] = await Promise.all([
       admin.from("profiles").select("id,setor,email_setor").eq("id", userId).maybeSingle(),
       admin.from("user_roles").select("role").eq("user_id", userId),
-      admin.from("profiles").select("email_setor").eq("id", userId).maybeSingle(),
     ]);
 
     const roleSet = new Set((roles || []).map((r: any) => r.role));
@@ -88,11 +88,11 @@ Deno.serve(async (req) => {
       return fail(403, { code: "FORBIDDEN", message: "Usuário sem setor vinculado." });
     }
 
-    if (!isAdmin && setorEmail?.email_setor) {
+    if (!isAdmin && profile?.email_setor) {
       const { data: setorRow } = await admin
         .from("setor_emails")
         .select("id,perfis,ativo")
-        .eq("email_setor", setorEmail.email_setor)
+        .eq("email_setor", profile.email_setor)
         .maybeSingle();
 
       if (!setorRow?.ativo) return fail(403, { code: "FORBIDDEN", message: "Setor inativo." });

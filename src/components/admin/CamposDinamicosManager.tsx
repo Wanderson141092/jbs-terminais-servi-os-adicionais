@@ -126,9 +126,47 @@ const CamposDinamicosManager = () => {
   };
 
   const handleDelete = async (campo: CampoAnalise) => {
+    const [{ count: valuesCount, error: valuesError }, { error: mappingCleanupError }] = await Promise.all([
+      supabase
+        .from("campos_analise_valores")
+        .select("id", { count: "exact", head: true })
+        .eq("campo_id", campo.id),
+      supabase.from("pergunta_mapeamento").delete().eq("campo_analise_id", campo.id),
+    ]);
+
+    if (valuesError) {
+      toast.error("Erro ao validar vínculos do campo.");
+      return;
+    }
+
+    if (mappingCleanupError) {
+      toast.error("Erro ao limpar mapeamentos do campo.");
+      return;
+    }
+
+    if ((valuesCount || 0) > 0) {
+      const { error: disableError } = await supabase
+        .from("campos_analise")
+        .update({ ativo: false, visivel_externo: false, updated_at: new Date().toISOString() })
+        .eq("id", campo.id);
+
+      if (disableError) {
+        toast.error("Campo possui dados e não pôde ser desativado automaticamente.");
+        return;
+      }
+
+      toast.warning(`Campo possui ${valuesCount} registro(s) e foi apenas desativado para preservar histórico.`);
+      fetchData();
+      return;
+    }
+
     const { error } = await supabase.from("campos_analise").delete().eq("id", campo.id);
-    if (error) { toast.error("Erro ao excluir. Pode haver valores vinculados."); return; }
-    toast.success("Campo excluído!");
+    if (error) {
+      toast.error("Erro ao excluir campo.");
+      return;
+    }
+
+    toast.success("Campo excluído com sucesso.");
     fetchData();
   };
 

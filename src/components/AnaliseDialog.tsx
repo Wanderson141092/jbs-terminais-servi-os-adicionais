@@ -1787,7 +1787,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <DialogTitle>Visualizar Documento</DialogTitle>
             </DialogHeader>
             <div className="flex-1 min-h-[60vh]">
-              {previewUrl.toLowerCase().endsWith('.pdf') ? (
+              {/\.pdf(\?|$)/i.test(previewUrl) ? (
                 <iframe src={previewUrl} className="w-full h-[60vh]" title="Preview" />
               ) : (
                 <img src={previewUrl} alt="Preview" className="max-w-full max-h-[60vh] mx-auto" />

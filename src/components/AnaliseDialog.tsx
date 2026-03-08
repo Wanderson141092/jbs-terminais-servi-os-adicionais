@@ -1171,33 +1171,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Anexos da Solicitação — botão para abrir visualizador */}
+            {/* Anexos da Solicitação — preview inline */}
             {formArquivos.length > 0 && (
-              <div className="border rounded-lg p-3 bg-muted/20">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                    <Paperclip className="h-4 w-4" />
-                    Anexos da Solicitação ({formArquivos.length})
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1.5"
-                    onClick={() => { setAttachmentInitialIndex(0); setShowAttachmentViewer(true); }}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    Visualizar Anexos
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {formArquivos.map((arq, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-[10px] cursor-pointer hover:bg-accent" onClick={() => { setAttachmentInitialIndex(idx); setShowAttachmentViewer(true); }}>
-                      <FileText className="h-3 w-3 mr-1" />
-                      {arq.label || arq.file_name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              <InlineAttachmentPreview
+                arquivos={formArquivos}
+                title="Anexos da Solicitação"
+                icon={<Paperclip className="h-4 w-4" />}
+                onExpandClick={() => {
+                  setAttachmentInitialIndex(0);
+                  setShowAttachmentViewer(true);
+                }}
+              />
             )}
 
             {solicitacao.observacoes && (

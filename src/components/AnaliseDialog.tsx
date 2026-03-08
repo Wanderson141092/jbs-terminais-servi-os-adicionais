@@ -145,6 +145,37 @@ const resolveCamposExibicao = ({
   });
 };
 
+const resolveStoragePath = (rawUrl: string | null | undefined, bucket: "form-uploads" | "deferimento") => {
+  if (!rawUrl) return null;
+  if (!rawUrl.startsWith("http")) return rawUrl;
+
+  const match = rawUrl.match(new RegExp(`/storage/v1/object/(?:sign|public)/${bucket}/([^?]+)`));
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+};
+
+const resolveMaskAffixes = (config?: any) => {
+  const legacyPrefix = config?.mask?.prefix || config?.mascara?.prefixo || config?.mascara_prefixo;
+  const legacySuffix = config?.mask?.suffix || config?.mascara?.sufixo || config?.mascara_sufixo;
+
+  return {
+    prefixo: String(config?.prefixo ?? legacyPrefix ?? "").trim(),
+    sufixo: String(config?.sufixo ?? legacySuffix ?? "").trim(),
+  };
+};
+
+const applyAffixSafely = (value: any, prefixo: string, sufixo: string) => {
+  if (typeof value !== "string") return value;
+
+  let next = value;
+  if (prefixo && !next.trimStart().startsWith(prefixo)) {
+    next = `${prefixo}${next}`;
+  }
+  if (sufixo && !next.trimEnd().endsWith(sufixo)) {
+    next = `${next} ${sufixo}`.trim();
+  }
+  return next;
+};
+
 const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
@@ -152,10 +183,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [selectedStatus, setSelectedStatus] = useState(solicitacao.status || "");
   const [loading, setLoading] = useState(false);
   const [adminSelectedSetor, setAdminSelectedSetor] = useState<"COMEX" | "ARMAZEM" | null>(null);
-  const [attachments, setAttachments] = useState<any[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showDeferimentoAction, setShowDeferimentoAction] = useState<string | null>(null);
-  const [motivoRecusaDeferimento, setMotivoRecusaDeferimento] = useState("");
   const [showLancamentoDialog, setShowLancamentoDialog] = useState(false);
   const [servicoConfig, setServicoConfig] = useState<ServicoConfig | null>(null);
   const [servicos, setServicos] = useState<any[]>([]);
@@ -293,50 +320,51 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
       // Consultas auxiliares: anexos e histórico somente após a carga principal
       const [attachRes, histRes] = await Promise.all([
-        supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
+        supabase
+          .from("deferimento_documents")
+          .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
+          .eq("solicitacao_id", solicitacao.id)
+          .order("created_at", { ascending: false }),
         supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false }),
       ]);
-      setAttachments(attachRes.data || []);
       setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
 
-      // Sign deferimento document URLs (private bucket)
+      // Sign deferimento document URLs (private bucket) with robust path parsing
       const rawDefDocs = attachRes.data || [];
-      const signedDefArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string; error?: boolean }[] = [];
-      for (const doc of rawDefDocs) {
-        let signedUrl = doc.file_url;
-        let storagePath: string | null = null;
-        let hasError = false;
+      const signedDefArquivos = await Promise.all(
+        rawDefDocs.map(async (doc) => {
+          const storagePath = resolveStoragePath(doc.file_url, "deferimento");
+          let signedUrl = doc.file_url || "";
+          let hasError = false;
 
-        if (doc.file_url && !doc.file_url.startsWith("http")) {
-          storagePath = doc.file_url;
-        } else if (doc.file_url) {
-          const signMatch = doc.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/deferimento\/([^?]+)/);
-          if (signMatch) {
-            storagePath = decodeURIComponent(signMatch[1]);
-          }
-        }
+          if (storagePath) {
+            const { data: signedData, error: signError } = await supabase.storage
+              .from("deferimento")
+              .createSignedUrl(storagePath, 3600);
 
-        if (storagePath) {
-          const { data: signedData, error: signError } = await supabase.storage
-            .from("deferimento")
-            .createSignedUrl(storagePath, 3600);
-          if (signedData) {
-            signedUrl = signedData.signedUrl;
-          } else {
-            console.error("[Deferimento] Falha ao gerar URL assinada:", storagePath, signError);
+            if (signedData?.signedUrl) {
+              signedUrl = signedData.signedUrl;
+            } else {
+              console.error("[Deferimento] Falha ao gerar URL assinada:", storagePath, signError);
+              hasError = true;
+            }
+          } else if (!doc.file_url) {
             hasError = true;
           }
-        } else if (!doc.file_url) {
-          hasError = true;
-        }
 
-        signedDefArquivos.push({
-          pergunta_id: doc.id,
-          file_url: signedUrl || "",
-          file_name: doc.file_name || "Documento",
-          label: doc.document_type === "deferimento" ? `Deferimento: ${doc.file_name}` : doc.file_name,
-          error: hasError,
-        });
+          return {
+            pergunta_id: doc.id,
+            file_url: signedUrl,
+            file_name: doc.file_name || "Documento",
+            label: doc.document_type ? `${doc.document_type}: ${doc.file_name}` : doc.file_name,
+            error: hasError,
+          };
+        })
+      );
+
+      const defFailures = signedDefArquivos.filter((f) => f.error).length;
+      if (defFailures > 0) {
+        toast.warning(`${defFailures} documento(s) de deferimento com erro de carregamento.`);
       }
       setDeferimentoArquivos(signedDefArquivos);
 
@@ -415,47 +443,38 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
           // Process attachments with signed URLs
           const rawArquivos = (bestResponse.arquivos as any[]) || [];
-          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string; error?: boolean }[] = [];
-          let failedCount = 0;
-          for (const arq of rawArquivos) {
-            let signedUrl = arq.file_url;
-            let storagePath: string | null = null;
-            let hasError = false;
+          const signedArquivos = await Promise.all(
+            rawArquivos.map(async (arq) => {
+              const storagePath = resolveStoragePath(arq.file_url, "form-uploads");
+              let signedUrl = arq.file_url || "";
+              let hasError = false;
 
-            if (arq.file_url && !arq.file_url.startsWith("http")) {
-              storagePath = arq.file_url;
-            } else if (arq.file_url) {
-              const signMatch = arq.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/form-uploads\/([^?]+)/);
-              if (signMatch) {
-                storagePath = decodeURIComponent(signMatch[1]);
-              }
-            }
-
-            if (storagePath) {
-              const { data: signedData, error: signError } = await supabase.storage
-                .from("form-uploads")
-                .createSignedUrl(storagePath, 3600);
-              if (signedData) {
-                signedUrl = signedData.signedUrl;
-              } else {
-                console.error("[Anexos] Falha ao gerar URL assinada:", storagePath, signError);
+              if (storagePath) {
+                const { data: signedData, error: signError } = await supabase.storage
+                  .from("form-uploads")
+                  .createSignedUrl(storagePath, 3600);
+                if (signedData?.signedUrl) {
+                  signedUrl = signedData.signedUrl;
+                } else {
+                  console.error("[Anexos] Falha ao gerar URL assinada:", storagePath, signError);
+                  hasError = true;
+                }
+              } else if (!arq.file_url) {
                 hasError = true;
-                failedCount++;
               }
-            } else if (!arq.file_url) {
-              hasError = true;
-              failedCount++;
-            }
 
-            const pid = arq.pergunta_id || arq.campo_id || "";
-            signedArquivos.push({
-              pergunta_id: pid,
-              file_url: signedUrl || "",
-              file_name: arq.file_name || "Arquivo",
-              label: perguntaLabelMap.get(pid) || undefined,
-              error: hasError,
-            });
-          }
+              const pid = arq.pergunta_id || arq.campo_id || "";
+              return {
+                pergunta_id: pid,
+                file_url: signedUrl,
+                file_name: arq.file_name || "Arquivo",
+                label: perguntaLabelMap.get(pid) || undefined,
+                error: hasError,
+              };
+            })
+          );
+
+          const failedCount = signedArquivos.filter((a) => a.error).length;
           if (failedCount > 0) {
             toast.warning(`${failedCount} anexo(s) não puderam ser carregados. Verifique o visualizador de anexos.`);
           }
@@ -901,7 +920,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         solicitacao_id: solicitacao.id,
         deferimento_document_id: docId,
         accept: aceito,
-        motivo_recusa: aceito ? null : motivoRecusaDeferimento,
+        motivo_recusa: null,
       },
     });
 
@@ -912,20 +931,39 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
 
     toast.success(aceito ? "Deferimento aceito!" : "Deferimento recusado!");
-    setShowDeferimentoAction(null);
-    setMotivoRecusaDeferimento("");
     setLoading(false);
 
     const { data: deferimentoDocs } = await supabase
       .from("deferimento_documents")
-      .select("*")
+      .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
       .eq("solicitacao_id", solicitacao.id)
-      .eq("document_type", "deferimento");
+      .order("created_at", { ascending: false });
 
-    setAttachments(prev => {
-      const nonDeferimento = prev.filter(a => a.document_type !== "deferimento");
-      return [...nonDeferimento, ...(deferimentoDocs || [])];
-    });
+    const refreshed = await Promise.all(
+      (deferimentoDocs || []).map(async (doc: any) => {
+        const storagePath = resolveStoragePath(doc.file_url, "deferimento");
+        let signedUrl = doc.file_url || "";
+        let hasError = false;
+
+        if (storagePath) {
+          const { data: signedData } = await supabase.storage.from("deferimento").createSignedUrl(storagePath, 3600);
+          if (signedData?.signedUrl) signedUrl = signedData.signedUrl;
+          else hasError = true;
+        } else if (!doc.file_url) {
+          hasError = true;
+        }
+
+        return {
+          pergunta_id: doc.id,
+          file_url: signedUrl,
+          file_name: doc.file_name || "Documento",
+          label: doc.document_type ? `${doc.document_type}: ${doc.file_name}` : doc.file_name,
+          error: hasError,
+        };
+      })
+    );
+
+    setDeferimentoArquivos(refreshed);
   };
 
   const handleConfirmarLancamento = async (configId?: string) => {
@@ -1711,32 +1749,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         </DialogContent>
       </Dialog>
 
-      {/* Preview Modal */}
-      {previewUrl && (
-        <Dialog open onOpenChange={() => setPreviewUrl(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Visualizar Documento</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 min-h-[60vh]">
-              {/\.pdf(\?|$)/i.test(previewUrl) ? (
-                <iframe src={previewUrl} className="w-full h-[60vh]" title="Preview" />
-              ) : (
-                <img src={previewUrl} alt="Preview" className="max-w-full max-h-[60vh] mx-auto" />
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPreviewUrl(null)}>Fechar</Button>
-              <Button asChild>
-                <a href={previewUrl} download target="_blank" rel="noopener noreferrer">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </a>
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Visualizador de Anexos do Formulário */}
       <AttachmentViewer
@@ -2073,14 +2085,23 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 // Helper Functions
 const formatFormValue = (val: any, tipo: string, config?: any): string => {
-  const prefixo = config?.prefixo || "";
-  const sufixo = config?.sufixo || "";
+  const { prefixo, sufixo } = resolveMaskAffixes(config);
+  const rawValue = applyAffixSafely(val, prefixo, sufixo);
 
-  if (val && typeof val === "object" && !Array.isArray(val)) {
-    if (val.campo1 && val.campo2) return `${prefixo}${val.campo1} / ${val.campo2}${sufixo ? " " + sufixo : ""}`;
-    return normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true, itemPrefix: prefixo, itemSuffix: sufixo });
+  if (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) {
+    if (rawValue.campo1 && rawValue.campo2) {
+      const pair = `${rawValue.campo1} / ${rawValue.campo2}`;
+      return normalizeFormValue(applyAffixSafely(pair, prefixo, sufixo), { nullishFallback: "—" });
+    }
+    return normalizeFormValue(rawValue, {
+      nullishFallback: "—",
+      preserveObjects: true,
+      itemPrefix: prefixo,
+      itemSuffix: sufixo,
+    });
   }
-  return normalizeFormValue(val, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+
+  return normalizeFormValue(rawValue, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
 };
 
 // Helper Components

@@ -153,8 +153,53 @@ const CamposFixosManager = () => {
 
   const handleDelete = async (campo: CampoFixo) => {
     if (!confirm(`Tem certeza que deseja excluir o campo "${campo.campo_label}"?`)) return;
-    const { error } = await supabase.from("campos_fixos_config").delete().eq("id", campo.id);
-    if (error) { toast.error("Erro ao excluir"); return; }
+
+    const probe = await supabase.from("solicitacoes").select(`id,${campo.campo_chave}`).limit(1);
+    const hasColumn = !probe.error;
+
+    if (hasColumn) {
+      const { count, error: countError } = await supabase
+        .from("solicitacoes")
+        .select("id", { count: "exact", head: true })
+        .not(campo.campo_chave, "is", null);
+
+      if (countError) {
+        toast.error("Erro ao validar uso do campo nos processos.");
+        return;
+      }
+
+      if ((count || 0) > 0) {
+        const { error: disableError } = await supabase
+          .from("campos_fixos_config")
+          .update({ ativo: false, visivel_analise: false, visivel_externo: false, updated_at: new Date().toISOString() })
+          .eq("id", campo.id);
+
+        if (disableError) {
+          toast.error("Campo possui dados e não pôde ser desativado automaticamente.");
+          return;
+        }
+
+        toast.warning(`Campo possui ${count} processo(s) com valor e foi desativado para preservar histórico.`);
+        fetchData();
+        return;
+      }
+    }
+
+    const [{ error: mappingError }, { error: deleteError }] = await Promise.all([
+      supabase.from("pergunta_mapeamento").delete().eq("campo_solicitacao", campo.campo_chave),
+      supabase.from("campos_fixos_config").delete().eq("id", campo.id),
+    ]);
+
+    if (mappingError) {
+      toast.error("Erro ao limpar vínculos do campo.");
+      return;
+    }
+
+    if (deleteError) {
+      toast.error("Erro ao excluir campo.");
+      return;
+    }
+
     toast.success("Campo excluído!");
     fetchData();
   };

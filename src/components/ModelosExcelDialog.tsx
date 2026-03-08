@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, Download, Trash2, FileSpreadsheet, File, Settings2, Loader2 } from "lucide-react";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import ReportColumnMappingDialog from "@/components/admin/ReportColumnMappingDialog";
 
 interface ModeloRelatorio {

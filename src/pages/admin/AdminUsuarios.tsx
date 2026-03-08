@@ -13,8 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Users, ArrowLeft, Save, Shield, Edit, Trash2, Ban, CheckCircle, Plus, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
-import { useGestorCheck } from "@/hooks/useGestorCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface Profile {
   id: string;

@@ -125,8 +125,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       .from("formulario_respostas")
       .select("respostas, arquivos, created_at")
       .eq("formulario_id", formularioId)
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .order("created_at", { ascending: false });
 
     const { data: perguntasData } = await supabase
       .from("formulario_perguntas")

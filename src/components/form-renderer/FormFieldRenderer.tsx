@@ -283,36 +283,7 @@ const FormFieldRenderer = ({
     );
   }
 
-  const renderNumeroField = () => {
-    const prefixo = config?.prefixo;
-    const sufixo = config?.sufixo;
-    const permitirNeg = config?.permitir_negativo ?? true;
-    const minVal = config?.min != null ? config.min : (permitirNeg ? undefined : 0);
-    const maxVal = config?.max != null ? config.max : undefined;
-
-    const input = (
-      <Input
-        type="number"
-        value={value || ""}
-        onChange={(e) => onValueChange(e.target.value)}
-        placeholder={pergunta.placeholder || ""}
-        min={minVal}
-        max={maxVal}
-        className={prefixo || sufixo ? "flex-1" : ""}
-      />
-    );
-
-    if (prefixo || sufixo) {
-      return (
-        <div className="flex items-center gap-2">
-          {prefixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{prefixo}</span>}
-          {input}
-          {sufixo && <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{sufixo}</span>}
-        </div>
-      );
-    }
-    return input;
-  };
+  // numero rendering is handled inline in renderSingleField
 
   const renderSelectField = () => {
     if (!opcoes) return null;

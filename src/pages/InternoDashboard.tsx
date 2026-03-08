@@ -240,11 +240,8 @@ const InternoDashboard = () => {
         .slice(0, 50);
 
       if (staleSnapshotIds.length > 0) {
-        await Promise.allSettled(
-          staleSnapshotIds.map((id) =>
-            supabase.rpc("rebuild_process_snapshot", { p_solicitacao_id: id })
-          )
-        );
+        // Snapshot rebuild skipped - function not available
+        // Stale snapshots will be refreshed on next write
 
         const { data: refreshedData } = await (supabase
           .from("solicitacoes_v" as any)

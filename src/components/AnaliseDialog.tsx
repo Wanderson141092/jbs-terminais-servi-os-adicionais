@@ -815,13 +815,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       }
     }
     
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from("solicitacoes")
       .update(updatePayload)
       .eq("id", solicitacao.id);
 
-    if (error || data?.ok === false) {
-      toast.error(getStructuredError("Erro ao atualizar status.", data) + (error?.message ? ` ${error.message}` : ""));
+    if (updateError || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao atualizar status.", data) + (updateError?.message ? ` ${updateError.message}` : ""));
       setLoading(false);
       return;
     }

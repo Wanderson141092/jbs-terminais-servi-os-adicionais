@@ -722,7 +722,6 @@ const AdminFormularios = () => {
                 <TableRow>
                   <TableHead>Data</TableHead>
                   {perguntasExportacao.map((p) => <TableHead key={p.id}>{p.rotulo}</TableHead>)}
-                  {campos.map((c) => <TableHead key={c.id}>{c.pergunta?.rotulo || c.pergunta_id}</TableHead>)}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -734,14 +733,10 @@ const AdminFormularios = () => {
                       const val = respostasObj[p.id];
                       const arquivosArr = r.arquivos as { pergunta_id?: string; campo_id?: string; file_url: string; file_name: string }[] | null;
                       const arquivo = arquivosArr?.find((a) => (a.pergunta_id || a.campo_id) === p.id);
-                      const val = respostasObj[c.pergunta_id] ?? respostasObj[c.id];
-                      const arquivosArr = r.arquivos as { pergunta_id?: string; campo_id?: string; file_url: string; file_name: string }[] | null;
-                      const arquivo = arquivosArr?.find((a) => a.pergunta_id === c.pergunta_id || a.campo_id === c.id);
                       if (arquivo) {
                         return <TableCell key={p.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
                       }
-                      return <TableCell key={p.id} className="text-sm">{Array.isArray(val) ? val.join(", ") : (val as string) || "—"}</TableCell>;
-                      return <TableCell key={c.id} className="text-sm">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
+                      return <TableCell key={p.id} className="text-sm">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
                     })}
                   </TableRow>
                 ))}

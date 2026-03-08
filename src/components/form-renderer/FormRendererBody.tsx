@@ -45,6 +45,7 @@ const FormRendererBody = ({
               onFileChange={(file) => onFileChange(pergunta.id, file)}
               allValues={values}
               allPerguntas={perguntas}
+              onSiblingValueChange={onValueChange}
             />
           </div>
         );

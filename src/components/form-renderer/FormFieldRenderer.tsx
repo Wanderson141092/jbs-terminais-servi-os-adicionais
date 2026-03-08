@@ -58,6 +58,7 @@ interface FormFieldRendererProps {
   onFileChange: (file: File | null) => void;
   allValues?: Record<string, any>;
   allPerguntas?: PerguntaComCondicao[];
+  onSiblingValueChange?: (id: string, value: any) => void;
 }
 
 const SearchableSelect = ({ options, value, onValueChange, placeholder }: {

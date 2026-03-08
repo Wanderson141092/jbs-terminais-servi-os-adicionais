@@ -1021,7 +1021,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   return (
     <>
       <Dialog open onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto [&>button.absolute]:hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 flex-wrap">
               <FileText className="h-5 w-5" />

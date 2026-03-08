@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
           let rawVal = respostas[map.pergunta_id];
           let formattedVal: string;
           if (Array.isArray(rawVal)) {
-            formattedVal = rawVal.join(" ");
+            formattedVal = rawVal.join("\n");
           } else {
             formattedVal = String(rawVal);
           }

@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizeFormValue } from "@/lib/normalizeFormValue";
 import AttachmentViewer from "./AttachmentViewer";
+import InlineAttachmentPreview from "./InlineAttachmentPreview";
 
 interface AnaliseDialogProps {
   solicitacao: any;
@@ -1170,33 +1171,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Anexos da Solicitação — botão para abrir visualizador */}
+            {/* Anexos da Solicitação — preview inline */}
             {formArquivos.length > 0 && (
-              <div className="border rounded-lg p-3 bg-muted/20">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                    <Paperclip className="h-4 w-4" />
-                    Anexos da Solicitação ({formArquivos.length})
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1.5"
-                    onClick={() => { setAttachmentInitialIndex(0); setShowAttachmentViewer(true); }}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    Visualizar Anexos
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {formArquivos.map((arq, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-[10px] cursor-pointer hover:bg-accent" onClick={() => { setAttachmentInitialIndex(idx); setShowAttachmentViewer(true); }}>
-                      <FileText className="h-3 w-3 mr-1" />
-                      {arq.label || arq.file_name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              <InlineAttachmentPreview
+                arquivos={formArquivos}
+                title="Anexos da Solicitação"
+                icon={<Paperclip className="h-4 w-4" />}
+                onExpandClick={() => {
+                  setAttachmentInitialIndex(0);
+                  setShowAttachmentViewer(true);
+                }}
+              />
             )}
 
             {solicitacao.observacoes && (
@@ -1603,64 +1588,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               );
             })()}
 
-            {/* Anexos */}
+            {/* Documentos de Deferimento */}
             {attachments.length > 0 && (
               <>
                 <Separator />
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Anexos
-                  </p>
-                  <div className="space-y-2">
-                    {showEmbeddedPreview ? (
-                      attachments.map((att) => (
-                        <div key={att.id} className="border rounded-lg p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">{att.file_name}</span>
-                            <Button variant="ghost" size="sm" asChild>
-                              <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          </div>
-                          <div className="bg-muted/30 rounded overflow-hidden">
-                            {att.file_url.toLowerCase().endsWith('.pdf') ? (
-                              <iframe 
-                                src={att.file_url} 
-                                className="w-full h-[250px]" 
-                                title={att.file_name}
-                              />
-                            ) : (
-                              <img 
-                                src={att.file_url} 
-                                alt={att.file_name} 
-                                className="max-w-full max-h-[250px] mx-auto"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      attachments.map((att) => (
-                        <div key={att.id} className="border rounded-lg p-3 flex items-center justify-between">
-                          <span className="text-sm">{att.file_name}</span>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setPreviewUrl(att.file_url)}>
-                              <Eye className="h-4 w-4 mr-1" />
-                              Visualizar
-                            </Button>
-                            <Button variant="ghost" size="sm" asChild>
-                              <a href={att.file_url} download target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <InlineAttachmentPreview
+                  arquivos={attachments.map((att: any) => ({
+                    pergunta_id: att.id,
+                    file_url: att.file_url,
+                    file_name: att.file_name,
+                    label: att.document_type === "deferimento" ? `Deferimento: ${att.file_name}` : att.file_name,
+                  }))}
+                  title="Documentos de Deferimento"
+                  icon={<FileText className="h-4 w-4" />}
+                  className="border-amber-200/50"
+                />
               </>
             )}
 

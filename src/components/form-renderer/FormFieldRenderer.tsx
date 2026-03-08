@@ -532,11 +532,40 @@ const FormFieldRenderer = ({
             <Input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-              onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                if (file) {
+                  const maxSize = 10 * 1024 * 1024; // 10MB
+                  const allowedTypes = [
+                    "application/pdf",
+                    "image/jpeg",
+                    "image/png",
+                    "image/jpg",
+                    "application/msword",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                  ];
+                  if (file.size === 0) {
+                    toast.error("O arquivo está vazio (0 bytes). Selecione outro arquivo.");
+                    e.target.value = "";
+                    return;
+                  }
+                  if (file.size > maxSize) {
+                    toast.error(`O arquivo excede o limite de 10MB (${(file.size / 1024 / 1024).toFixed(1)}MB).`);
+                    e.target.value = "";
+                    return;
+                  }
+                  if (!allowedTypes.includes(file.type)) {
+                    toast.error("Tipo de arquivo não permitido. Formatos aceitos: PDF, JPG, PNG, DOC, DOCX.");
+                    e.target.value = "";
+                    return;
+                  }
+                }
+                onFileChange(file);
+              }}
             />
             {fileData && (
               <p className="text-xs text-muted-foreground mt-1">
-                Arquivo selecionado: {fileData.file.name}
+                Arquivo selecionado: {fileData.file.name} ({(fileData.file.size / 1024).toFixed(0)}KB)
               </p>
             )}
           </div>
@@ -876,8 +905,21 @@ const FormFieldRenderer = ({
             )}
             {sp.tipo === "arquivo" && (
               <div>
-                <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
-                {fileData && <p className="text-xs text-muted-foreground mt-1">Arquivo: {fileData.file.name}</p>}
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file) {
+                      if (file.size === 0) { toast.error("O arquivo está vazio."); e.target.value = ""; return; }
+                      if (file.size > 10 * 1024 * 1024) { toast.error("O arquivo excede 10MB."); e.target.value = ""; return; }
+                      const allowed = ["application/pdf","image/jpeg","image/png","image/jpg","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+                      if (!allowed.includes(file.type)) { toast.error("Tipo não permitido. Aceitos: PDF, JPG, PNG, DOC, DOCX."); e.target.value = ""; return; }
+                    }
+                    onFileChange(file);
+                  }}
+                />
+                {fileData && <p className="text-xs text-muted-foreground mt-1">Arquivo: {fileData.file.name} ({(fileData.file.size / 1024).toFixed(0)}KB)</p>}
               </div>
             )}
             {sp.tipo === "informativo" && (

@@ -1062,6 +1062,39 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             </DialogDescription>
           </DialogHeader>
 
+          {/* Ações de Cancelamento / Recusa - topo direito, botões empilhados */}
+          {(canCancel || canRecusar) && solicitacao.status !== 'cancelado' && solicitacao.status !== 'recusado' && (
+            <div className="flex justify-end">
+              <div className="flex flex-col gap-2 bg-destructive/5 p-2 rounded-lg border border-destructive/20 min-w-[160px]">
+                <p className="text-xs font-semibold text-destructive">Ações de Cancelamento / Recusa:</p>
+                {canCancel && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelarClick}
+                    disabled={loading}
+                    className="w-full border-destructive/50 text-destructive hover:bg-destructive/10 text-xs h-7"
+                  >
+                    <Ban className="h-3 w-3 mr-1" />
+                    Cancelar
+                  </Button>
+                )}
+                {canRecusar && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleRecusarClick}
+                    disabled={loading}
+                    className="w-full text-xs h-7"
+                  >
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Recusar
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-4">
             {/* Alerta de Cancelamento Pendente */}
             {(solicitacao as any).cancelamento_solicitado === true && solicitacao.status !== "cancelado" && (
@@ -1730,40 +1763,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               )}
             </div>
 
-            {/* Ações de Cancelamento / Recusa - no final, lado esquerdo, metade do tamanho */}
-            {(canCancel || canRecusar) && solicitacao.status !== 'cancelado' && solicitacao.status !== 'recusado' && (
-              <div className="flex justify-start mt-4">
-                <div className="w-1/2 space-y-2 bg-destructive/5 p-2 rounded-lg border border-destructive/20">
-                  <p className="text-xs font-semibold text-destructive">Ações de Cancelamento / Recusa:</p>
-                  <div className="flex gap-2">
-                    {canCancel && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCancelarClick}
-                        disabled={loading}
-                        className="flex-1 border-destructive/50 text-destructive hover:bg-destructive/10 text-xs h-7"
-                      >
-                        <Ban className="h-3 w-3 mr-1" />
-                        Cancelar
-                      </Button>
-                    )}
-                    {canRecusar && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleRecusarClick}
-                        disabled={loading}
-                        className="flex-1 text-xs h-7"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Recusar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <DialogFooter>

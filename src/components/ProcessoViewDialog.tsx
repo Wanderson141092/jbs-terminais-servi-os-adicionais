@@ -451,7 +451,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                           </div>
                         </div>
                         <div className="bg-muted/30 rounded overflow-hidden">
-                          {arq.file_url?.toLowerCase().endsWith('.pdf') ? (
+                          {arq.file_name?.toLowerCase().endsWith('.pdf') ? (
                             <iframe src={arq.file_url} className="w-full h-[200px]" title={arq.file_name} />
                           ) : (
                             <img src={arq.file_url} alt={arq.file_name} className="max-w-full max-h-[200px] mx-auto" />

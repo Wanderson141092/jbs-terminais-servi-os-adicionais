@@ -920,32 +920,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (data?.data?.all_confirmed) onClose();
   };
 
-  const handleDesfazerLancamento = async (configId: string) => {
-    setLoading(true);
-    const { data, error } = await supabase.functions.invoke("confirm_billing", {
-      body: {
-        solicitacao_id: solicitacao.id,
-        cobranca_config_id: configId,
-        confirm: false,
-      },
-    });
-
-    if (error || data?.ok === false) {
-      toast.error(getStructuredError("Erro ao desfazer lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
-      setLoading(false);
-      return;
-    }
-
-    const { data: updatedRegistros } = await supabase
-      .from("lancamento_cobranca_registros")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-    setLancamentoRegistros(updatedRegistros || []);
-
-    const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
-    toast.success(`Lançamento "${cfgLabel}" desfeito!`);
-    setLoading(false);
-  };
+  // handleDesfazerLancamento is defined below after handleSaveObservacao
 
   const logAudit = async (acao: string, detalhes: string) => {
     await supabase.rpc("insert_audit_log", {

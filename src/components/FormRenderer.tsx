@@ -272,7 +272,7 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
 
         uploadedFiles.push({
           pergunta_id: perguntaId,
-          file_url: uploadResponse.file_url,
+          file_url: uploadResponse.storage_path || uploadResponse.file_url,
           file_name: uploadResponse.file_name,
         });
       }

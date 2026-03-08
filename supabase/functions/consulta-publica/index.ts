@@ -337,10 +337,21 @@ Deno.serve(async (req) => {
       if (arquivos && arquivos.length > 0) {
         for (const arq of arquivos) {
           let signedUrl = arq.file_url;
+          let storagePath: string | null = null;
+
           if (arq.file_url && !arq.file_url.startsWith("http")) {
+            storagePath = arq.file_url;
+          } else if (arq.file_url) {
+            const signMatch = arq.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/form-uploads\/([^?]+)/);
+            if (signMatch) {
+              storagePath = decodeURIComponent(signMatch[1]);
+            }
+          }
+
+          if (storagePath) {
             const { data: signedData } = await supabaseAdmin.storage
               .from("form-uploads")
-              .createSignedUrl(arq.file_url, 3600);
+              .createSignedUrl(storagePath, 3600);
             if (signedData) signedUrl = signedData.signedUrl;
           }
           formAttachmentsExternal.push({ file_name: arq.file_name, file_url: signedUrl });

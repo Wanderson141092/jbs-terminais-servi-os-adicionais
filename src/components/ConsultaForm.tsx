@@ -30,7 +30,7 @@ const ConsultaForm = React.forwardRef<HTMLFormElement, ConsultaFormProps>(({ onS
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form ref={ref} onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label className="text-sm font-semibold text-foreground mb-2 block">
           Consulta de Solicitação

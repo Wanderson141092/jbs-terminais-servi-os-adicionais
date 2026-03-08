@@ -488,21 +488,31 @@ const FormFieldRenderer = ({
           const mascara = config?.mascara as string | undefined;
           const maxChars = config?.max_chars as number | undefined;
           return (
-            <Input
-              value={fieldValue || ""}
-              onChange={(e) => {
-                if (mascara) {
-                  onFieldChange(applyMask(e.target.value, mascara));
-                } else {
-                  let val = e.target.value.toUpperCase();
-                  if (maxChars) val = val.slice(0, maxChars);
-                  onFieldChange(val);
-                }
-              }}
-              placeholder={pergunta.placeholder || ""}
-              maxLength={mascara ? mascara.length : (maxChars || undefined)}
-              className="font-mono"
-            />
+            <div className="relative">
+              <Input
+                value={fieldValue || ""}
+                onChange={(e) => {
+                  if (mascara) {
+                    onFieldChange(applyMask(e.target.value, mascara));
+                  } else {
+                    let val = e.target.value.toUpperCase();
+                    if (maxChars) val = val.slice(0, maxChars);
+                    onFieldChange(val);
+                  }
+                }}
+                onBlur={isCnpjField ? (e) => handleCnpjBlur(e.target.value) : undefined}
+                placeholder={pergunta.placeholder || ""}
+                maxLength={mascara ? mascara.length : (maxChars || undefined)}
+                className="font-mono"
+                readOnly={isRazaoSocialField}
+                disabled={isRazaoSocialField && cnpjLoading}
+              />
+              {isCnpjField && cnpjLoading && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground animate-pulse">
+                  Consultando...
+                </span>
+              )}
+            </div>
           );
         })()}
 

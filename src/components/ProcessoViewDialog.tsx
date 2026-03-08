@@ -39,8 +39,9 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
   const [servicoNome, setServicoNome] = useState<string | undefined>(undefined);
   const [camposDinamicos, setCamposDinamicos] = useState<{ nome: string; valor: string }[]>([]);
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string; config?: any }[]>([]);
-  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
+  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string; label?: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
+  const [showAttachmentViewer, setShowAttachmentViewer] = useState(false);
 
   useEffect(() => {
     if (open && solicitacao) {

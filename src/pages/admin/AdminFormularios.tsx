@@ -30,6 +30,7 @@ import BancoPerguntasManager from "@/components/admin/BancoPerguntasManager";
 import FormularioBuilder from "@/components/admin/FormularioBuilder";
 import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";
 import EstilosFormularioManager from "@/components/admin/EstilosFormularioManager";
+import { normalizeFormValue } from "@/lib/normalizeFormValue";
 
 interface Formulario {
   id: string;
@@ -38,6 +39,7 @@ interface Formulario {
   ativo: boolean;
   created_at: string;
   estilo?: string;
+  servico_id?: string | null;
 }
 
 interface Campo {
@@ -369,15 +371,31 @@ const AdminFormularios = () => {
 
   const saveForm = async () => {
     if (!formData.titulo.trim()) { toast.error("Título é obrigatório"); return; }
+    if (!formData.servico_id) {
+      toast.error("Selecione um serviço válido para salvar o formulário.");
+      return;
+    }
+    if (!servicos.some((servico) => servico.id === formData.servico_id)) {
+      toast.error("O serviço selecionado é inválido ou está inativo. Escolha outro serviço.");
+      return;
+    }
+
     if (editingForm) {
       const { error } = await supabase.from("formularios").update({
-        titulo: formData.titulo, descricao: formData.descricao || null, estilo: formData.estilo, servico_id: formData.servico_id || null, updated_at: new Date().toISOString(),
+        titulo: formData.titulo,
+        descricao: formData.descricao || null,
+        estilo: formData.estilo,
+        servico_id: formData.servico_id,
+        updated_at: new Date().toISOString(),
       }).eq("id", editingForm.id);
       if (error) { toast.error("Erro ao atualizar formulário"); return; }
       toast.success("Formulário atualizado!");
     } else {
       const { error } = await supabase.from("formularios").insert({
-        titulo: formData.titulo, descricao: formData.descricao || null, estilo: formData.estilo, servico_id: formData.servico_id || null,
+        titulo: formData.titulo,
+        descricao: formData.descricao || null,
+        estilo: formData.estilo,
+        servico_id: formData.servico_id,
       });
       if (error) { toast.error("Erro ao criar formulário"); return; }
       toast.success("Formulário criado!");
@@ -438,6 +456,8 @@ const AdminFormularios = () => {
           if (Array.isArray(val)) return val.join(", ");
           if (typeof val === "boolean") return val ? "Sim" : "Não";
           return (val as string) || "";
+          const val = respostasObj[c.id];
+          return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
         }),
       ];
       sheet.addRow(row);
@@ -541,8 +561,8 @@ const AdminFormularios = () => {
                       <TableCell className="font-medium">{form.titulo}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{form.descricao || "—"}</TableCell>
                       <TableCell>
-                        {(form as any).servico_id ? (
-                          <Badge variant="secondary" className="text-xs">{servicos.find(s => s.id === (form as any).servico_id)?.nome || "—"}</Badge>
+                        {form.servico_id ? (
+                          <Badge variant="secondary" className="text-xs">{servicos.find(s => s.id === form.servico_id)?.nome || "—"}</Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">Nenhum</span>
                         )}
@@ -620,10 +640,9 @@ const AdminFormularios = () => {
             <div>
               <Label>Serviço Vinculado</Label>
               <p className="text-xs text-muted-foreground mb-1">Vincule este formulário ao serviço correspondente para geração correta do protocolo e mapeamento automático do "Serviço Adicional".</p>
-              <Select value={formData.servico_id} onValueChange={(v) => setFormData({ ...formData, servico_id: v === "__none__" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione o serviço (opcional)" /></SelectTrigger>
+              <Select value={formData.servico_id} onValueChange={(v) => setFormData({ ...formData, servico_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Nenhum</SelectItem>
                   {servicos.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
                   ))}
@@ -720,7 +739,7 @@ const AdminFormularios = () => {
                       if (arquivo) {
                         return <TableCell key={c.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
                       }
-                      return <TableCell key={c.id} className="text-sm">{Array.isArray(val) ? val.join(", ") : (val as string) || "—"}</TableCell>;
+                      return <TableCell key={c.id} className="text-sm">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
                     })}
                   </TableRow>
                 ))}

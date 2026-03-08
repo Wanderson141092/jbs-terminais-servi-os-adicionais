@@ -527,6 +527,214 @@ export type Database = {
           },
         ]
       }
+      cobrancas: {
+        Row: {
+          cobranca_config_id: string | null
+          confirmado: boolean
+          confirmado_data: string | null
+          confirmado_por: string | null
+          created_at: string
+          id: string
+          origem: string
+          solicitacao_id: string
+          status_financeiro: string
+          updated_at: string
+        }
+        Insert: {
+          cobranca_config_id?: string | null
+          confirmado?: boolean
+          confirmado_data?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          id?: string
+          origem?: string
+          solicitacao_id: string
+          status_financeiro?: string
+          updated_at?: string
+        }
+        Update: {
+          cobranca_config_id?: string | null
+          confirmado?: boolean
+          confirmado_data?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          id?: string
+          origem?: string
+          solicitacao_id?: string
+          status_financeiro?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_cobranca_config_id_fkey"
+            columns: ["cobranca_config_id"]
+            isOneToOne: false
+            referencedRelation: "lancamento_cobranca_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_data: {
+        Row: {
+          arquivos: Json | null
+          created_at: string
+          formulario_id: string
+          id: string
+          ip_address: string | null
+          legacy_formulario_resposta_id: string | null
+          respostas: Json
+        }
+        Insert: {
+          arquivos?: Json | null
+          created_at?: string
+          formulario_id: string
+          id?: string
+          ip_address?: string | null
+          legacy_formulario_resposta_id?: string | null
+          respostas: Json
+        }
+        Update: {
+          arquivos?: Json | null
+          created_at?: string
+          formulario_id?: string
+          id?: string
+          ip_address?: string | null
+          legacy_formulario_resposta_id?: string | null
+          respostas?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_data_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_data_legacy_formulario_resposta_id_fkey"
+            columns: ["legacy_formulario_resposta_id"]
+            isOneToOne: false
+            referencedRelation: "formulario_respostas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_field_mapping: {
+        Row: {
+          created_at: string
+          form_field_id: string
+          formulario_id: string
+          id: string
+          legacy_formulario_pergunta_id: string | null
+          obrigatorio: boolean
+          ordem: number
+        }
+        Insert: {
+          created_at?: string
+          form_field_id: string
+          formulario_id: string
+          id?: string
+          legacy_formulario_pergunta_id?: string | null
+          obrigatorio?: boolean
+          ordem?: number
+        }
+        Update: {
+          created_at?: string
+          form_field_id?: string
+          formulario_id?: string
+          id?: string
+          legacy_formulario_pergunta_id?: string | null
+          obrigatorio?: boolean
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_field_mapping_form_field_id_fkey"
+            columns: ["form_field_id"]
+            isOneToOne: false
+            referencedRelation: "form_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_field_mapping_formulario_id_fkey"
+            columns: ["formulario_id"]
+            isOneToOne: false
+            referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_field_mapping_legacy_formulario_pergunta_id_fkey"
+            columns: ["legacy_formulario_pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "formulario_perguntas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_fields: {
+        Row: {
+          ativo: boolean
+          config: Json | null
+          created_at: string
+          descricao: string | null
+          id: string
+          legacy_pergunta_id: string | null
+          opcoes: Json | null
+          placeholder: string | null
+          rotulo: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          config?: Json | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          legacy_pergunta_id?: string | null
+          opcoes?: Json | null
+          placeholder?: string | null
+          rotulo: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          config?: Json | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          legacy_pergunta_id?: string | null
+          opcoes?: Json | null
+          placeholder?: string | null
+          rotulo?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_fields_legacy_pergunta_id_fkey"
+            columns: ["legacy_pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "banco_perguntas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_mappings: {
         Row: {
           campo_externo: string
@@ -1441,6 +1649,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "setor_emails"
             referencedColumns: ["email_setor"]
+          },
+        ]
+      }
+      process_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          event_payload: Json
+          event_type: string
+          id: string
+          solicitacao_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          event_payload?: Json
+          event_type: string
+          id?: string
+          solicitacao_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          event_payload?: Json
+          event_type?: string
+          id?: string
+          solicitacao_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_events_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_events_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
+            referencedColumns: ["id"]
           },
         ]
       }

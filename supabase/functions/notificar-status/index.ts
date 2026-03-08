@@ -6,11 +6,128 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const PAYLOAD_VERSION = "2026-03-07";
+const FUNCTION_NAME = "notificar-status";
+
+type ActionType = "notificar_status" | "reenviar_chave";
+
+type StandardResponse = {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+};
+
+type ActionPayload = {
+  payload_version: string;
+  action: ActionType;
+  solicitacao_id: string;
+  timestamp: string;
+  usuario_id?: string;
+  novo_status?: string;
+};
+
+const jsonResponse = (status: number, body: StandardResponse) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const isUuid = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+const isValidTimestamp = (value: unknown): value is string => {
+  if (typeof value !== "string") return false;
+  const parsed = Date.parse(value);
+  return !Number.isNaN(parsed);
+};
+
+const parseAndValidatePayload = (body: unknown): { payload?: ActionPayload; error?: StandardResponse } => {
+  if (!body || typeof body !== "object") {
+    return {
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Payload inválido.",
+        details: { reason: "body deve ser um objeto JSON" },
+      },
+    };
+  }
+
+  const payload = body as Record<string, unknown>;
+
+  if (payload.payload_version !== PAYLOAD_VERSION) {
+    return {
+      error: {
+        code: "VERSION_NOT_SUPPORTED",
+        message: "Versão de payload não suportada.",
+        details: { expected: PAYLOAD_VERSION, received: payload.payload_version },
+      },
+    };
+  }
+
+  if (payload.action !== "notificar_status" && payload.action !== "reenviar_chave") {
+    return {
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Ação inválida.",
+        details: { allowed_actions: ["notificar_status", "reenviar_chave"] },
+      },
+    };
+  }
+
+  if (!isUuid(payload.solicitacao_id)) {
+    return {
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "solicitacao_id inválido.",
+      },
+    };
+  }
+
+  if (!isValidTimestamp(payload.timestamp)) {
+    return {
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "timestamp inválido.",
+        details: { expected_format: "ISO-8601" },
+      },
+    };
+  }
+
+  if (payload.action === "notificar_status") {
+    if (typeof payload.novo_status !== "string" || payload.novo_status.trim().length === 0) {
+      return {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "novo_status é obrigatório para a action notificar_status.",
+        },
+      };
+    }
+
+    if (!isUuid(payload.usuario_id)) {
+      return {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "usuario_id inválido para a action notificar_status.",
+        },
+      };
+    }
+  }
+
+  return {
+    payload: {
+      payload_version: payload.payload_version,
+      action: payload.action,
+      solicitacao_id: payload.solicitacao_id,
+      timestamp: payload.timestamp,
+      usuario_id: payload.usuario_id as string | undefined,
+      novo_status: payload.novo_status as string | undefined,
+    },
+  };
+};
+
 /**
- * Notificar Status - Dispara notificações internas e e-mail para o cliente
- * quando o status de uma solicitação muda.
- * 
- * Body: { solicitacao_id, novo_status, usuario_id (quem alterou) }
+ * Notificar Status - Endpoint consolidado com action + payload versionado.
  */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,40 +137,80 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Não autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse(401, {
+        code: "UNAUTHORIZED",
+        message: "Não autorizado.",
+      });
     }
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
     const body = await req.json();
+    const { payload, error } = parseAndValidatePayload(body);
 
-    // Handle resend validation key action
-    if (body.action === "reenviar_chave") {
-      const { solicitacao_id } = body;
-      if (!solicitacao_id) {
-        return new Response(
-          JSON.stringify({ error: "solicitacao_id é obrigatório" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    if (error || !payload) {
+      return jsonResponse(400, error!);
+    }
+
+    const idempotencyInsert = {
+      function_name: FUNCTION_NAME,
+      solicitacao_id: payload.solicitacao_id,
+      action: payload.action,
+      request_timestamp: payload.timestamp,
+      status_code: 202,
+      response: { code: "PROCESSING", message: "Requisição em processamento." },
+    };
+
+    const { error: lockError } = await supabaseAdmin
+      .from("edge_function_idempotency")
+      .insert(idempotencyInsert);
+
+    if (lockError) {
+      const { data: existing } = await supabaseAdmin
+        .from("edge_function_idempotency")
+        .select("status_code, response")
+        .eq("function_name", FUNCTION_NAME)
+        .eq("solicitacao_id", payload.solicitacao_id)
+        .eq("action", payload.action)
+        .eq("request_timestamp", payload.timestamp)
+        .maybeSingle();
+
+      if (existing) {
+        return jsonResponse(existing.status_code, existing.response as StandardResponse);
       }
 
+      return jsonResponse(500, {
+        code: "IDEMPOTENCY_ERROR",
+        message: "Não foi possível validar idempotência.",
+        details: { error: lockError.message },
+      });
+    }
+
+    if (payload.action === "reenviar_chave") {
       const { data: sol } = await supabaseAdmin
         .from("solicitacoes_v")
         .select("protocolo, cliente_email, chave_consulta")
-        .eq("id", solicitacao_id)
+        .eq("id", payload.solicitacao_id)
         .single();
 
       if (!sol || !sol.cliente_email || !sol.chave_consulta) {
-        return new Response(
-          JSON.stringify({ error: "Solicitação não encontrada ou sem e-mail/chave." }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const responseBody: StandardResponse = {
+          code: "NOT_FOUND",
+          message: "Solicitação não encontrada ou sem e-mail/chave.",
+        };
+
+        await supabaseAdmin
+          .from("edge_function_idempotency")
+          .update({ status_code: 404, response: responseBody })
+          .eq("function_name", FUNCTION_NAME)
+          .eq("solicitacao_id", payload.solicitacao_id)
+          .eq("action", payload.action)
+          .eq("request_timestamp", payload.timestamp);
+
+        return jsonResponse(404, responseBody);
       }
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -63,7 +220,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${serviceKey}`,
+          Authorization: `Bearer ${serviceKey}`,
         },
         body: JSON.stringify({
           to: sol.cliente_email,
@@ -91,58 +248,65 @@ Deno.serve(async (req) => {
         }),
       });
 
-      // Log the resend action in audit_log
-      const { usuario_id: resendUsuarioId } = body;
-      if (resendUsuarioId) {
+      if (payload.usuario_id) {
         await supabaseAdmin.rpc("insert_audit_log", {
-          p_solicitacao_id: solicitacao_id,
-          p_usuario_id: resendUsuarioId,
+          p_solicitacao_id: payload.solicitacao_id,
+          p_usuario_id: payload.usuario_id,
           p_acao: "reenvio_chave_consulta",
           p_detalhes: `Chave de consulta reenviada para ${sol.cliente_email}`,
         });
       }
 
-      return new Response(
-        JSON.stringify({ success: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const responseBody: StandardResponse = {
+        code: "SUCCESS",
+        message: "Chave reenviada com sucesso.",
+        details: { solicitacao_id: payload.solicitacao_id, action: payload.action },
+      };
+
+      await supabaseAdmin
+        .from("edge_function_idempotency")
+        .update({ status_code: 200, response: responseBody })
+        .eq("function_name", FUNCTION_NAME)
+        .eq("solicitacao_id", payload.solicitacao_id)
+        .eq("action", payload.action)
+        .eq("request_timestamp", payload.timestamp);
+
+      return jsonResponse(200, responseBody);
     }
 
-    const { solicitacao_id, novo_status, usuario_id } = body;
-
-    if (!solicitacao_id || !novo_status || !usuario_id) {
-      return new Response(
-        JSON.stringify({ error: "solicitacao_id, novo_status e usuario_id são obrigatórios" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Fetch solicitação
     const { data: solicitacao } = await supabaseAdmin
       .from("solicitacoes_v")
       .select("*")
-      .eq("id", solicitacao_id)
+      .eq("id", payload.solicitacao_id)
       .single();
 
     if (!solicitacao) {
-      return new Response(
-        JSON.stringify({ error: "Solicitação não encontrada" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const responseBody: StandardResponse = {
+        code: "NOT_FOUND",
+        message: "Solicitação não encontrada.",
+      };
+
+      await supabaseAdmin
+        .from("edge_function_idempotency")
+        .update({ status_code: 404, response: responseBody })
+        .eq("function_name", FUNCTION_NAME)
+        .eq("solicitacao_id", payload.solicitacao_id)
+        .eq("action", payload.action)
+        .eq("request_timestamp", payload.timestamp);
+
+      return jsonResponse(404, responseBody);
     }
 
-    // Fetch status label
     const { data: statusParam } = await supabaseAdmin
       .from("parametros_campos")
       .select("valor")
       .eq("grupo", "status_processo")
-      .eq("sigla", novo_status)
+      .eq("sigla", payload.novo_status)
       .eq("ativo", true)
       .maybeSingle();
 
-    const statusLabel = statusParam?.valor || novo_status;
+    const statusLabel = statusParam?.valor || payload.novo_status;
 
-    // Fetch the service for this solicitation
     const servicoNome = solicitacao.tipo_operacao || "Serviço";
     const { data: servicoDataRow } = await supabaseAdmin
       .from("servicos")
@@ -153,29 +317,24 @@ Deno.serve(async (req) => {
 
     const servicoId = servicoDataRow?.id;
 
-    // Fetch notification rules for this status, filtered by service
     const { data: allRules } = await supabaseAdmin
       .from("notification_rules")
       .select("*")
-      .eq("status_gatilho", novo_status)
+      .eq("status_gatilho", payload.novo_status)
       .eq("ativo", true);
 
-    // Filter rules that match this service
-    const rules = (allRules || []).filter((r: any) => 
-      !servicoId || r.servico_id === servicoId
-    );
+    const rules = (allRules || []).filter((r: any) => !servicoId || r.servico_id === servicoId);
 
     const results: { internal: number; email: boolean } = { internal: 0, email: false };
 
-    // Build notification message based on status
     const buildNotificationMessage = () => {
-      if (novo_status === "aguardando_confirmacao") {
+      if (payload.novo_status === "aguardando_confirmacao") {
         return `Uma nova solicitação de ${servicoNome} foi recebida. Protocolo: ${solicitacao.protocolo}`;
       }
-      if (novo_status === "cancelado") {
+      if (payload.novo_status === "cancelado") {
         return `A solicitação ${solicitacao.protocolo} (${servicoNome}) foi cancelada.`;
       }
-      if (novo_status === "recusado") {
+      if (payload.novo_status === "recusado") {
         return `A solicitação ${solicitacao.protocolo} (${servicoNome}) foi recusada.`;
       }
       return `Solicitação ${solicitacao.protocolo} atualizada para: ${statusLabel}`;
@@ -187,15 +346,12 @@ Deno.serve(async (req) => {
       const tiposNotificacao = rule.tipos_notificacao || [];
       const setorIds = rule.setor_ids || [];
 
-      // Internal notifications - send to users in the specified setores
       if (tiposNotificacao.includes("interna") && setorIds.length > 0) {
-        // Check if any setor_id is the special "admin" marker
         const hasAdminTarget = setorIds.includes("admin");
         const regularSetorIds = setorIds.filter((id: string) => id !== "admin");
 
         const profileIds: string[] = [];
 
-        // Get profiles from regular setores
         if (regularSetorIds.length > 0) {
           const { data: setorEmails } = await supabaseAdmin
             .from("setor_emails")
@@ -208,7 +364,7 @@ Deno.serve(async (req) => {
               .from("profiles")
               .select("id")
               .in("email_setor", emails)
-              .neq("id", usuario_id);
+              .neq("id", payload.usuario_id);
 
             if (profiles) {
               profileIds.push(...profiles.map((p: any) => p.id));
@@ -216,7 +372,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Get admin users if "admin" target is present
         if (hasAdminTarget) {
           const { data: adminRoles } = await supabaseAdmin
             .from("user_roles")
@@ -225,7 +380,7 @@ Deno.serve(async (req) => {
 
           if (adminRoles) {
             for (const ar of adminRoles) {
-              if (ar.user_id !== usuario_id && !profileIds.includes(ar.user_id)) {
+              if (ar.user_id !== payload.usuario_id && !profileIds.includes(ar.user_id)) {
                 profileIds.push(ar.user_id);
               }
             }
@@ -235,7 +390,7 @@ Deno.serve(async (req) => {
         if (profileIds.length > 0) {
           const notifications = profileIds.map((uid: string) => ({
             usuario_id: uid,
-            solicitacao_id,
+            solicitacao_id: payload.solicitacao_id,
             mensagem: notificationMessage,
             tipo: "status_update",
           }));
@@ -250,7 +405,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Email notification to client
       if (tiposNotificacao.includes("email") && solicitacao.cliente_email) {
         try {
           const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -260,7 +414,7 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${serviceKey}`,
+              Authorization: `Bearer ${serviceKey}`,
             },
             body: JSON.stringify({
               to: solicitacao.cliente_email,
@@ -300,19 +454,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
+    const responseBody: StandardResponse = {
+      code: "SUCCESS",
+      message: "Notificações processadas com sucesso.",
+      details: {
+        solicitacao_id: payload.solicitacao_id,
+        action: payload.action,
         notifications_sent: results.internal,
         email_sent: results.email,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      },
+    };
+
+    await supabaseAdmin
+      .from("edge_function_idempotency")
+      .update({ status_code: 200, response: responseBody })
+      .eq("function_name", FUNCTION_NAME)
+      .eq("solicitacao_id", payload.solicitacao_id)
+      .eq("action", payload.action)
+      .eq("request_timestamp", payload.timestamp);
+
+    return jsonResponse(200, responseBody);
   } catch (err) {
     console.error("Erro interno:", err);
-    return new Response(
-      JSON.stringify({ error: "Erro interno do servidor" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse(500, {
+      code: "INTERNAL_ERROR",
+      message: "Erro interno do servidor.",
+      details: { error: String(err) },
+    });
   }
 });

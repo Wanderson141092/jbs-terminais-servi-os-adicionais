@@ -10,7 +10,7 @@ interface ConsultaFormProps {
   isLoading: boolean;
 }
 
-const ConsultaForm = ({ onSearch, isLoading }: ConsultaFormProps) => {
+const ConsultaForm = React.forwardRef<HTMLFormElement, ConsultaFormProps>(({ onSearch, isLoading }, ref) => {
   const [valor, setValor] = useState("");
   const [chave, setChave] = useState("");
 

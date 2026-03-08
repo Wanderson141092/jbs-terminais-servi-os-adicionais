@@ -13,6 +13,7 @@ import ProcessStageStepper from "./ProcessStageStepper";
 import ProcessChecklist from "./ProcessChecklist";
 import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw, ClipboardList } from "lucide-react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
+import { normalizeFormValue } from "@/lib/normalizeFormValue";
 
 interface ProcessoViewDialogProps {
   open: boolean;

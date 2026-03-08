@@ -122,22 +122,22 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       return;
     }
 
-    const { data: respostas } = await supabase
-      .from("formulario_respostas")
-      .select("respostas, arquivos, created_at")
-      .eq("formulario_id", formularioId)
-      .order("created_at", { ascending: false });
-
-    const { data: perguntasData } = await supabase
-      .from("formulario_perguntas")
-      .select("pergunta_id, banco_perguntas(id, rotulo, tipo, config)")
-      .eq("formulario_id", formularioId)
-      .order("ordem");
-
-    const { data: mapeamentos } = await supabase
-      .from("pergunta_mapeamento")
-      .select("pergunta_id, campo_solicitacao, campo_analise_id")
-      .eq("formulario_id", formularioId);
+    const [{ data: respostas }, { data: perguntasData }, { data: mapeamentos }] = await Promise.all([
+      supabase
+        .from("formulario_respostas")
+        .select("respostas, arquivos, created_at")
+        .eq("formulario_id", formularioId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("formulario_perguntas")
+        .select("pergunta_id, banco_perguntas(id, rotulo, tipo, config)")
+        .eq("formulario_id", formularioId)
+        .order("ordem"),
+      supabase
+        .from("pergunta_mapeamento")
+        .select("pergunta_id, campo_solicitacao, campo_analise_id")
+        .eq("formulario_id", formularioId),
+    ]);
 
     if (!respostas || respostas.length === 0 || !perguntasData) {
       setFormRespostas([]);
@@ -157,17 +157,16 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     const respostasObj = bestResponse.respostas as Record<string, any>;
     const mappedPerguntaIds = new Set((mapeamentos || []).map(m => m.pergunta_id));
 
-    const unmapped: { rotulo: string; valor: any; tipo: string }[] = [];
+    const unmapped: { rotulo: string; valor: any; tipo: string; config?: any }[] = [];
     for (const fp of perguntasData) {
       const bp = (fp as any).banco_perguntas;
       if (!bp) continue;
       if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
-      // For external forms, skip mapped; for internal show all
       if (isExternalForm && mappedPerguntaIds.has(bp.id)) continue;
 
       const val = respostasObj[bp.id];
       if (val !== undefined && val !== null && val !== "") {
-        unmapped.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
+        unmapped.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo, config: bp.config });
       }
     }
     setFormRespostas(unmapped);

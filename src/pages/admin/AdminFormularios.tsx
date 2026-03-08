@@ -24,8 +24,7 @@ import {
   ArrowLeft, Plus, Save, Edit, Trash2, FileText, Eye, Download, Database, Settings2, HelpCircle, List, Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
-import { useGestorCheck } from "@/hooks/useGestorCheck";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import BancoPerguntasManager from "@/components/admin/BancoPerguntasManager";
 import FormularioBuilder from "@/components/admin/FormularioBuilder";
 import CamposDinamicosManager from "@/components/admin/CamposDinamicosManager";

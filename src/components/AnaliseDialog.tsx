@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { buildNotificarStatusPayload } from "@/lib/edgePayload";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";

@@ -410,7 +410,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                     {formRespostas.map((fr, i) => (
                       <div key={i}>
                         <Label className="text-xs text-muted-foreground">{fr.rotulo}</Label>
-                        <p className="text-sm">{formatResponseValue(fr.valor, fr.tipo)}</p>
+                        <p className="text-sm">{formatResponseValue(fr.valor, fr.tipo, fr.config)}</p>
                       </div>
                     ))}
                   </div>

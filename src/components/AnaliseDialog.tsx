@@ -191,50 +191,30 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (payload?.error?.message) return payload.error.message as string;
     if (payload?.message) return payload.message as string;
     return fallback;
+  };
+
   const fetchCobrancaRegistros = async () => {
-    const { data: newRegistros } = await supabase
-      .from("cobrancas")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-
-    if (newRegistros && newRegistros.length > 0) {
-      return newRegistros;
-    }
-
-    const { data: legacyRegistros } = await supabase
+    const { data } = await supabase
       .from("lancamento_cobranca_registros")
       .select("*")
       .eq("solicitacao_id", solicitacao.id);
-
-    return legacyRegistros || [];
+    return data || [];
   };
 
   const upsertCobrancaRegistro = async (payload: any) => {
-    await supabase.from("cobrancas").upsert(
-      {
-        ...payload,
-        status_financeiro: payload.confirmado ? "confirmado" : "pendente",
-      },
-      { onConflict: "solicitacao_id,cobranca_config_id" }
-    );
-
     await supabase.from("lancamento_cobranca_registros").upsert(payload, { onConflict: "solicitacao_id,cobranca_config_id" });
   };
 
-
   useEffect(() => {
     const fetchData = async () => {
-      const [servicoRes, allServicosRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes, camposAnaliseRes] = await Promise.all([
-        supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
+      const [servicoRes, allServicosRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, camposFixosRes, camposAnaliseRes] = await Promise.all([
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
         supabase.from("parametros_campos").select("*").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
         supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
-        supabase.from("process_campos_view" as any).select("campo_id, campo_valor, campo_nome").eq("solicitacao_id", solicitacao.id),
+        supabase.from("campos_analise_valores").select("campo_id, valor").eq("solicitacao_id", solicitacao.id),
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
-        fetchCobrancaRegistros(),
         supabase.from("campos_fixos_config").select("campo_chave, campo_label, ordem, servico_ids, visivel_analise").eq("ativo", true).eq("visivel_analise", true).order("ordem"),
         supabase.from("campos_analise").select("id, nome, ordem, servico_ids, visivel_externo").eq("ativo", true).order("ordem"),
       ]);

@@ -193,53 +193,26 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
 
     setLoading(true);
 
-    const updates: any = {
-      updated_at: new Date().toISOString()
-    };
+    const targetStatus = newStatus === 'aprovado' ? 'confirmado_aguardando_vistoria' : 'recusado';
 
-    if (newStatus === 'aprovado') {
-      updates.comex_aprovado = true;
-      updates.armazem_aprovado = true;
-      updates.comex_justificativa = justificativa;
-      updates.armazem_justificativa = justificativa;
-      updates.comex_usuario_id = userId;
-      updates.armazem_usuario_id = userId;
-      updates.comex_data = new Date().toISOString();
-      updates.armazem_data = new Date().toISOString();
-      updates.status = 'confirmado_aguardando_vistoria';
-    } else if (newStatus === 'reprovado') {
-      updates.comex_aprovado = false;
-      updates.armazem_aprovado = false;
-      updates.comex_justificativa = justificativa;
-      updates.armazem_justificativa = justificativa;
-      updates.comex_usuario_id = userId;
-      updates.armazem_usuario_id = userId;
-      updates.comex_data = new Date().toISOString();
-      updates.armazem_data = new Date().toISOString();
-      updates.status = 'recusado';
-    }
+    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        current_status: solicitacao.status,
+        target_status: targetStatus,
+        justification: justificativa.trim(),
+      },
+    });
 
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update(updates)
-      .eq("id", solicitacao.id);
-
-    if (error) {
-      toast.error("Erro ao alterar status");
+    if (error || data?.ok === false) {
+      const msg = data?.error?.message || error?.message || "Erro ao alterar status";
+      toast.error(msg);
     } else {
-      await supabase.rpc("insert_audit_log", {
-        p_solicitacao_id: solicitacao.id,
-        p_usuario_id: userId,
-        p_acao: newStatus === 'aprovado' ? 'status_alterado_aprovado' : 'status_alterado_recusado',
-        p_detalhes: `Status alterado de ${solicitacao.status} para ${newStatus}. Justificativa: ${justificativa}`
-      });
-
-      const finalStatus = newStatus === 'aprovado' ? 'confirmado_aguardando_vistoria' : 'recusado';
       supabase.functions.invoke("notificar-status", {
         body: buildNotificarStatusPayload({
           action: "notificar_status",
           solicitacao_id: solicitacao.id,
-          novo_status: finalStatus,
+          novo_status: targetStatus,
           usuario_id: userId,
         }),
       }).catch(() => {});

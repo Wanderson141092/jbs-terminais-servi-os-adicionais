@@ -182,7 +182,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [lancamentoRegistros, setLancamentoRegistros] = useState<any[]>([]);
   const [billingDialogData, setBillingDialogData] = useState<{ config: any } | null>(null);
   const [blockedBillingConfig, setBlockedBillingConfig] = useState<any | null>(null);
-  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
+  const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string; config?: any }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
   const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
@@ -317,7 +317,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
         const { data: perguntasData } = await supabase
           .from("formulario_perguntas")
-          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
+          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo, config)")
           .eq("formulario_id", formularioId)
           .order("ordem");
 
@@ -345,7 +345,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
           // For internal forms: show ALL responses (unmapped)
           // For external/iframe forms: mapped ones go to dynamic fields, show unmapped here
-          const allResponses: { rotulo: string; valor: any; tipo: string }[] = [];
+          const allResponses: { rotulo: string; valor: any; tipo: string; config?: any }[] = [];
           for (const fp of perguntasData) {
             const bp = (fp as any).banco_perguntas;
             if (!bp) continue;
@@ -355,7 +355,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
             const val = respostasObj[bp.id];
             if (val !== undefined && val !== null && val !== "") {
-              allResponses.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo });
+              allResponses.push({ rotulo: bp.rotulo, valor: val, tipo: bp.tipo, config: bp.config });
             }
           }
           setFormRespostas(allResponses);
@@ -1129,7 +1129,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
                 <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Respostas do Formulário</p>
                 {formRespostas.map((fr, idx) => (
-                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={fr.rotulo} value={formatFormValue(fr.valor, fr.tipo)} />
+                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={fr.rotulo} value={formatFormValue(fr.valor, fr.tipo, fr.config)} />
                 ))}
               </div>
             )}
@@ -2148,13 +2148,26 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 };
 
 // Helper Functions
-const formatFormValue = (val: any, tipo: string): string => {
+const formatFormValue = (val: any, tipo: string, config?: any): string => {
+  let result: string;
+
   if (val && typeof val === "object" && !Array.isArray(val)) {
-    if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
-    return normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true });
+    if (val.campo1 && val.campo2) result = `${val.campo1} / ${val.campo2}`;
+    else result = normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true });
+  } else {
+    result = normalizeFormValue(val, { nullishFallback: "—" });
   }
 
-  return normalizeFormValue(val, { nullishFallback: "—" });
+  // Apply prefix/suffix from question config when displaying
+  if (config && result !== "—") {
+    const prefixo = config.prefixo || "";
+    const sufixo = config.sufixo || "";
+    if (prefixo || sufixo) {
+      result = `${prefixo}${result}${sufixo ? " " + sufixo : ""}`;
+    }
+  }
+
+  return result;
 };
 
 // Helper Components

@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
       lancamento_confirmado,
       cliente_nome,
       cnpj,
+      force_correction,
     } = body || {};
 
     if (!solicitacao_id) return fail(400, { code: "INVALID_REQUEST", message: "solicitacao_id é obrigatório." });

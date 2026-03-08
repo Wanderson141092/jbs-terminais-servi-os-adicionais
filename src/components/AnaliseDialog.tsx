@@ -720,7 +720,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setShowConclusaoLancamentoDialog(false);
     setLoading(true);
 
-    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+    const { data, error: transitionError } = await supabase.functions.invoke("request_process_transition", {
       body: {
         solicitacao_id: solicitacao.id,
         current_status: solicitacao.status,

@@ -1533,60 +1533,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             )}
 
 
-            {(() => {
-              const applicableCobrancas = cobrancaConfigs.filter((cfg: any) => {
-                const statusAtivacao = cfg.status_ativacao || [];
-                if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-                return true;
-              });
 
-              if (applicableCobrancas.length === 0) return null;
-
-              return (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Cobrança: ações rápidas</p>
-                    <div className="flex items-center gap-1.5">
-                      {applicableCobrancas.map((cfg: any) => {
-                        const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
-                        const isConfirmed = registro?.confirmado === true;
-                        const isBlocked = cfg.tipo === "pendencia" && solicitacao.lacre_armador_aceite_custo !== true;
-
-                        return (
-                          <button
-                            key={cfg.id}
-                            type="button"
-                            onClick={() => {
-                              if (isConfirmed) return;
-                              if (isBlocked) {
-                                setBlockedBillingConfig(cfg);
-                                return;
-                              }
-                              setBillingDialogData({ config: cfg });
-                            }}
-                            title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : isBlocked ? "Fluxo bloqueado" : "Pendente"}`}
-                            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-60"
-                            disabled={isConfirmed}
-                          >
-                            {isConfirmed ? (
-                              <Check className="h-4 w-4 text-muted-foreground/50" />
-                            ) : isBlocked ? (
-                              <span className="relative inline-flex items-center text-amber-700">
-                                <DollarSign className="h-4 w-4" />
-                                <Lock className="h-2.5 w-2.5 absolute -bottom-0.5 -right-1" />
-                              </span>
-                            ) : (
-                              <DollarSign className="h-4 w-4 text-destructive" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
 
             {/* Documentos de Deferimento */}
             {attachments.length > 0 && (

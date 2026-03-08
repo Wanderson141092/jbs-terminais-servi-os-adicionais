@@ -191,50 +191,30 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (payload?.error?.message) return payload.error.message as string;
     if (payload?.message) return payload.message as string;
     return fallback;
+  };
+
   const fetchCobrancaRegistros = async () => {
-    const { data: newRegistros } = await supabase
-      .from("cobrancas")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-
-    if (newRegistros && newRegistros.length > 0) {
-      return newRegistros;
-    }
-
-    const { data: legacyRegistros } = await supabase
+    const { data } = await supabase
       .from("lancamento_cobranca_registros")
       .select("*")
       .eq("solicitacao_id", solicitacao.id);
-
-    return legacyRegistros || [];
+    return data || [];
   };
 
   const upsertCobrancaRegistro = async (payload: any) => {
-    await supabase.from("cobrancas").upsert(
-      {
-        ...payload,
-        status_financeiro: payload.confirmado ? "confirmado" : "pendente",
-      },
-      { onConflict: "solicitacao_id,cobranca_config_id" }
-    );
-
     await supabase.from("lancamento_cobranca_registros").upsert(payload, { onConflict: "solicitacao_id,cobranca_config_id" });
   };
 
-
   useEffect(() => {
     const fetchData = async () => {
-      const [servicoRes, allServicosRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes, camposAnaliseRes] = await Promise.all([
-        supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
+      const [servicoRes, allServicosRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, camposFixosRes, camposAnaliseRes] = await Promise.all([
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
         supabase.from("parametros_campos").select("*").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
         supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
-        supabase.from("process_campos_view" as any).select("campo_id, campo_valor, campo_nome").eq("solicitacao_id", solicitacao.id),
+        supabase.from("campos_analise_valores").select("campo_id, valor").eq("solicitacao_id", solicitacao.id),
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
-        fetchCobrancaRegistros(),
         supabase.from("campos_fixos_config").select("campo_chave, campo_label, ordem, servico_ids, visivel_analise").eq("ativo", true).eq("visivel_analise", true).order("ordem"),
         supabase.from("campos_analise").select("id, nome, ordem, servico_ids, visivel_externo").eq("ativo", true).order("ordem"),
       ]);
@@ -292,14 +272,10 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         ? allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0 || c.servico_ids.includes(currentServicoId))
         : allCobrancaConfig.filter((c: any) => c.servico_ids.length === 0);
       setCobrancaConfigs(serviceCobrancaConfig);
-      setLancamentoRegistros(registrosRes.data || []);
 
-      // Build dynamic fields display
-      const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
-        campo_nome: cv.campo_nome || "Campo",
-        valor: cv.campo_valor || "",
-      })).filter((cv: any) => cv.valor);
-      setCamposDinamicos(camposVals);
+      // Fetch billing registros separately
+      const registrosData = await fetchCobrancaRegistros();
+      setLancamentoRegistros(registrosData);
 
       // Filter campos fixos by service
       const filteredCamposFixos = (camposFixosRes.data || [])
@@ -332,34 +308,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
         // Fetch form responses
         const { data: respostasData } = await supabase
-          .from("form_data")
+          .from("formulario_respostas")
           .select("respostas, arquivos, created_at")
           .eq("formulario_id", formularioId)
           .order("created_at", { ascending: false })
           .limit(10);
 
-        const respostas = (respostasData && respostasData.length > 0)
-          ? respostasData
-          : (await supabase
-            .from("formulario_respostas")
-            .select("respostas, arquivos, created_at")
-            .eq("formulario_id", formularioId)
-            .order("created_at", { ascending: false })
-            .limit(10)).data;
+        const respostas = respostasData;
 
-        const { data: perguntasNewData } = await supabase
-          .from("form_field_mapping")
-          .select("form_field_id, ordem, form_fields(id, rotulo, tipo)")
+        const { data: perguntasData } = await supabase
+          .from("formulario_perguntas")
+          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
           .eq("formulario_id", formularioId)
           .order("ordem");
-
-        const perguntasData = (perguntasNewData && perguntasNewData.length > 0)
-          ? perguntasNewData.map((p: any) => ({ pergunta_id: p.form_field_id, ordem: p.ordem, banco_perguntas: p.form_fields }))
-          : (await supabase
-            .from("formulario_perguntas")
-            .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
-            .eq("formulario_id", formularioId)
-            .order("ordem")).data;
 
         const { data: mapeamentos } = await supabase
           .from("pergunta_mapeamento")
@@ -759,7 +720,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setShowConclusaoLancamentoDialog(false);
     setLoading(true);
 
-    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+    const { data, error: transitionError } = await supabase.functions.invoke("request_process_transition", {
       body: {
         solicitacao_id: solicitacao.id,
         current_status: solicitacao.status,
@@ -854,13 +815,13 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       }
     }
     
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from("solicitacoes")
       .update(updatePayload)
       .eq("id", solicitacao.id);
 
-    if (error || data?.ok === false) {
-      toast.error(getStructuredError("Erro ao atualizar status.", data) + (error?.message ? ` ${error.message}` : ""));
+    if (updateError || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao atualizar status.", data) + (updateError?.message ? ` ${updateError.message}` : ""));
       setLoading(false);
       return;
     }
@@ -869,6 +830,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setJustificativaNaoVistoriado("");
     }
 
+    const statusLabel = statusOptions.find((s: any) => s.value === selectedStatus)?.label || selectedStatus;
     await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
     
     // Dispatch email/notification via edge function
@@ -947,50 +909,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setLoading(false);
       return;
     }
-    
-    if (configId) {
-      // Confirm individual registro
-      let error: any = null;
-      try {
-        await upsertCobrancaRegistro({
-          solicitacao_id: solicitacao.id,
-          cobranca_config_id: configId,
-          confirmado: true,
-          confirmado_por: userId,
-          confirmado_data: new Date().toISOString(),
-        });
-      } catch (err) {
-        error = err;
-      }
 
-      if (error) {
-        toast.error("Erro ao confirmar lançamento");
-        setLoading(false);
-        return;
-      }
-
-      // Refresh registros
-      const updatedRegistros = await fetchCobrancaRegistros();
-      setLancamentoRegistros(updatedRegistros || []);
-
-      // Check if ALL applicable registros are now confirmed
-      const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
-        const statusAtivacao = cfg.status_ativacao || [];
-        if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-        if (cfg.tipo === "servico") return true;
-        if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true;
-        return false;
-      });
-      const allConfirmed = applicableConfigs.every((cfg: any) => {
-        const reg = (updatedRegistros || []).find((r: any) => r.cobranca_config_id === cfg.id);
-        return reg?.confirmado === true;
-      });
-
-    const { data: updatedRegistros } = await supabase
-      .from("lancamento_cobranca_registros")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-    setLancamentoRegistros(updatedRegistros || []);
+    const updatedRegistros = await fetchCobrancaRegistros();
+    setLancamentoRegistros(updatedRegistros);
 
     const cfgLabel = cobrancaConfigs.find((c: any) => c.id === effectiveConfigId)?.rotulo_analise || "Cobrança";
     toast.success(`Lançamento "${cfgLabel}" confirmado!`);
@@ -999,32 +920,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     if (data?.data?.all_confirmed) onClose();
   };
 
-  const handleDesfazerLancamento = async (configId: string) => {
-    setLoading(true);
-    const { data, error } = await supabase.functions.invoke("confirm_billing", {
-      body: {
-        solicitacao_id: solicitacao.id,
-        cobranca_config_id: configId,
-        confirm: false,
-      },
-    });
-
-    if (error || data?.ok === false) {
-      toast.error(getStructuredError("Erro ao desfazer lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
-      setLoading(false);
-      return;
-    }
-
-    const { data: updatedRegistros } = await supabase
-      .from("lancamento_cobranca_registros")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-    setLancamentoRegistros(updatedRegistros || []);
-
-    const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
-    toast.success(`Lançamento "${cfgLabel}" desfeito!`);
-    setLoading(false);
-  };
+  // handleDesfazerLancamento is defined below after handleSaveObservacao
 
   const logAudit = async (acao: string, detalhes: string) => {
     await supabase.rpc("insert_audit_log", {
@@ -1087,49 +983,22 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const handleDesfazerLancamento = async (configId: string) => {
     setLoading(true);
-    const nowIso = new Date().toISOString();
-    const [{ error: newError }, { error: legacyError }] = await Promise.all([
-      supabase
-        .from("cobrancas")
-        .update({
-          confirmado: false,
-          status_financeiro: "pendente",
-          confirmado_por: null,
-          confirmado_data: null,
-          updated_at: nowIso,
-        })
-        .eq("solicitacao_id", solicitacao.id)
-        .eq("cobranca_config_id", configId),
-      supabase
-        .from("lancamento_cobranca_registros")
-        .update({
-          confirmado: false,
-          confirmado_por: null,
-          confirmado_data: null,
-          updated_at: nowIso,
-        })
-        .eq("solicitacao_id", solicitacao.id)
-        .eq("cobranca_config_id", configId),
-    ]);
+    const { data, error } = await supabase.functions.invoke("confirm_billing", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        cobranca_config_id: configId,
+        confirm: false,
+      },
+    });
 
-    const error = newError || legacyError;
-
-    if (error) {
-      toast.error("Erro ao desfazer lançamento");
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao desfazer lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
 
-    // Update global field
-    await supabase.from("solicitacoes").update({
-      lancamento_confirmado: false,
-      lancamento_confirmado_por: null,
-      lancamento_confirmado_data: null,
-    }).eq("id", solicitacao.id);
-
-    // Refresh registros
     const updatedRegistros = await fetchCobrancaRegistros();
-    setLancamentoRegistros(updatedRegistros || []);
+    setLancamentoRegistros(updatedRegistros);
 
     const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
     await logAudit("lancamento_desfeito", `Lançamento desfeito: ${cfgLabel}. Protocolo: ${solicitacao.protocolo}.`);

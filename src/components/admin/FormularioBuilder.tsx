@@ -245,7 +245,7 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
       return;
     }
 
-    const { error } = await supabase.from("pergunta_mapeamento").insert(insertData);
+    const { error } = await supabase.from("pergunta_mapeamento").insert(insertData as any);
     if (error) { toast.error("Erro ao salvar mapeamento"); return; }
     toast.success("Mapeamento criado!");
     setShowMapDialog(false);

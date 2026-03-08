@@ -294,6 +294,7 @@ const AdminFormularios = () => {
   const [loading, setLoading] = useState(true);
   const [formularios, setFormularios] = useState<Formulario[]>([]);
   const [perguntasExportacao, setPerguntasExportacao] = useState<PerguntaExportavel[]>([]);
+  const [campos, setCampos] = useState<PerguntaExportavel[]>([]);
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [formStyles, setFormStyles] = useState<FormStyle[]>([]);
 
@@ -344,26 +345,9 @@ const AdminFormularios = () => {
         rotulo: fp.banco_perguntas?.rotulo || fp.pergunta_id || "Pergunta sem rótulo",
         ordem: fp.ordem || 0,
       }))
-      .filter((p: PerguntaExportavel) => !!p.id);
+      .filter((p: any) => !!p.id);
 
-    setPerguntasExportacao(perguntas);
-  const fetchCampos = async (formularioId: string) => {
-    const { data } = await supabase
-      .from("formulario_perguntas")
-      .select("id, formulario_id, pergunta_id, obrigatorio, ordem, banco_perguntas(id, rotulo, tipo)")
-      .eq("formulario_id", formularioId)
-      .order("ordem");
-
-    const camposFormatados = ((data || []) as any[]).map((item) => ({
-      id: item.id,
-      formulario_id: item.formulario_id,
-      pergunta_id: item.pergunta_id,
-      obrigatorio: item.obrigatorio,
-      ordem: item.ordem,
-      pergunta: item.banco_perguntas,
-    }));
-
-    setCampos(camposFormatados);
+    setPerguntasExportacao(perguntas as any);
   };
 
   const fetchRespostas = async (formularioId: string) => {
@@ -457,7 +441,6 @@ const AdminFormularios = () => {
 
     // Headers
     const headers = ["Data", ...perguntasExportacao.map((p) => p.rotulo)];
-    const headers = ["Data", ...campos.map((c) => c.pergunta?.rotulo || c.pergunta_id)];
     const headerRow = sheet.addRow(headers);
     headerRow.eachCell((cell) => {
       cell.font = { bold: true };
@@ -471,12 +454,6 @@ const AdminFormularios = () => {
         new Date(r.created_at).toLocaleString("pt-BR"),
         ...perguntasExportacao.map((p) => {
           const val = respostasObj[p.id];
-        ...campos.map((c) => {
-          const val = respostasObj[c.pergunta_id] ?? respostasObj[c.id];
-          if (Array.isArray(val)) return val.join(", ");
-          if (typeof val === "boolean") return val ? "Sim" : "Não";
-          return (val as string) || "";
-          const val = respostasObj[c.id];
           return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
         }),
       ];
@@ -745,7 +722,6 @@ const AdminFormularios = () => {
                 <TableRow>
                   <TableHead>Data</TableHead>
                   {perguntasExportacao.map((p) => <TableHead key={p.id}>{p.rotulo}</TableHead>)}
-                  {campos.map((c) => <TableHead key={c.id}>{c.pergunta?.rotulo || c.pergunta_id}</TableHead>)}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -757,14 +733,10 @@ const AdminFormularios = () => {
                       const val = respostasObj[p.id];
                       const arquivosArr = r.arquivos as { pergunta_id?: string; campo_id?: string; file_url: string; file_name: string }[] | null;
                       const arquivo = arquivosArr?.find((a) => (a.pergunta_id || a.campo_id) === p.id);
-                      const val = respostasObj[c.pergunta_id] ?? respostasObj[c.id];
-                      const arquivosArr = r.arquivos as { pergunta_id?: string; campo_id?: string; file_url: string; file_name: string }[] | null;
-                      const arquivo = arquivosArr?.find((a) => a.pergunta_id === c.pergunta_id || a.campo_id === c.id);
                       if (arquivo) {
                         return <TableCell key={p.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
                       }
-                      return <TableCell key={p.id} className="text-sm">{Array.isArray(val) ? val.join(", ") : (val as string) || "—"}</TableCell>;
-                      return <TableCell key={c.id} className="text-sm">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
+                      return <TableCell key={p.id} className="text-sm">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
                     })}
                   </TableRow>
                 ))}

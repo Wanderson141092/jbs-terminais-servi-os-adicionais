@@ -909,50 +909,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setLoading(false);
       return;
     }
-    
-    if (configId) {
-      // Confirm individual registro
-      let error: any = null;
-      try {
-        await upsertCobrancaRegistro({
-          solicitacao_id: solicitacao.id,
-          cobranca_config_id: configId,
-          confirmado: true,
-          confirmado_por: userId,
-          confirmado_data: new Date().toISOString(),
-        });
-      } catch (err) {
-        error = err;
-      }
 
-      if (error) {
-        toast.error("Erro ao confirmar lançamento");
-        setLoading(false);
-        return;
-      }
-
-      // Refresh registros
-      const updatedRegistros = await fetchCobrancaRegistros();
-      setLancamentoRegistros(updatedRegistros || []);
-
-      // Check if ALL applicable registros are now confirmed
-      const applicableConfigs = cobrancaConfigs.filter((cfg: any) => {
-        const statusAtivacao = cfg.status_ativacao || [];
-        if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-        if (cfg.tipo === "servico") return true;
-        if (cfg.tipo === "pendencia") return solicitacao.lacre_armador_aceite_custo === true;
-        return false;
-      });
-      const allConfirmed = applicableConfigs.every((cfg: any) => {
-        const reg = (updatedRegistros || []).find((r: any) => r.cobranca_config_id === cfg.id);
-        return reg?.confirmado === true;
-      });
-
-    const { data: updatedRegistros } = await supabase
-      .from("lancamento_cobranca_registros")
-      .select("*")
-      .eq("solicitacao_id", solicitacao.id);
-    setLancamentoRegistros(updatedRegistros || []);
+    const updatedRegistros = await fetchCobrancaRegistros();
+    setLancamentoRegistros(updatedRegistros);
 
     const cfgLabel = cobrancaConfigs.find((c: any) => c.id === effectiveConfigId)?.rotulo_analise || "Cobrança";
     toast.success(`Lançamento "${cfgLabel}" confirmado!`);

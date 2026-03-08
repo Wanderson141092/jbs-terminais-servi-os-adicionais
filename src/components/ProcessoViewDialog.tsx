@@ -574,7 +574,7 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
           </DialogHeader>
           {previewUrl && (
             <div className="w-full h-[70vh]">
-              {previewUrl.toLowerCase().endsWith('.pdf') ? (
+              {/\.pdf(\?|$)/i.test(previewUrl) ? (
                 <iframe src={previewUrl} className="w-full h-full" />
               ) : (
                 <img src={previewUrl} alt="Documento" className="max-w-full max-h-full mx-auto" />

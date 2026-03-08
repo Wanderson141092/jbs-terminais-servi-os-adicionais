@@ -299,6 +299,47 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setAttachments(attachRes.data || []);
       setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
 
+      // Sign deferimento document URLs (private bucket)
+      const rawDefDocs = attachRes.data || [];
+      const signedDefArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string; error?: boolean }[] = [];
+      for (const doc of rawDefDocs) {
+        let signedUrl = doc.file_url;
+        let storagePath: string | null = null;
+        let hasError = false;
+
+        if (doc.file_url && !doc.file_url.startsWith("http")) {
+          storagePath = doc.file_url;
+        } else if (doc.file_url) {
+          const signMatch = doc.file_url.match(/\/storage\/v1\/object\/(?:sign|public)\/deferimento\/([^?]+)/);
+          if (signMatch) {
+            storagePath = decodeURIComponent(signMatch[1]);
+          }
+        }
+
+        if (storagePath) {
+          const { data: signedData, error: signError } = await supabase.storage
+            .from("deferimento")
+            .createSignedUrl(storagePath, 3600);
+          if (signedData) {
+            signedUrl = signedData.signedUrl;
+          } else {
+            console.error("[Deferimento] Falha ao gerar URL assinada:", storagePath, signError);
+            hasError = true;
+          }
+        } else if (!doc.file_url) {
+          hasError = true;
+        }
+
+        signedDefArquivos.push({
+          pergunta_id: doc.id,
+          file_url: signedUrl || "",
+          file_name: doc.file_name || "Documento",
+          label: doc.document_type === "deferimento" ? `Deferimento: ${doc.file_name}` : doc.file_name,
+          error: hasError,
+        });
+      }
+      setDeferimentoArquivos(signedDefArquivos);
+
       // Fetch form responses and attachments
       const formularioId = solicitacao.formulario_id;
       if (formularioId) {

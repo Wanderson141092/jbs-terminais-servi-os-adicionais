@@ -1021,7 +1021,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   return (
     <>
       <Dialog open onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto [&>button.absolute]:hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 flex-wrap">
               <FileText className="h-5 w-5" />
@@ -1058,7 +1058,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               )}
               {/* Ações de Cancelamento / Recusa - ao lado da chave */}
               {(canCancel || canRecusar) && solicitacao.status !== 'cancelado' && solicitacao.status !== 'recusado' && (
-                <div className="ml-auto mr-8 flex gap-1 bg-destructive/5 px-2 py-1 rounded-md border border-destructive/20">
+                <div className="ml-auto flex gap-1 bg-destructive/5 px-2 py-1 rounded-md border border-destructive/20">
                     {canCancel && (
                       <Button
                         variant="outline"

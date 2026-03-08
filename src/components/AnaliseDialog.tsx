@@ -940,20 +940,39 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     }
 
     toast.success(aceito ? "Deferimento aceito!" : "Deferimento recusado!");
-    setShowDeferimentoAction(null);
-    setMotivoRecusaDeferimento("");
     setLoading(false);
 
     const { data: deferimentoDocs } = await supabase
       .from("deferimento_documents")
-      .select("*")
+      .select("id, file_name, file_url, status, motivo_recusa, created_at, document_type")
       .eq("solicitacao_id", solicitacao.id)
-      .eq("document_type", "deferimento");
+      .order("created_at", { ascending: false });
 
-    setAttachments(prev => {
-      const nonDeferimento = prev.filter(a => a.document_type !== "deferimento");
-      return [...nonDeferimento, ...(deferimentoDocs || [])];
-    });
+    const refreshed = await Promise.all(
+      (deferimentoDocs || []).map(async (doc: any) => {
+        const storagePath = resolveStoragePath(doc.file_url, "deferimento");
+        let signedUrl = doc.file_url || "";
+        let hasError = false;
+
+        if (storagePath) {
+          const { data: signedData } = await supabase.storage.from("deferimento").createSignedUrl(storagePath, 3600);
+          if (signedData?.signedUrl) signedUrl = signedData.signedUrl;
+          else hasError = true;
+        } else if (!doc.file_url) {
+          hasError = true;
+        }
+
+        return {
+          pergunta_id: doc.id,
+          file_url: signedUrl,
+          file_name: doc.file_name || "Documento",
+          label: doc.document_type ? `${doc.document_type}: ${doc.file_name}` : doc.file_name,
+          error: hasError,
+        };
+      })
+    );
+
+    setDeferimentoArquivos(refreshed);
   };
 
   const handleConfirmarLancamento = async (configId?: string) => {

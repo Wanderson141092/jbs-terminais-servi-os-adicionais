@@ -929,7 +929,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         solicitacao_id: solicitacao.id,
         deferimento_document_id: docId,
         accept: aceito,
-        motivo_recusa: aceito ? null : motivoRecusaDeferimento,
+        motivo_recusa: null,
       },
     });
 

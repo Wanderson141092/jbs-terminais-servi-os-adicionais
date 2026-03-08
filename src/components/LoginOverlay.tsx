@@ -157,6 +157,8 @@ const LoginOverlay = React.forwardRef<HTMLDivElement, LoginOverlayProps>(({ open
       </DialogContent>
     </Dialog>
   );
-};
+});
+
+LoginOverlay.displayName = "LoginOverlay";
 
 export default LoginOverlay;

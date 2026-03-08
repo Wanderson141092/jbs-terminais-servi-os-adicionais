@@ -43,11 +43,13 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
 
   useEffect(() => {
     if (open && solicitacao) {
-      fetchAttachments();
-      fetchServicoConfig();
-      fetchCamposDinamicos();
-      fetchFormRespostas();
-      checkIfExternalForm();
+      Promise.all([
+        fetchAttachments(),
+        fetchServicoConfig(),
+        fetchCamposDinamicos(),
+        fetchFormRespostas(),
+        checkIfExternalForm(),
+      ]);
     }
   }, [open, solicitacao]);
 

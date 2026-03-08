@@ -75,6 +75,8 @@ const ConsultaForm = React.forwardRef<HTMLFormElement, ConsultaFormProps>(({ onS
       </div>
     </form>
   );
-};
+});
+
+ConsultaForm.displayName = "ConsultaForm";
 
 export default ConsultaForm;

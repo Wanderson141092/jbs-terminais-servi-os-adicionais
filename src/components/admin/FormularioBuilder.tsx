@@ -10,7 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
@@ -543,21 +543,21 @@ const FormularioBuilder = ({ formularioId, onClose }: FormularioBuilderProps) =>
                   <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione o campo destino" /></SelectTrigger>
                   <SelectContent>
                     {camposFixos.length > 0 && (
-                      <SelectGroup>
+                      <>
                         <SelectLabel>Campos fixos</SelectLabel>
                         {camposFixos.map((c) => (
                           <SelectItem key={c.id} value={`fixo:${c.id}`}>{c.campo_label}</SelectItem>
                         ))}
-                      </SelectGroup>
+                        <SelectSeparator />
+                      </>
                     )}
-                    {camposFixos.length > 0 && camposAnalise.length > 0 && <SelectSeparator />}
                     {camposAnalise.length > 0 && (
-                      <SelectGroup>
+                      <>
                         <SelectLabel>Campos dinâmicos</SelectLabel>
                         {camposAnalise.map((c) => (
                           <SelectItem key={c.id} value={`dinamico:${c.id}`}>{c.nome}</SelectItem>
                         ))}
-                      </SelectGroup>
+                      </>
                     )}
                   </SelectContent>
                 </Select>

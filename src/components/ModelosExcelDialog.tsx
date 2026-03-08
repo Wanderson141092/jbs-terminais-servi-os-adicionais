@@ -65,7 +65,7 @@ const ModelosExcelDialog = ({ open, onClose }: ModelosExcelDialogProps) => {
   const [mappingModeloNome, setMappingModeloNome] = useState("");
   const [modeloMappingCounts, setModeloMappingCounts] = useState<Record<string, number>>({});
 
-  const { isAdmin } = useAdminCheck(user?.id || null);
+  const { isAdmin } = useRoleCheck(user?.id || null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {

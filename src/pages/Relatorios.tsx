@@ -66,7 +66,7 @@ const Relatorios = () => {
   const [downloadModelo, setDownloadModelo] = useState<ModeloRelatorio | null>(null);
   const [modeloMappingCounts, setModeloMappingCounts] = useState<Record<string, number>>({});
 
-  const { isAdmin } = useAdminCheck(user?.id || null);
+  const { isAdmin } = useRoleCheck(user?.id || null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {

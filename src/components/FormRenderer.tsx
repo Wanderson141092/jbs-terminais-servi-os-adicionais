@@ -277,12 +277,22 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
         });
       }
 
-      // Build respostas
+      // Build respostas with normalization
       const respostas: Record<string, any> = {};
-      for (const [perguntaId, value] of Object.entries(values)) {
-        if (visibilityState.visibleResponseIds.has(perguntaId)) {
-          respostas[perguntaId] = value;
+      for (const [perguntaId, val] of Object.entries(values)) {
+        if (!visibilityState.visibleResponseIds.has(perguntaId)) continue;
+
+        // Normalize: checkbox booleans → "Sim"/"Não"
+        if (val === true) { respostas[perguntaId] = "Sim"; continue; }
+        if (val === false) { respostas[perguntaId] = "Não"; continue; }
+
+        // Normalize: arrays → newline-separated string
+        if (Array.isArray(val)) {
+          respostas[perguntaId] = val.filter((v: any) => v !== "" && v !== null && v !== undefined).join("\n");
+          continue;
         }
+
+        respostas[perguntaId] = val;
       }
 
       const mapeamentosVisiveis = mapeamentos.filter((map) => visibilityState.visibleResponseIds.has(map.pergunta_id));

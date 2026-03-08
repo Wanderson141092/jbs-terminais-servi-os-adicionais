@@ -830,6 +830,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
       setJustificativaNaoVistoriado("");
     }
 
+    const statusLabel = statusOptions.find((s: any) => s.value === selectedStatus)?.label || selectedStatus;
     await createNotification(`Status da solicitação ${solicitacao.protocolo} atualizado para: ${statusLabel}`, "status");
     
     // Dispatch email/notification via edge function

@@ -281,8 +281,7 @@ const FormulariosManual = () => (
 const AdminFormularios = () => {
   const navigate = useNavigate();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
-  const { isGestor } = useGestorCheck(currentUserId);
+  const { isAdmin: isCurrentUserAdmin, isGestor } = useRoleCheck(currentUserId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

@@ -89,8 +89,7 @@ const AdminUsuarios = () => {
   const [userPasswordLoading, setUserPasswordLoading] = useState(false);
   
   const currentUserIsMaster = useCurrentUserIsMaster();
-  const { isAdmin: isCurrentUserAdmin } = useAdminCheck(currentUserId);
-  const { isGestor, gestorSetorEmail } = useGestorCheck(currentUserId);
+  const { isAdmin: isCurrentUserAdmin, isGestor, gestorSetorEmail } = useRoleCheck(currentUserId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

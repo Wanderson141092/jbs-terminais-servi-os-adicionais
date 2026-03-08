@@ -184,8 +184,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [billingDialogData, setBillingDialogData] = useState<{ config: any } | null>(null);
   const [blockedBillingConfig, setBlockedBillingConfig] = useState<any | null>(null);
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string; config?: any }[]>([]);
-  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string; label?: string }[]>([]);
+  const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string; label?: string; error?: boolean }[]>([]);
   const [showAttachmentViewer, setShowAttachmentViewer] = useState(false);
+  const [attachmentInitialIndex, setAttachmentInitialIndex] = useState(0);
   const [isExternalForm, setIsExternalForm] = useState(false);
   const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
 
@@ -371,10 +372,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
           // Process attachments with signed URLs
           const rawArquivos = (bestResponse.arquivos as any[]) || [];
-          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string }[] = [];
+          const signedArquivos: { pergunta_id: string; file_url: string; file_name: string; label?: string; error?: boolean }[] = [];
+          let failedCount = 0;
           for (const arq of rawArquivos) {
             let signedUrl = arq.file_url;
             let storagePath: string | null = null;
+            let hasError = false;
 
             if (arq.file_url && !arq.file_url.startsWith("http")) {
               storagePath = arq.file_url;
@@ -386,19 +389,32 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             }
 
             if (storagePath) {
-              const { data: signedData } = await supabase.storage
+              const { data: signedData, error: signError } = await supabase.storage
                 .from("form-uploads")
                 .createSignedUrl(storagePath, 3600);
-              if (signedData) signedUrl = signedData.signedUrl;
+              if (signedData) {
+                signedUrl = signedData.signedUrl;
+              } else {
+                console.error("[Anexos] Falha ao gerar URL assinada:", storagePath, signError);
+                hasError = true;
+                failedCount++;
+              }
+            } else if (!arq.file_url) {
+              hasError = true;
+              failedCount++;
             }
 
             const pid = arq.pergunta_id || arq.campo_id || "";
             signedArquivos.push({
               pergunta_id: pid,
-              file_url: signedUrl,
+              file_url: signedUrl || "",
               file_name: arq.file_name || "Arquivo",
               label: perguntaLabelMap.get(pid) || undefined,
+              error: hasError,
             });
+          }
+          if (failedCount > 0) {
+            toast.warning(`${failedCount} anexo(s) não puderam ser carregados. Verifique o visualizador de anexos.`);
           }
           setFormArquivos(signedArquivos);
         } else {
@@ -1166,7 +1182,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs gap-1.5"
-                    onClick={() => setShowAttachmentViewer(true)}
+                    onClick={() => { setAttachmentInitialIndex(0); setShowAttachmentViewer(true); }}
                   >
                     <Eye className="h-3.5 w-3.5" />
                     Visualizar Anexos
@@ -1174,7 +1190,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {formArquivos.map((arq, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-[10px] cursor-pointer hover:bg-accent" onClick={() => { setShowAttachmentViewer(true); }}>
+                    <Badge key={idx} variant="secondary" className="text-[10px] cursor-pointer hover:bg-accent" onClick={() => { setAttachmentInitialIndex(idx); setShowAttachmentViewer(true); }}>
                       <FileText className="h-3 w-3 mr-1" />
                       {arq.label || arq.file_name}
                     </Badge>
@@ -1802,6 +1818,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         onOpenChange={setShowAttachmentViewer}
         arquivos={formArquivos}
         title="Anexos da Solicitação"
+        initialIndex={attachmentInitialIndex}
       />
 
       {/* Dialog para confirmar lançamento */}

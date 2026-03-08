@@ -1058,32 +1058,34 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               )}
               {/* Ações de Cancelamento / Recusa - ao lado da chave */}
               {(canCancel || canRecusar) && solicitacao.status !== 'cancelado' && solicitacao.status !== 'recusado' && (
-                <div className="ml-auto flex items-center gap-1.5 bg-destructive/5 px-2 py-1 rounded-md border border-destructive/20">
+                <div className="ml-auto flex flex-col gap-1 bg-destructive/5 px-2 py-1 rounded-md border border-destructive/20">
                   <span className="text-[10px] font-semibold text-destructive whitespace-nowrap">Cancelamento / Recusa:</span>
-                  {canCancel && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancelarClick}
-                      disabled={loading}
-                      className="border-destructive/50 text-destructive hover:bg-destructive/10 text-[10px] h-6 px-2"
-                    >
-                      <Ban className="h-3 w-3 mr-1" />
-                      Cancelar
-                    </Button>
-                  )}
-                  {canRecusar && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleRecusarClick}
-                      disabled={loading}
-                      className="text-[10px] h-6 px-2"
-                    >
-                      <XCircle className="h-3 w-3 mr-1" />
-                      Recusar
-                    </Button>
-                  )}
+                  <div className="flex gap-1">
+                    {canCancel && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelarClick}
+                        disabled={loading}
+                        className="border-destructive/50 text-destructive hover:bg-destructive/10 text-[10px] h-6 px-2"
+                      >
+                        <Ban className="h-3 w-3 mr-1" />
+                        Cancelar
+                      </Button>
+                    )}
+                    {canRecusar && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleRecusarClick}
+                        disabled={loading}
+                        className="text-[10px] h-6 px-2"
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Recusar
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </DialogTitle>

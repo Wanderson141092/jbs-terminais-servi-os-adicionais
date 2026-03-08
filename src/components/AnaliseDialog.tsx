@@ -317,7 +317,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
         const { data: perguntasData } = await supabase
           .from("formulario_perguntas")
-          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
+          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo, config)")
           .eq("formulario_id", formularioId)
           .order("ordem");
 

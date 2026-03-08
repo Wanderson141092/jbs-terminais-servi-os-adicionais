@@ -1801,6 +1801,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         </Dialog>
       )}
 
+      {/* Visualizador de Anexos do Formulário */}
+      <AttachmentViewer
+        open={showAttachmentViewer}
+        onOpenChange={setShowAttachmentViewer}
+        arquivos={formArquivos}
+        title="Anexos da Solicitação"
+      />
+
       {/* Dialog para confirmar lançamento */}
       <Dialog open={showLancamentoDialog} onOpenChange={setShowLancamentoDialog}>
         <DialogContent>

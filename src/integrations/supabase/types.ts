@@ -1652,6 +1652,48 @@ export type Database = {
           },
         ]
       }
+      process_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          event_payload: Json
+          event_type: string
+          id: string
+          solicitacao_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          event_payload?: Json
+          event_type: string
+          id?: string
+          solicitacao_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          event_payload?: Json
+          event_type?: string
+          id?: string
+          solicitacao_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_events_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_events_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_v"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       protocol_config: {
         Row: {
           ano_referencia: number | null

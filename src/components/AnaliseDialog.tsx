@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
+import { buildNotificarStatusPayload } from "@/lib/edgePayload";
 import { Input } from "@/components/ui/input";
 import { CheckCircle2, XCircle, AlertTriangle, FileText, Package, User, Calendar, Clock, Download, Eye, Check, X, DollarSign, MessageSquare, History, ToggleRight, Ban, Key, Send, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusBadge from "./StatusBadge";
+import BillingConfirmDialog from "./BillingConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { normalizeFormValue } from "@/lib/normalizeFormValue";
 
 interface AnaliseDialogProps {
   solicitacao: any;
@@ -47,6 +50,99 @@ interface ObservacaoHistorico {
   tipo_observacao?: string;
 }
 
+interface CampoFixoConfig {
+  campo_chave: string;
+  campo_label: string;
+  ordem: number;
+  servico_ids: string[];
+  visivel_analise: boolean;
+}
+
+interface CampoAnaliseConfig {
+  id: string;
+  nome: string;
+  ordem: number;
+  servico_ids: string[];
+  visivel_externo: boolean;
+}
+
+interface CampoAnaliseValor {
+  campo_id: string;
+  valor: string | null;
+}
+
+interface PerguntaMapeamento {
+  pergunta_id: string;
+  campo_solicitacao: string;
+  campo_analise_id?: string | null;
+}
+
+interface CampoResolvido {
+  key: string;
+  label: string;
+  valor: string;
+  ordem: number;
+}
+
+const toDisplayValue = (valor: unknown) => {
+  if (valor === undefined || valor === null || valor === "") return "—";
+  if (typeof valor === "boolean") return valor ? "Sim" : "Não";
+  return String(valor);
+};
+
+const resolveCamposExibicao = ({
+  solicitacao,
+  servicoId,
+  isExternalForm,
+  camposFixosConfig,
+  camposAnaliseConfig,
+  camposAnaliseValores,
+  mapeamentos,
+}: {
+  solicitacao: any;
+  servicoId?: string;
+  isExternalForm: boolean;
+  camposFixosConfig: CampoFixoConfig[];
+  camposAnaliseConfig: CampoAnaliseConfig[];
+  camposAnaliseValores: CampoAnaliseValor[];
+  mapeamentos: PerguntaMapeamento[];
+}): CampoResolvido[] => {
+  const campoAnaliseValorMap = new Map<string, string | null>(
+    camposAnaliseValores.map((cv) => [cv.campo_id, cv.valor])
+  );
+  const camposAnaliseMapeados = new Set(
+    mapeamentos.filter((m) => !!m.campo_analise_id).map((m) => m.campo_analise_id as string)
+  );
+
+  const fixos = camposFixosConfig
+    .filter((cf) => cf.visivel_analise)
+    .filter((cf) => cf.servico_ids.length === 0 || (servicoId && cf.servico_ids.includes(servicoId)))
+    .map((cf) => ({
+      key: `fixo:${cf.campo_chave}`,
+      label: cf.campo_label,
+      valor: toDisplayValue((solicitacao as any)[cf.campo_chave]),
+      ordem: cf.ordem,
+    }));
+
+  const dinamicos = camposAnaliseConfig
+    .filter((ca) => ca.servico_ids.length === 0 || (servicoId && ca.servico_ids.includes(servicoId)))
+    .filter((ca) => {
+      if (!isExternalForm) return true;
+      return camposAnaliseMapeados.has(ca.id) || campoAnaliseValorMap.has(ca.id) || ca.visivel_externo;
+    })
+    .map((ca) => ({
+      key: `dinamico:${ca.id}`,
+      label: ca.nome,
+      valor: toDisplayValue(campoAnaliseValorMap.get(ca.id)),
+      ordem: ca.ordem,
+    }));
+
+  return [...fixos, ...dinamicos].sort((a, b) => {
+    if (a.ordem !== b.ordem) return a.ordem - b.ordem;
+    return a.label.localeCompare(b.label);
+  });
+};
+
 const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose }: AnaliseDialogProps) => {
   const [justificativa, setJustificativa] = useState("");
   const [showRecusaConfirm, setShowRecusaConfirm] = useState(false);
@@ -75,7 +171,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [justificativaNaoVistoriado, setJustificativaNaoVistoriado] = useState("");
   const [clienteNome, setClienteNome] = useState("");
   const [clienteCnpj, setClienteCnpj] = useState("");
-  const [camposDinamicos, setCamposDinamicos] = useState<{ campo_nome: string; valor: string }[]>([]);
+  const [camposExibicao, setCamposExibicao] = useState<CampoResolvido[]>([]);
   const [custoposicionamento, setCustoposicionamento] = useState<boolean | null>(solicitacao.custo_posicionamento ?? null);
   const [cancelRecusaConfig, setCancelRecusaConfig] = useState<any[]>([]);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -84,6 +180,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [showConclusaoLancamentoDialog, setShowConclusaoLancamentoDialog] = useState(false);
   const [cobrancaConfigs, setCobrancaConfigs] = useState<any[]>([]);
   const [lancamentoRegistros, setLancamentoRegistros] = useState<any[]>([]);
+  const [billingDialogData, setBillingDialogData] = useState<{ config: any } | null>(null);
+  const [blockedBillingConfig, setBlockedBillingConfig] = useState<any | null>(null);
   const [formRespostas, setFormRespostas] = useState<{ rotulo: string; valor: any; tipo: string }[]>([]);
   const [formArquivos, setFormArquivos] = useState<{ pergunta_id: string; file_url: string; file_name: string }[]>([]);
   const [isExternalForm, setIsExternalForm] = useState(false);
@@ -122,24 +220,23 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   useEffect(() => {
     const fetchData = async () => {
-      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
+      const [servicoRes, allServicosRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes] = await Promise.all([
+      const [attachRes, servicoRes, allServicosRes, histRes, statusRes, pendenciaRes, camposValoresRes, cancelConfigRes, cobrancaConfigRes, registrosRes, camposFixosRes, camposAnaliseRes] = await Promise.all([
         supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
         supabase.from("servicos").select("*").eq("nome", solicitacao.tipo_operacao || "Posicionamento").maybeSingle(),
         supabase.from("servicos").select("*, status_confirmacao_lancamento").eq("ativo", true),
-        supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false }),
         supabase.from("parametros_campos").select("*").eq("grupo", "status_processo").eq("ativo", true).order("ordem"),
         supabase.from("parametros_campos").select("*").eq("grupo", "pendencia_opcoes").eq("ativo", true).order("ordem"),
-        supabase.from("campos_analise_valores").select("campo_id, valor, campos_analise(nome)").eq("solicitacao_id", solicitacao.id),
+        supabase.from("process_campos_view" as any).select("campo_id, campo_valor, campo_nome").eq("solicitacao_id", solicitacao.id),
         supabase.from("cancelamento_recusa_config").select("*").eq("ativo", true),
         supabase.from("lancamento_cobranca_config").select("*").eq("ativo", true).order("created_at"),
         fetchCobrancaRegistros(),
         supabase.from("campos_fixos_config").select("campo_chave, campo_label, ordem, servico_ids, visivel_analise").eq("ativo", true).eq("visivel_analise", true).order("ordem"),
+        supabase.from("campos_analise").select("id, nome, ordem, servico_ids, visivel_externo").eq("ativo", true).order("ordem"),
       ]);
 
-      setAttachments(attachRes.data || []);
       if (servicoRes.data) setServicoConfig(servicoRes.data);
       setServicos(allServicosRes.data || []);
-      setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
       setSolicitarDeferimento(solicitacao.solicitar_deferimento || false);
       setSolicitarLacreArmador(solicitacao.solicitar_lacre_armador || false);
       setCustoLacreArmador(solicitacao.lacre_armador_aceite_custo ?? null);
@@ -195,8 +292,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
       // Build dynamic fields display
       const camposVals = (camposValoresRes.data || []).map((cv: any) => ({
-        campo_nome: cv.campos_analise?.nome || "Campo",
-        valor: cv.valor || "",
+        campo_nome: cv.campo_nome || "Campo",
+        valor: cv.campo_valor || "",
       })).filter((cv: any) => cv.valor);
       setCamposDinamicos(camposVals);
 
@@ -205,6 +302,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         .filter((cf: any) => cf.servico_ids.length === 0 || (currentServicoId && cf.servico_ids.includes(currentServicoId)))
         .map((cf: any) => ({ campo_chave: cf.campo_chave, campo_label: cf.campo_label, ordem: cf.ordem }));
       setCamposFixos(filteredCamposFixos);
+      let mapeamentosFormulario: PerguntaMapeamento[] = [];
+      let externalForm = false;
+
+
+      // Consultas auxiliares: anexos e histórico somente após a carga principal
+      const [attachRes, histRes] = await Promise.all([
+        supabase.from("deferimento_documents").select("*").eq("solicitacao_id", solicitacao.id).neq("document_type", "deferimento"),
+        supabase.from("observacao_historico").select("*").eq("solicitacao_id", solicitacao.id).order("created_at", { ascending: false }),
+      ]);
+      setAttachments(attachRes.data || []);
+      setObservacaoHistorico((histRes.data as ObservacaoHistorico[]) || []);
 
       // Fetch form responses and attachments
       const formularioId = solicitacao.formulario_id;
@@ -215,7 +323,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           .select("id, tipo")
           .eq("formulario_id", formularioId)
           .maybeSingle();
-        setIsExternalForm(!!extBtn);
+        externalForm = !!extBtn;
+        setIsExternalForm(externalForm);
 
         // Fetch form responses
         const { data: respostasData } = await supabase
@@ -252,6 +361,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           .from("pergunta_mapeamento")
           .select("pergunta_id, campo_solicitacao, campo_analise_id")
           .eq("formulario_id", formularioId);
+        mapeamentosFormulario = (mapeamentos || []) as PerguntaMapeamento[];
 
         if (respostas && respostas.length > 0 && perguntasData) {
           // Find response closest to solicitacao creation time
@@ -277,7 +387,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
             if (!bp) continue;
             if (bp.tipo === "informativo" || bp.tipo === "subtitulo") continue;
             // For external forms, skip mapped questions (they show in Campos de Análise)
-            if (!!extBtn && mappedPerguntaIds.has(bp.id)) continue;
+            if (externalForm && mappedPerguntaIds.has(bp.id)) continue;
 
             const val = respostasObj[bp.id];
             if (val !== undefined && val !== null && val !== "") {
@@ -323,6 +433,17 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         setFormRespostas([]);
         setFormArquivos([]);
       }
+
+      const camposResolvidos = resolveCamposExibicao({
+        solicitacao,
+        servicoId: currentServicoId,
+        isExternalForm: externalForm,
+        camposFixosConfig: (camposFixosRes.data || []) as CampoFixoConfig[],
+        camposAnaliseConfig: (camposAnaliseRes.data || []) as CampoAnaliseConfig[],
+        camposAnaliseValores: (camposValoresRes.data || []) as CampoAnaliseValor[],
+        mapeamentos: mapeamentosFormulario,
+      });
+      setCamposExibicao(camposResolvidos);
     };
     
     fetchData();
@@ -529,7 +650,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} cancelada`, "status");
     supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: "cancelado", usuario_id: userId },
+      body: buildNotificarStatusPayload({
+        action: "notificar_status",
+        solicitacao_id: solicitacao.id,
+        novo_status: "cancelado",
+        usuario_id: userId,
+      }),
     }).catch(() => {});
 
     toast.success("Cancelamento realizado!");
@@ -576,7 +702,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} recusada: ${cancelJustificativa.trim()}`, "status");
     supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: "recusado", usuario_id: userId },
+      body: buildNotificarStatusPayload({
+        action: "notificar_status",
+        solicitacao_id: solicitacao.id,
+        novo_status: "recusado",
+        usuario_id: userId,
+      }),
     }).catch(() => {});
 
     toast.success("Recusa registrada!");
@@ -797,7 +928,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     
     // Dispatch email/notification via edge function
     supabase.functions.invoke("notificar-status", {
-      body: { solicitacao_id: solicitacao.id, novo_status: selectedStatus, usuario_id: userId },
+      body: buildNotificarStatusPayload({
+        action: "notificar_status",
+        solicitacao_id: solicitacao.id,
+        novo_status: selectedStatus,
+        usuario_id: userId,
+      }),
     }).catch(() => {}); // Fire and forget
     
     toast.success("Atualização realizada com sucesso!");
@@ -1036,6 +1172,14 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     setLoading(false);
   };
 
+  const refreshLancamentoRegistros = async () => {
+    const { data: updatedRegistros } = await supabase
+      .from("lancamento_cobranca_registros")
+      .select("*")
+      .eq("solicitacao_id", solicitacao.id);
+    setLancamentoRegistros(updatedRegistros || []);
+  };
+
   const togglePendencia = (valor: string) => {
     setPendenciasSelecionadas(prev => 
       prev.includes(valor) ? prev.filter(v => v !== valor) : [...prev, valor]
@@ -1074,7 +1218,11 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                       e.stopPropagation();
                       try {
                         const { error } = await supabase.functions.invoke("notificar-status", {
-                          body: { action: "reenviar_chave", solicitacao_id: solicitacao.id, usuario_id: userId },
+                          body: buildNotificarStatusPayload({
+                            action: "reenviar_chave",
+                            solicitacao_id: solicitacao.id,
+                            usuario_id: userId,
+                          }),
                         });
                         if (error) throw error;
                         toast.success("Chave reenviada para o e-mail do cliente!");
@@ -1139,27 +1287,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <InfoItem icon={<Package className="h-4 w-4" />} label="Tipo Carga" value={formatTipoCarga(solicitacao.tipo_carga)} />
             </div>
 
-            {/* Campos Fixos da Solicitação */}
-            {camposFixos.length > 0 && (
+            {/* Campos resolvidos para exibição (fixos + análise) */}
+            {camposExibicao.length > 0 && (
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
                 <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos do Processo</p>
-                {camposFixos.map((cf) => {
-                  const val = (solicitacao as any)[cf.campo_chave];
-                  if (val === undefined || val === null || val === "") return null;
-                  const displayVal = typeof val === "boolean" ? (val ? "Sim" : "Não") : String(val);
-                  return (
-                    <InfoItem key={cf.campo_chave} icon={<FileText className="h-4 w-4" />} label={cf.campo_label} value={displayVal} />
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Dynamic analysis fields - only for external/iframe forms */}
-            {isExternalForm && camposDinamicos.length > 0 && (
-              <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
-                <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Campos de Análise</p>
-                {camposDinamicos.map((cd, idx) => (
-                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={cd.campo_nome} value={cd.valor} />
+                {camposExibicao.map((campo) => (
+                  <InfoItem key={campo.key} icon={<FileText className="h-4 w-4" />} label={campo.label} value={campo.valor} />
                 ))}
               </div>
             )}
@@ -1463,39 +1596,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                             />
                           </div>
 
-                          {/* Custo Posic. Lacre - ao lado, 50% */}
+                          {/* Custo Posic. Lacre - indicador visual */}
                           {showPendenciaBadge && (
-                            <div className={`flex-1 basis-1/2 border rounded-md p-2.5 flex flex-col justify-center ${
+                            <div className={`flex-1 basis-1/2 border rounded-md p-2.5 flex items-center ${
                               pendenciaConfirmed
                                 ? "bg-green-50 border-green-200"
                                 : "bg-red-50 border-red-200"
                             }`}>
-                              <div className={`flex items-center gap-1.5 mb-1.5 ${pendenciaConfirmed ? "text-green-600" : "text-red-600"}`}>
+                              <div className={`flex items-center gap-1.5 ${pendenciaConfirmed ? "text-green-600" : "text-red-600"}`}>
                                 <DollarSign className="h-3.5 w-3.5" />
                                 <span className="text-xs font-semibold">
-                                  {pendenciaConfig?.rotulo_analise || "Custo Posic. Lacre"}: {pendenciaConfirmed ? "Confirmado" : "Aguardando confirmação"}
+                                  {pendenciaConfig?.rotulo_analise || "Custo Posic. Lacre"}: {pendenciaConfirmed ? "Confirmado" : "Pendente"}
                                 </span>
                               </div>
-                              {!pendenciaConfirmed ? (
-                                <Button 
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-7 w-full"
-                                  onClick={() => handleConfirmarLancamento(pendenciaConfig?.id)}
-                                >
-                                  Confirmar Lançamento
-                                </Button>
-                              ) : (
-                                <Button 
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-xs text-muted-foreground hover:text-destructive h-7 w-full"
-                                  onClick={() => handleDesfazerLancamento(pendenciaConfig?.id)}
-                                  disabled={loading}
-                                >
-                                  Desfazer
-                                </Button>
-                              )}
                             </div>
                           )}
                         </div>
@@ -1568,77 +1681,55 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 
             {(() => {
-              // Build list of ALL applicable cobranca configs (both servico and pendencia)
               const applicableCobrancas = cobrancaConfigs.filter((cfg: any) => {
                 const statusAtivacao = cfg.status_ativacao || [];
                 if (statusAtivacao.length > 0 && !statusAtivacao.includes(solicitacao.status)) return false;
-                if (cfg.tipo === "pendencia") return false; // pendencia has its own dedicated UI above
                 return true;
               });
 
-              // Also check legacy: if no registros exist but global field is pending
-              const svcConf = servicos.find(sv => sv.nome === (solicitacao.tipo_operacao || ""));
-              const statusLanc = svcConf?.status_confirmacao_lancamento || [];
-              const legacyMatch = statusLanc.includes(solicitacao.status);
-              
-              if (applicableCobrancas.length === 0 && !legacyMatch) return null;
-              if (applicableCobrancas.length === 0 && solicitacao.lancamento_confirmado) return null;
-              
+              if (applicableCobrancas.length === 0) return null;
+
               return (
                 <>
                   <Separator />
-                  <div className="space-y-3">
-                    {applicableCobrancas.map((cfg: any) => {
-                      const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
-                      const isConfirmed = registro?.confirmado === true;
-                      return (
-                        <div key={cfg.id} className={`border rounded-lg p-4 ${isConfirmed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-                          <div className={`flex items-center justify-between mb-2`}>
-                            <div className={`flex items-center gap-2 ${isConfirmed ? "text-green-600" : "text-red-600"}`}>
-                              {isConfirmed ? <Check className="h-5 w-5" /> : <DollarSign className="h-5 w-5" />}
-                              <span className="font-semibold">{cfg.rotulo_analise}: {isConfirmed ? "Confirmado" : "Aguardando confirmação"}</span>
-                            </div>
-                            {isConfirmed && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDesfazerLancamento(cfg.id)}
-                                disabled={loading}
-                                className="text-xs text-muted-foreground hover:text-destructive h-7"
-                              >
-                                Desfazer
-                              </Button>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Cobrança: ações rápidas</p>
+                    <div className="flex items-center gap-1.5">
+                      {applicableCobrancas.map((cfg: any) => {
+                        const registro = lancamentoRegistros.find((r: any) => r.cobranca_config_id === cfg.id);
+                        const isConfirmed = registro?.confirmado === true;
+                        const isBlocked = cfg.tipo === "pendencia" && solicitacao.lacre_armador_aceite_custo !== true;
+
+                        return (
+                          <button
+                            key={cfg.id}
+                            type="button"
+                            onClick={() => {
+                              if (isConfirmed) return;
+                              if (isBlocked) {
+                                setBlockedBillingConfig(cfg);
+                                return;
+                              }
+                              setBillingDialogData({ config: cfg });
+                            }}
+                            title={`${cfg.rotulo_analise}: ${isConfirmed ? "Confirmado" : isBlocked ? "Fluxo bloqueado" : "Pendente"}`}
+                            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-60"
+                            disabled={isConfirmed}
+                          >
+                            {isConfirmed ? (
+                              <Check className="h-4 w-4 text-muted-foreground/50" />
+                            ) : isBlocked ? (
+                              <span className="relative inline-flex items-center text-amber-700">
+                                <DollarSign className="h-4 w-4" />
+                                <Lock className="h-2.5 w-2.5 absolute -bottom-0.5 -right-1" />
+                              </span>
+                            ) : (
+                              <DollarSign className="h-4 w-4 text-destructive" />
                             )}
-                          </div>
-                          {!isConfirmed && (
-                            <Button 
-                              onClick={() => handleConfirmarLancamento(cfg.id)} 
-                              variant="outline" 
-                              disabled={loading}
-                              className="border-red-300 text-red-600 hover:bg-red-50 w-full"
-                            >
-                              Confirmar Lançamento — {cfg.rotulo_analise}
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {applicableCobrancas.length === 0 && legacyMatch && !solicitacao.lancamento_confirmado && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-center gap-2 text-red-600 mb-2">
-                          <DollarSign className="h-5 w-5" />
-                          <span className="font-semibold">Aguardando confirmação de lançamento do serviço</span>
-                        </div>
-                        <Button 
-                          onClick={() => handleConfirmarLancamento()} 
-                          variant="outline" 
-                          disabled={loading}
-                          className="border-red-300 text-red-600 hover:bg-red-50 w-full"
-                        >
-                          Confirmar Lançamento
-                        </Button>
-                      </div>
-                    )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               );
@@ -1758,13 +1849,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     Histórico de Observações
                   </p>
                   <div className="max-h-[200px] overflow-auto space-y-2">
-                    {observacaoHistorico.map((obs) => (
-                      <div key={obs.id} className={`rounded-lg p-2 text-xs ${obs.tipo_observacao === "externa" ? "bg-blue-50 border border-blue-100" : "bg-muted/50"}`}>
+                    {observacaoHistorico.map((obs) => {
+                      const isExterna = obs.tipo_observacao === "externa";
+                      const isAutoRecusaCorte = obs.tipo_observacao === "sistema_auto_recusa_corte";
+
+                      return (
+                      <div key={obs.id} className={`rounded-lg p-2 text-xs ${isExterna ? "bg-blue-50 border border-blue-100" : isAutoRecusaCorte ? "bg-amber-50 border border-amber-200" : "bg-muted/50"}`}>
                         <div className="flex justify-between items-start mb-1">
                           <span className="font-medium flex items-center gap-1.5">
                             {obs.autor_nome || "Sistema"}
-                            {obs.tipo_observacao === "externa" ? (
+                            {isExterna ? (
                               <span className="text-[10px] text-blue-600 font-normal">🌐 Externa</span>
+                            ) : isAutoRecusaCorte ? (
+                              <span className="text-[10px] text-amber-700 font-normal">⚠️ Recusado automaticamente</span>
                             ) : (
                               <span className="text-[10px] text-muted-foreground font-normal">🔒 Interna</span>
                             )}
@@ -1803,7 +1900,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                         )}
                         <StatusBadge status={obs.status_no_momento} />
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1913,6 +2011,37 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {billingDialogData && (
+        <BillingConfirmDialog
+          open={!!billingDialogData}
+          onOpenChange={(open) => { if (!open) setBillingDialogData(null); }}
+          solicitacao={solicitacao}
+          cobrancaConfig={billingDialogData.config}
+          userId={userId}
+          onUpdate={async () => {
+            setBillingDialogData(null);
+            await refreshLancamentoRegistros();
+          }}
+        />
+      )}
+
+      <AlertDialog open={!!blockedBillingConfig} onOpenChange={(open) => { if (!open) setBlockedBillingConfig(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-amber-700" />
+              Fluxo de cobrança bloqueado
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A cobrança "{blockedBillingConfig?.rotulo_analise || "Pendência"}" será habilitada somente após aceite de custo para lacre armador.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setBlockedBillingConfig(null)}>Fechar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog de confirmação de lançamento ao concluir serviço */}
       <AlertDialog open={showConclusaoLancamentoDialog} onOpenChange={setShowConclusaoLancamentoDialog}>
@@ -2175,22 +2304,12 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
 // Helper Functions
 const formatFormValue = (val: any, tipo: string): string => {
-  if (val === null || val === undefined) return "—";
-  if (Array.isArray(val)) return val.join("\n");
-  if (typeof val === "object") {
+  if (val && typeof val === "object" && !Array.isArray(val)) {
     if (val.campo1 && val.campo2) return `${val.campo1} / ${val.campo2}`;
-    return JSON.stringify(val);
+    return normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true });
   }
-  if (typeof val === "boolean") return val ? "Sim" : "Não";
-  // Clean up JSON-like array strings: ["val1","val2"] -> val1\nval2
-  const strVal = String(val);
-  if (strVal.startsWith("[") && strVal.endsWith("]")) {
-    try {
-      const parsed = JSON.parse(strVal);
-      if (Array.isArray(parsed)) return parsed.join("\n");
-    } catch { /* not JSON */ }
-  }
-  return strVal;
+
+  return normalizeFormValue(val, { nullishFallback: "—" });
 };
 
 // Helper Components

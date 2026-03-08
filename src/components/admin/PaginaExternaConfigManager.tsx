@@ -46,6 +46,7 @@ const LACRE_CONFIGS = [
 ];
 
 const EMAIL_TOGGLE_KEY = "solicitar_email_acompanhamento";
+const EMAIL_TOGGLE_DEFAULT = true;
 
 const PaginaExternaConfigManager = () => {
   const [lacreConfigs, setLacreConfigs] = useState<SystemConfig[]>([]);
@@ -84,7 +85,7 @@ const PaginaExternaConfigManager = () => {
       supabase.from("deferimento_titulos").select("*").order("created_at"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("page_config").select("*").eq("config_key", "portal_cliente_url").maybeSingle(),
-      supabase.from("page_config").select("*").eq("config_key", EMAIL_TOGGLE_KEY).maybeSingle(),
+      supabase.from("page_config").select("id, is_active").eq("config_key", EMAIL_TOGGLE_KEY).order("created_at", { ascending: true }),
     ]);
     setLacreConfigs(lacreRes.data || []);
     setDeferimentoTitulos(titulosRes.data || []);
@@ -94,11 +95,93 @@ const PaginaExternaConfigManager = () => {
       setPortalActive(portalRes.data.is_active ?? true);
       setPortalConfigId(portalRes.data.id);
     }
-    if (emailRes.data) {
-      setEmailToggle(emailRes.data.is_active ?? true);
-      setEmailToggleId(emailRes.data.id);
+    if (emailRes.error) {
+      console.error("[PaginaExternaConfigManager] Falha ao carregar toggle de e-mail:", emailRes.error);
+      setEmailToggle(EMAIL_TOGGLE_DEFAULT);
+      setEmailToggleId(null);
+    } else if (emailRes.data && emailRes.data.length > 0) {
+      const [primary, ...duplicates] = emailRes.data;
+      setEmailToggle(primary.is_active ?? EMAIL_TOGGLE_DEFAULT);
+      setEmailToggleId(primary.id);
+
+      if (duplicates.length > 0) {
+        const duplicateIds = duplicates.map((item) => item.id);
+        const { error: deleteError } = await supabase.from("page_config").delete().in("id", duplicateIds);
+        if (deleteError) {
+          console.error("[PaginaExternaConfigManager] Falha ao remover duplicidades de config_key solicitar_email_acompanhamento:", deleteError);
+        }
+      }
+    } else {
+      setEmailToggle(EMAIL_TOGGLE_DEFAULT);
+      setEmailToggleId(null);
     }
     setLoading(false);
+  };
+
+  const persistEmailToggle = async (checked: boolean) => {
+    const previousToggle = emailToggle;
+    const previousToggleId = emailToggleId;
+
+    setEmailToggle(checked);
+    setSavingEmail(true);
+
+    const payload = {
+      config_key: EMAIL_TOGGLE_KEY,
+      config_value: checked ? "true" : "false",
+      config_type: "boolean",
+      description: "Solicitar e-mail para acompanhamento do processo na página externa",
+      is_active: checked,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data: existingConfigs, error: readError } = await supabase
+        .from("page_config")
+        .select("id")
+        .eq("config_key", EMAIL_TOGGLE_KEY)
+        .order("created_at", { ascending: true });
+
+      if (readError) throw readError;
+
+      if (existingConfigs && existingConfigs.length > 0) {
+        const [primary, ...duplicates] = existingConfigs;
+
+        const { error: updateError } = await supabase
+          .from("page_config")
+          .update(payload)
+          .eq("id", primary.id);
+
+        if (updateError) throw updateError;
+
+        if (duplicates.length > 0) {
+          const duplicateIds = duplicates.map((item) => item.id);
+          const { error: deleteError } = await supabase.from("page_config").delete().in("id", duplicateIds);
+          if (deleteError) {
+            console.error("[PaginaExternaConfigManager] Falha ao remover duplicidades do toggle de e-mail:", deleteError);
+          }
+        }
+
+        setEmailToggleId(primary.id);
+      } else {
+        const { data: createdConfig, error: insertError } = await supabase
+          .from("page_config")
+          .insert(payload)
+          .select("id")
+          .single();
+
+        if (insertError) throw insertError;
+        setEmailToggleId(createdConfig.id);
+      }
+
+      toast.success(checked ? "E-mail ativado!" : "E-mail desativado!");
+    } catch (error) {
+      console.error("[PaginaExternaConfigManager] Falha ao persistir toggle de e-mail:", error);
+      setEmailToggle(previousToggle);
+      setEmailToggleId(previousToggleId);
+      toast.error("Erro ao salvar configuração de e-mail. Alteração revertida.");
+    } finally {
+      setSavingEmail(false);
+    }
   };
 
   const savePortalConfig = async () => {
@@ -211,26 +294,7 @@ const PaginaExternaConfigManager = () => {
                 Se ativado, o campo de e-mail será exibido na tela de confirmação após o envio do formulário externo.
               </p>
             </div>
-            <Switch checked={emailToggle} onCheckedChange={async (checked) => {
-              setEmailToggle(checked);
-              setSavingEmail(true);
-              const payload = {
-                config_key: EMAIL_TOGGLE_KEY,
-                config_value: checked ? "true" : "false",
-                config_type: "boolean",
-                description: "Solicitar e-mail para acompanhamento do processo na página externa",
-                is_active: checked,
-                updated_at: new Date().toISOString(),
-              };
-              if (emailToggleId) {
-                await supabase.from("page_config").update(payload).eq("id", emailToggleId);
-              } else {
-                const { data } = await supabase.from("page_config").insert(payload).select("id").single();
-                if (data) setEmailToggleId(data.id);
-              }
-              toast.success(checked ? "E-mail ativado!" : "E-mail desativado!");
-              setSavingEmail(false);
-            }} />
+            <Switch checked={emailToggle} disabled={savingEmail} onCheckedChange={persistEmailToggle} />
           </div>
         </CardContent>
       </Card>

@@ -50,13 +50,28 @@ Deno.serve(async (req) => {
     }
 
     // 1. Fetch formulario to get linked servico_id
-    const { data: formularioData } = await supabase
+    const { data: formularioData, error: formularioError } = await supabase
       .from("formularios")
-      .select("servico_id")
+      .select("id, servico_id")
       .eq("id", formulario_id)
       .maybeSingle();
 
-    const formularioServicoId = formularioData?.servico_id || null;
+    if (formularioError) throw formularioError;
+    if (!formularioData) {
+      return new Response(
+        JSON.stringify({ error: "Formulário não encontrado." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!formularioData.servico_id) {
+      return new Response(
+        JSON.stringify({ error: "Este formulário não possui serviço vinculado e não pode receber envios." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const formularioServicoId = formularioData.servico_id;
 
     // 2. Save form response
     const { error: respError } = await supabase.from("formulario_respostas").insert({
@@ -71,14 +86,22 @@ Deno.serve(async (req) => {
     const solicitacaoData: Record<string, any> = {};
     const dynamicFieldValues: { campo_id: string; valor: string }[] = [];
 
+    const { data: camposFixosRows } = await supabase
+      .from("campos_fixos_config")
+      .select("id, campo_chave");
+
+    const campoChaveById = new Map<string, string>(
+      (camposFixosRows || []).map((campo: any) => [campo.id, campo.campo_chave])
+    );
+
     if (mapeamentos && Array.isArray(mapeamentos)) {
       for (const map of mapeamentos) {
         if (respostas[map.pergunta_id] !== undefined) {
-          // Format value: arrays become newline-separated strings
+          // Format value: arrays become space-separated strings
           let rawVal = respostas[map.pergunta_id];
           let formattedVal: string;
           if (Array.isArray(rawVal)) {
-            formattedVal = rawVal.join("\n");
+            formattedVal = rawVal.join(" ");
           } else {
             formattedVal = String(rawVal);
           }
@@ -89,48 +112,41 @@ Deno.serve(async (req) => {
               valor: formattedVal,
             });
           } else if (map.campo_solicitacao && map.campo_solicitacao !== "__dinamico__") {
-            solicitacaoData[map.campo_solicitacao] = formattedVal;
+            let campoDestino = map.campo_solicitacao;
+            if (campoDestino.startsWith("fixo:")) {
+              const [, campoFixoId, campoChaveFallback] = campoDestino.split(":");
+              campoDestino = campoChaveById.get(campoFixoId) || campoChaveFallback || campoDestino;
+            }
+            solicitacaoData[campoDestino] = formattedVal;
           }
         }
       }
     }
 
-    // 4. Resolve service - prefer formulario's linked service, fallback to tipo_operacao name lookup
-    let servicoId: string | null = formularioServicoId;
+    // 4. Resolve service from formulário
+    const servicoId: string = formularioServicoId;
     let codigoLetra = "S";
     let servicoNome: string | null = null;
 
-    if (servicoId) {
-      // Fetch service details from linked servico_id
-      const { data: svc } = await supabase
-        .from("servicos")
-        .select("id, nome, codigo_prefixo")
-        .eq("id", servicoId)
-        .maybeSingle();
-      if (svc) {
-        codigoLetra = (svc.codigo_prefixo || "S")[0].toUpperCase();
-        servicoNome = svc.nome;
-        // Auto-set tipo_operacao if not mapped
-        if (!solicitacaoData.tipo_operacao) {
-          solicitacaoData.tipo_operacao = svc.nome;
-        }
-      }
-    } else {
-      // Fallback: lookup by tipo_operacao name
-      const tipoOp = solicitacaoData.tipo_operacao || null;
-      if (tipoOp) {
-        const { data: svc } = await supabase
-          .from("servicos")
-          .select("id, nome, codigo_prefixo")
-          .eq("nome", tipoOp)
-          .eq("ativo", true)
-          .maybeSingle();
-        if (svc) {
-          servicoId = svc.id;
-          codigoLetra = (svc.codigo_prefixo || "S")[0].toUpperCase();
-          servicoNome = svc.nome;
-        }
-      }
+    // Fetch service details from linked servico_id
+    const { data: svc } = await supabase
+      .from("servicos")
+      .select("id, nome, codigo_prefixo, ativo")
+      .eq("id", servicoId)
+      .maybeSingle();
+
+    if (!svc || !svc.ativo) {
+      return new Response(
+        JSON.stringify({ error: "O serviço vinculado a este formulário é inválido ou está inativo." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    codigoLetra = (svc.codigo_prefixo || "S")[0].toUpperCase();
+    servicoNome = svc.nome;
+    // Auto-set tipo_operacao if not mapped
+    if (!solicitacaoData.tipo_operacao) {
+      solicitacaoData.tipo_operacao = svc.nome;
     }
 
     // 5. Generate protocol number — per-service, with annual reset (YY prefix)
@@ -139,12 +155,7 @@ Deno.serve(async (req) => {
     const currentYear = brTime.getFullYear();
     const yearPrefix = String(currentYear).slice(-2);
 
-    let configQuery = supabase.from("protocol_config").select("*");
-    if (servicoId) {
-      configQuery = configQuery.eq("servico_id", servicoId);
-    } else {
-      configQuery = configQuery.is("servico_id", null);
-    }
+    const configQuery = supabase.from("protocol_config").select("*").eq("servico_id", servicoId);
 
     const { data: configRows } = await configQuery;
     let configData = (configRows || []).find((c: any) => c.ano_referencia === currentYear);
@@ -242,6 +253,8 @@ Deno.serve(async (req) => {
       initialStatus = "confirmado_aguardando_servico";
     }
 
+    const observacoesLimpas = solicitacaoData.observacoes?.trim() || null;
+
     // 8. Insert solicitacao (with formulario_id link)
     const { error: solError } = await supabase.from("solicitacoes").insert({
       protocolo,
@@ -252,9 +265,7 @@ Deno.serve(async (req) => {
       numero_conteiner: solicitacaoData.numero_conteiner || null,
       cnpj: solicitacaoData.cnpj || null,
       lpco: solicitacaoData.lpco || null,
-      observacoes: autoRecusado
-        ? `${solicitacaoData.observacoes || ""}\nPedido realizado após o horário de corte`.trim()
-        : (solicitacaoData.observacoes || null),
+      observacoes: observacoesLimpas,
       data_posicionamento: solicitacaoData.data_posicionamento || null,
       data_agendamento: solicitacaoData.data_agendamento || null,
       tipo_carga: solicitacaoData.tipo_carga || null,
@@ -279,6 +290,17 @@ Deno.serve(async (req) => {
         valor: dv.valor,
       }));
       await supabase.from("campos_analise_valores").insert(inserts);
+    }
+
+    if (autoRecusado && solData) {
+      await supabase.from("observacao_historico").insert({
+        solicitacao_id: solData.id,
+        observacao: "Pedido recusado automaticamente por envio após o horário de corte.",
+        status_no_momento: initialStatus,
+        autor_id: "00000000-0000-0000-0000-000000000000",
+        autor_nome: "Sistema",
+        tipo_observacao: "sistema_auto_recusa_corte",
+      });
     }
 
     // 10. Trigger notifications

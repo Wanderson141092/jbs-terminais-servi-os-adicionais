@@ -71,3 +71,44 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Migração gradual (3 fases)
+
+### Fase 1 — criação de estruturas novas (sem desligar legado)
+- Aplicar a migration `20260307162000_rollout_novo_modelo_processamento.sql`.
+- Esta migration cria:
+  - tabelas novas: `cobrancas_v2`, `process_events_v2`, `process_snapshot_v2`;
+  - tabelas de operação/auditoria: `migration_runtime_flags`, `migration_backfill_runs`, `migration_backfill_checkpoints`, `migration_backfill_batches`;
+  - views de leitura com switch por flag: `*_read_model`.
+
+### Fase 2 — dual-write + validação de consistência
+- Habilitar dual-write por entidade em `migration_runtime_flags.dual_write_enabled`.
+- Executar backfills por lotes:
+  - `supabase/scripts/backfill/cobrancas_backfill.sql`
+  - `supabase/scripts/backfill/process_events_backfill.sql`
+  - `supabase/scripts/backfill/process_snapshot_backfill.sql`
+- Validar consistência com:
+  - `select * from public.migration_validate_consistency();`
+
+### Fase 3 — switch de leitura + desativação gradual do legado
+- Ativar leitura do novo por entidade em `migration_runtime_flags.read_from_new_enabled`.
+- Bloquear escrita no legado gradualmente com `migration_runtime_flags.legacy_write_disabled`.
+
+## Feature flags de endpoint (frontend)
+
+O frontend agora resolve endpoints novos/legados por ambiente e por endpoint usando `src/lib/backendEndpoints.ts`.
+
+Variáveis:
+- `VITE_API_ENV` (`development`, `staging`, `production`)
+- `VITE_USE_NEXT_ENDPOINTS` (fallback global)
+- `VITE_USE_NEXT_CONSULTAPUBLICA`
+- `VITE_USE_NEXT_ENVIARFORMULARIO`
+- `VITE_USE_NEXT_UPLOADPUBLICO`
+- `VITE_USE_NEXT_NOTIFICARSTATUS`
+
+Exemplo:
+```env
+VITE_API_ENV=staging
+VITE_USE_NEXT_ENDPOINTS=true
+VITE_USE_NEXT_CONSULTAPUBLICA=true
+```

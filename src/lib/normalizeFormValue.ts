@@ -2,20 +2,32 @@ type NormalizeFormValueOptions = {
   arraySeparator?: string;
   nullishFallback?: string;
   preserveObjects?: boolean;
+  /** When set, each item in an array gets this prefix */
+  itemPrefix?: string;
+  /** When set, each item in an array gets this suffix */
+  itemSuffix?: string;
 };
 
 export const normalizeFormValue = (
   value: unknown,
   {
-    arraySeparator = " ",
+    arraySeparator = "\n",
     nullishFallback = "",
     preserveObjects = false,
+    itemPrefix = "",
+    itemSuffix = "",
   }: NormalizeFormValueOptions = {}
 ): string => {
   if (value === null || value === undefined) return nullishFallback;
 
+  const formatItem = (item: unknown): string => {
+    const s = String(item);
+    if (!itemPrefix && !itemSuffix) return s;
+    return `${itemPrefix}${s}${itemSuffix ? " " + itemSuffix : ""}`;
+  };
+
   if (Array.isArray(value)) {
-    return value.map((item) => String(item)).join(arraySeparator);
+    return value.map(formatItem).join(arraySeparator);
   }
 
   if (typeof value === "boolean") {
@@ -32,13 +44,27 @@ export const normalizeFormValue = (
     try {
       const parsed = JSON.parse(stringValue);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item)).join(arraySeparator);
+        return parsed.map(formatItem).join(arraySeparator);
       }
     } catch {
       // noop
     }
   }
 
+  // Handle already newline/space-separated multi-values for prefix/suffix
+  if ((itemPrefix || itemSuffix) && stringValue.includes("\n")) {
+    return stringValue
+      .split("\n")
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return "";
+        return formatItem(trimmed);
+      })
+      .filter(Boolean)
+      .join(arraySeparator);
+  }
+
+  if (itemPrefix || itemSuffix) return formatItem(stringValue);
   return stringValue;
 };
 

@@ -734,7 +734,7 @@ const AdminFormularios = () => {
                       if (arquivo) {
                         return <TableCell key={p.id}><a href={arquivo.file_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">{arquivo.file_name}</a></TableCell>;
                       }
-                      return <TableCell key={p.id} className="text-sm">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
+                      return <TableCell key={p.id} className="text-sm whitespace-pre-line">{normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true })}</TableCell>;
                     })}
                   </TableRow>
                 ))}

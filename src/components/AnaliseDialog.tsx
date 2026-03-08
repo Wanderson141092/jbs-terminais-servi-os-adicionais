@@ -983,49 +983,22 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
   const handleDesfazerLancamento = async (configId: string) => {
     setLoading(true);
-    const nowIso = new Date().toISOString();
-    const [{ error: newError }, { error: legacyError }] = await Promise.all([
-      supabase
-        .from("cobrancas")
-        .update({
-          confirmado: false,
-          status_financeiro: "pendente",
-          confirmado_por: null,
-          confirmado_data: null,
-          updated_at: nowIso,
-        })
-        .eq("solicitacao_id", solicitacao.id)
-        .eq("cobranca_config_id", configId),
-      supabase
-        .from("lancamento_cobranca_registros")
-        .update({
-          confirmado: false,
-          confirmado_por: null,
-          confirmado_data: null,
-          updated_at: nowIso,
-        })
-        .eq("solicitacao_id", solicitacao.id)
-        .eq("cobranca_config_id", configId),
-    ]);
+    const { data, error } = await supabase.functions.invoke("confirm_billing", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        cobranca_config_id: configId,
+        confirm: false,
+      },
+    });
 
-    const error = newError || legacyError;
-
-    if (error) {
-      toast.error("Erro ao desfazer lançamento");
+    if (error || data?.ok === false) {
+      toast.error(getStructuredError("Erro ao desfazer lançamento.", data) + (error?.message ? ` ${error.message}` : ""));
       setLoading(false);
       return;
     }
 
-    // Update global field
-    await supabase.from("solicitacoes").update({
-      lancamento_confirmado: false,
-      lancamento_confirmado_por: null,
-      lancamento_confirmado_data: null,
-    }).eq("id", solicitacao.id);
-
-    // Refresh registros
     const updatedRegistros = await fetchCobrancaRegistros();
-    setLancamentoRegistros(updatedRegistros || []);
+    setLancamentoRegistros(updatedRegistros);
 
     const cfgLabel = cobrancaConfigs.find((c: any) => c.id === configId)?.rotulo_analise || "Cobrança";
     await logAudit("lancamento_desfeito", `Lançamento desfeito: ${cfgLabel}. Protocolo: ${solicitacao.protocolo}.`);

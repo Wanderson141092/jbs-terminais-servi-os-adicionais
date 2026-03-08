@@ -441,7 +441,6 @@ const AdminFormularios = () => {
 
     // Headers
     const headers = ["Data", ...perguntasExportacao.map((p) => p.rotulo)];
-    const headers = ["Data", ...campos.map((c) => c.pergunta?.rotulo || c.pergunta_id)];
     const headerRow = sheet.addRow(headers);
     headerRow.eachCell((cell) => {
       cell.font = { bold: true };
@@ -455,12 +454,6 @@ const AdminFormularios = () => {
         new Date(r.created_at).toLocaleString("pt-BR"),
         ...perguntasExportacao.map((p) => {
           const val = respostasObj[p.id];
-        ...campos.map((c) => {
-          const val = respostasObj[c.pergunta_id] ?? respostasObj[c.id];
-          if (Array.isArray(val)) return val.join(", ");
-          if (typeof val === "boolean") return val ? "Sim" : "Não";
-          return (val as string) || "";
-          const val = respostasObj[c.id];
           return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
         }),
       ];

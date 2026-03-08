@@ -1758,32 +1758,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         </DialogContent>
       </Dialog>
 
-      {/* Preview Modal */}
-      {previewUrl && (
-        <Dialog open onOpenChange={() => setPreviewUrl(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Visualizar Documento</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 min-h-[60vh]">
-              {/\.pdf(\?|$)/i.test(previewUrl) ? (
-                <iframe src={previewUrl} className="w-full h-[60vh]" title="Preview" />
-              ) : (
-                <img src={previewUrl} alt="Preview" className="max-w-full max-h-[60vh] mx-auto" />
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPreviewUrl(null)}>Fechar</Button>
-              <Button asChild>
-                <a href={previewUrl} download target="_blank" rel="noopener noreferrer">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </a>
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Visualizador de Anexos do Formulário */}
       <AttachmentViewer

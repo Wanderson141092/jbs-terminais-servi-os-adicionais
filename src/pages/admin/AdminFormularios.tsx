@@ -345,9 +345,9 @@ const AdminFormularios = () => {
         rotulo: fp.banco_perguntas?.rotulo || fp.pergunta_id || "Pergunta sem rótulo",
         ordem: fp.ordem || 0,
       }))
-      .filter((p: PerguntaExportavel) => !!p.id);
+      .filter((p: any) => !!p.id);
 
-    setPerguntasExportacao(perguntas);
+    setPerguntasExportacao(perguntas as any);
   };
 
   const fetchRespostas = async (formularioId: string) => {

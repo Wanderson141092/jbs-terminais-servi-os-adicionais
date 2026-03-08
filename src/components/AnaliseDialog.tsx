@@ -308,34 +308,19 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
         // Fetch form responses
         const { data: respostasData } = await supabase
-          .from("form_data")
+          .from("formulario_respostas")
           .select("respostas, arquivos, created_at")
           .eq("formulario_id", formularioId)
           .order("created_at", { ascending: false })
           .limit(10);
 
-        const respostas = (respostasData && respostasData.length > 0)
-          ? respostasData
-          : (await supabase
-            .from("formulario_respostas")
-            .select("respostas, arquivos, created_at")
-            .eq("formulario_id", formularioId)
-            .order("created_at", { ascending: false })
-            .limit(10)).data;
+        const respostas = respostasData;
 
-        const { data: perguntasNewData } = await supabase
-          .from("form_field_mapping")
-          .select("form_field_id, ordem, form_fields(id, rotulo, tipo)")
+        const { data: perguntasData } = await supabase
+          .from("formulario_perguntas")
+          .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
           .eq("formulario_id", formularioId)
           .order("ordem");
-
-        const perguntasData = (perguntasNewData && perguntasNewData.length > 0)
-          ? perguntasNewData.map((p: any) => ({ pergunta_id: p.form_field_id, ordem: p.ordem, banco_perguntas: p.form_fields }))
-          : (await supabase
-            .from("formulario_perguntas")
-            .select("pergunta_id, ordem, banco_perguntas(id, rotulo, tipo)")
-            .eq("formulario_id", formularioId)
-            .order("ordem")).data;
 
         const { data: mapeamentos } = await supabase
           .from("pergunta_mapeamento")

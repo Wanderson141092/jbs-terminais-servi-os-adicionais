@@ -1167,7 +1167,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs gap-1.5"
-                    onClick={() => setShowAttachmentViewer(true)}
+                    onClick={() => { setAttachmentInitialIndex(0); setShowAttachmentViewer(true); }}
                   >
                     <Eye className="h-3.5 w-3.5" />
                     Visualizar Anexos

@@ -1803,6 +1803,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         onOpenChange={setShowAttachmentViewer}
         arquivos={formArquivos}
         title="Anexos da Solicitação"
+        initialIndex={attachmentInitialIndex}
       />
 
       {/* Dialog para confirmar lançamento */}

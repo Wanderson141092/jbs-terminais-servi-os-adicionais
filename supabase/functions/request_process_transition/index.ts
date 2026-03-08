@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
       return fail(403, { code: "FORBIDDEN", message: "Usuário sem setor vinculado." });
     }
 
-    if (!isAdmin && setorEmail?.email_setor) {
+    if (!isAdmin && profile?.email_setor) {
       const { data: setorRow } = await admin
         .from("setor_emails")
         .select("id,perfis,ativo")

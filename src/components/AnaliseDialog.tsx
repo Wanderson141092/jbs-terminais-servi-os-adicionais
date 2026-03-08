@@ -1083,7 +1083,6 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
                         Recusar
                       </Button>
                     )}
-                  </div>
                 </div>
               )}
             </DialogTitle>

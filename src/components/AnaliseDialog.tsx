@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizeFormValue } from "@/lib/normalizeFormValue";
 import AttachmentViewer from "./AttachmentViewer";
+import InlineAttachmentPreview from "./InlineAttachmentPreview";
 
 interface AnaliseDialogProps {
   solicitacao: any;

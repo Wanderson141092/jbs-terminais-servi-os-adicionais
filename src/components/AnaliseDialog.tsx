@@ -617,14 +617,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     const details = `Status atualizado para: Recusado. Justificativa: ${cancelJustificativa.trim()}`;
     await logAudit("status_atualizado", details);
     await createNotification(`Solicitação ${solicitacao.protocolo} recusada: ${cancelJustificativa.trim()}`, "status");
-    supabase.functions.invoke("notificar-status", {
-      body: buildNotificarStatusPayload({
-        action: "notificar_status",
-        solicitacao_id: solicitacao.id,
-        novo_status: "recusado",
-        usuario_id: userId,
-      }),
-    }).catch(() => {});
+    // Notification is now triggered automatically by the edge function
 
     toast.success("Recusa registrada!");
     setLoading(false);

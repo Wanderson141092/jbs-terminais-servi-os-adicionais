@@ -11,9 +11,10 @@ import { toast } from "sonner";
 import StatusBadge from "./StatusBadge";
 import ProcessStageStepper from "./ProcessStageStepper";
 import ProcessChecklist from "./ProcessChecklist";
-import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw, ClipboardList } from "lucide-react";
+import { FileText, Download, Eye, CheckCircle, XCircle, RefreshCw, ClipboardList, Paperclip } from "lucide-react";
 import { formatTipoCarga } from "@/lib/tipoCarga";
 import { normalizeFormValue } from "@/lib/normalizeFormValue";
+import AttachmentViewer from "./AttachmentViewer";
 
 interface ProcessoViewDialogProps {
   open: boolean;

@@ -586,7 +586,6 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
           )}
         </DialogContent>
       </Dialog>
-      </Dialog>
 
       {/* Visualizador de Anexos do Formulário */}
       <AttachmentViewer

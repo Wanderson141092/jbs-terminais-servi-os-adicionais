@@ -75,10 +75,9 @@ Deno.serve(async (req) => {
       return fail(403, { code: "SERVICE_DISABLED", message: "Serviço não habilitado para esta operação." });
     }
 
-    const [{ data: profile }, { data: roles }, { data: setorEmail }] = await Promise.all([
+    const [{ data: profile }, { data: roles }] = await Promise.all([
       admin.from("profiles").select("id,setor,email_setor").eq("id", userId).maybeSingle(),
       admin.from("user_roles").select("role").eq("user_id", userId),
-      admin.from("profiles").select("email_setor").eq("id", userId).maybeSingle(),
     ]);
 
     const roleSet = new Set((roles || []).map((r: any) => r.role));

@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
       lancamento_confirmado,
       cliente_nome,
       cnpj,
+      force_correction,
     } = body || {};
 
     if (!solicitacao_id) return fail(400, { code: "INVALID_REQUEST", message: "solicitacao_id é obrigatório." });
@@ -159,9 +160,10 @@ Deno.serve(async (req) => {
     }
 
     const isTerminalTransition = ["cancelado", "recusado"].includes(target_status);
+    const isForcedCorrection = force_correction === true && isAdmin;
     const higherOrders = Array.from(map.values()).filter((v) => v > currentOrder);
     const nextOrder = higherOrders.length > 0 ? Math.min(...higherOrders) : null;
-    if (!isTerminalTransition && nextOrder !== null && targetOrder !== nextOrder && target_status !== solicitacao.status) {
+    if (!isForcedCorrection && !isTerminalTransition && nextOrder !== null && targetOrder !== nextOrder && target_status !== solicitacao.status) {
       return fail(409, { code: "TRANSITION_NOT_ALLOWED", message: "Transição de status não permitida." });
     }
 

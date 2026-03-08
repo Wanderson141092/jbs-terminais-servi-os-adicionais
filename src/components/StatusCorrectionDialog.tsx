@@ -62,35 +62,20 @@ const StatusCorrectionDialog = ({ solicitacao, userId, onClose }: StatusCorrecti
 
     const statusLabel = statusOptions.find(s => s.value === selectedStatus)?.label || selectedStatus;
 
-    // Reset total: limpa campos, pendências, flags e aprovações ao corrigir status
-    const { error } = await supabase
-      .from("solicitacoes")
-      .update({
-        status: selectedStatus as any,
-        status_vistoria: statusLabel,
-        updated_at: new Date().toISOString(),
-        pendencias_selecionadas: [],
-        solicitar_deferimento: false,
-        solicitar_lacre_armador: false,
-        lacre_armador_aceite_custo: null,
-        lacre_armador_possui: null,
-        custo_posicionamento: null,
-        lancamento_confirmado: null,
-        lancamento_confirmado_por: null,
-        lancamento_confirmado_data: null,
-        comex_aprovado: null,
-        comex_justificativa: null,
-        comex_usuario_id: null,
-        comex_data: null,
-        armazem_aprovado: null,
-        armazem_justificativa: null,
-        armazem_usuario_id: null,
-        armazem_data: null,
-      })
-      .eq("id", solicitacao.id);
+    // Use edge function for status correction — single source of truth
+    const { data, error } = await supabase.functions.invoke("request_process_transition", {
+      body: {
+        solicitacao_id: solicitacao.id,
+        current_status: solicitacao.status,
+        target_status: selectedStatus,
+        justification: `[Correção de Status] Status: ${statusLabel}.\nObservação: ${justificativa.trim()}.`,
+        force_correction: true,
+      },
+    });
 
-    if (error) {
-      toast.error("Erro ao corrigir status: " + error.message);
+    if (error || data?.ok === false) {
+      const msg = data?.error?.message || error?.message || "Erro desconhecido";
+      toast.error("Erro ao corrigir status: " + msg);
       setLoading(false);
       return;
     }
@@ -101,15 +86,6 @@ const StatusCorrectionDialog = ({ solicitacao, userId, onClose }: StatusCorrecti
       p_usuario_id: userId,
       p_acao: "correcao_status",
       p_detalhes: `Correção de status: ${solicitacao.status} → ${statusLabel}. Justificativa: ${justificativa.trim()}`,
-    });
-
-    // Save justification in observation history (internal only)
-    await supabase.from("observacao_historico").insert({
-      solicitacao_id: solicitacao.id,
-      autor_id: userId,
-      observacao: `[Correção de Status] Status: ${statusLabel}.\nObservação: ${justificativa.trim()}.`,
-      status_no_momento: selectedStatus,
-      tipo_observacao: "interna",
     });
 
     toast.success("Status corrigido com sucesso!");

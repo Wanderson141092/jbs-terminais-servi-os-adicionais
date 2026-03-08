@@ -45,34 +45,37 @@ const BatchStatusDialog = ({
     }
 
     setLoading(true);
+    let successCount = 0;
 
     try {
       for (const sol of solicitacoes) {
-        const statusLabel = getStatusLabel(selectedStatus);
-        
-        const { error } = await supabase
-          .from("solicitacoes")
-          .update({
-            status: selectedStatus as any,
-            status_vistoria: statusLabel,
-          })
-          .eq("id", sol.id);
+        // Use edge function — single source of truth for status transitions
+        const { data, error } = await supabase.functions.invoke("request_process_transition", {
+          body: {
+            solicitacao_id: sol.id,
+            current_status: sol.status,
+            target_status: selectedStatus,
+            force_correction: true,
+          },
+        });
 
-        if (error) {
-          console.error("Error updating:", sol.protocolo, error);
+        if (error || data?.ok === false) {
+          console.error("Error updating:", sol.protocolo, data?.error?.message || error?.message);
           continue;
         }
 
         // Log audit via secure RPC
+        const statusLabel = getStatusLabel(selectedStatus);
         await supabase.rpc("insert_audit_log", {
           p_solicitacao_id: sol.id,
           p_usuario_id: userId,
           p_acao: "atualizacao_status_lote",
           p_detalhes: `Status atualizado em lote para: ${statusLabel}. Status anterior: ${sol.status_vistoria || sol.status}. Protocolo: ${sol.protocolo}. Total no lote: ${solicitacoes.length} processos.`,
         });
+        successCount++;
       }
 
-      toast.success(`${solicitacoes.length} processos atualizados com sucesso!`);
+      toast.success(`${successCount} de ${solicitacoes.length} processos atualizados com sucesso!`);
       onSuccess();
     } catch (err) {
       toast.error("Erro ao processar atualizações em lote");

@@ -93,32 +93,55 @@ interface CampoResolvido {
 const toDisplayValue = (valor: unknown) => {
   if (valor === undefined || valor === null || valor === "") return "—";
   if (typeof valor === "boolean") return valor ? "Sim" : "Não";
+
+  // If it's an object (not string), convert to readable format
+  if (typeof valor === "object" && !Array.isArray(valor)) {
+    const entries = Object.entries(valor as Record<string, any>).filter(([, v]) => v !== null && v !== undefined && v !== "");
+    if (entries.length === 0) return "—";
+    return entries.map(([k, v]) => {
+      const vals = Array.isArray(v) ? v.filter(Boolean).join("\n") : String(v);
+      return `${k}:\n${vals}`;
+    }).join("\n\n");
+  }
+
+  if (Array.isArray(valor)) {
+    const items = valor.filter(v => v !== null && v !== undefined && v !== "");
+    if (items.length === 0) return "—";
+    return items.map(item => {
+      if (typeof item === "object" && item !== null) {
+        return Object.values(item).filter(Boolean).join(", ");
+      }
+      return String(item);
+    }).join("\n");
+  }
+
   const str = String(valor);
+  
+  // Try to parse JSON strings into readable format
   if ((str.startsWith("[") && str.endsWith("]")) || (str.startsWith("{") && str.endsWith("}"))) {
     try {
       const parsed = JSON.parse(str);
       if (Array.isArray(parsed)) {
-        return parsed
-          .map((item) => {
-            if (typeof item === "object" && item !== null) {
-              return Object.values(item).filter(Boolean).join(", ");
-            }
-            return String(item);
-          })
-          .join("\n");
+        return parsed.map(item => {
+          if (typeof item === "object" && item !== null) {
+            return Object.values(item).filter(Boolean).join(", ");
+          }
+          return String(item);
+        }).join("\n");
       }
       if (typeof parsed === "object" && parsed !== null) {
         return Object.entries(parsed)
           .filter(([, v]) => v !== null && v !== undefined && v !== "")
           .map(([k, v]) => {
-            const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+            const vals = Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v);
             return `${k}:\n${vals}`;
           })
           .join("\n\n");
       }
     } catch { /* noop */ }
   }
-  // Strip remaining JSON artifacts
+
+  // Final cleanup: remove stray JSON artifacts
   return str.replace(/["\[\]{}]/g, "").trim() || "—";
 };
 

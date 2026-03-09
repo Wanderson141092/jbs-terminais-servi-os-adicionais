@@ -99,7 +99,12 @@ const toDisplayValue = (valor: unknown) => {
       const parsed = JSON.parse(str);
       if (Array.isArray(parsed)) {
         return parsed
-          .map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item)))
+          .map((item) => {
+            if (typeof item === "object" && item !== null) {
+              return Object.values(item).filter(Boolean).join(", ");
+            }
+            return String(item);
+          })
           .join("\n");
       }
       if (typeof parsed === "object" && parsed !== null) {
@@ -113,6 +118,7 @@ const toDisplayValue = (valor: unknown) => {
       }
     } catch { /* noop */ }
   }
+  // Strip remaining JSON artifacts
   return str.replace(/["\[\]{}]/g, "").trim() || "—";
 };
 

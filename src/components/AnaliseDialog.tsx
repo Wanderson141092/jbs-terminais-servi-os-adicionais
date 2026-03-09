@@ -418,9 +418,35 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
         const { data: mapeamentos } = await supabase
           .from("pergunta_mapeamento")
-          .select("pergunta_id, campo_solicitacao, campo_analise_id")
+          .select("pergunta_id, campo_solicitacao, campo_analise_id, banco_perguntas(config)")
           .eq("formulario_id", formularioId);
         mapeamentosFormulario = (mapeamentos || []) as PerguntaMapeamento[];
+
+        // Build affix map from mapeamentos: campo_analise_id → {prefixo, sufixo}
+        const affixMap = new Map<string, { prefixo: string; sufixo: string }>();
+        for (const m of mapeamentos || []) {
+          if (m.campo_analise_id && (m as any).banco_perguntas?.config) {
+            const cfg = (m as any).banco_perguntas.config;
+            const affixes = resolveMaskAffixes(cfg);
+            if (affixes.prefixo || affixes.sufixo) {
+              affixMap.set(m.campo_analise_id, affixes);
+            }
+          }
+        }
+
+        // Enrich campos_analise_valores with affixes
+        const enrichedCamposValores: CampoAnaliseValor[] = (camposValoresRes.data || []).map((cv: any) => {
+          const affixes = affixMap.get(cv.campo_id);
+          return {
+            campo_id: cv.campo_id,
+            valor: cv.valor,
+            prefixo: affixes?.prefixo || "",
+            sufixo: affixes?.sufixo || "",
+          };
+        });
+
+        // Store enriched values for later use
+        (camposValoresRes as any)._enriched = enrichedCamposValores;
 
         if (respostas && respostas.length > 0 && perguntasData) {
           // Find response closest to solicitacao creation time

@@ -93,7 +93,16 @@ interface CampoResolvido {
 const toDisplayValue = (valor: unknown) => {
   if (valor === undefined || valor === null || valor === "") return "—";
   if (typeof valor === "boolean") return valor ? "Sim" : "Não";
-  return String(valor);
+  const str = String(valor);
+  // Strip JSON artifacts from display
+  if ((str.startsWith("[") && str.endsWith("]")) || (str.startsWith("{") && str.endsWith("}"))) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) return parsed.map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item))).join(", ");
+      if (typeof parsed === "object" && parsed !== null) return Object.values(parsed).filter(Boolean).map(String).join(", ");
+    } catch { /* noop */ }
+  }
+  return str.replace(/["\[\]{}]/g, "").trim() || "—";
 };
 
 const resolveCamposExibicao = ({

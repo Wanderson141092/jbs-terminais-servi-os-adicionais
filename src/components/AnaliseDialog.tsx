@@ -1340,7 +1340,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
                 <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Respostas do Formulário</p>
                 {formRespostas.map((fr, idx) => (
-                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={fr.rotulo} value={formatFormValue(fr.valor, fr.tipo, fr.config)} />
+                  <FormResponseItem key={idx} rotulo={fr.rotulo} valor={fr.valor} tipo={fr.tipo} config={fr.config} />
                 ))}
               </div>
             )}

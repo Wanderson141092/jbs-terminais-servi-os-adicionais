@@ -372,8 +372,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   };
 
   const infoItems = [
-    solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
+    solicitacao.categoria ? { icon: <FileText className="h-4 w-4" />, label: "Categoria", value: solicitacao.categoria } : null,
     solicitacao.numero_conteiner ? { icon: <Package className="h-4 w-4" />, label: "Contêiner", value: solicitacao.numero_conteiner } : null,
+    solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
     { icon: <Calendar className="h-4 w-4" />, label: getDateLabel(), value: getDateValue() !== "—" ? getDateValue() : null },
     solicitacao.tipo_carga ? { icon: <Package className="h-4 w-4" />, label: "Tipo de Carga", value: formattedTipoCarga } : null,
     solicitacao.tipo_operacao ? { icon: <FileText className="h-4 w-4" />, label: "Serviço solicitado", value: solicitacao.tipo_operacao } : null,
@@ -505,46 +506,7 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
             ))}
           </div>
 
-          {/* Informações adicionais da solicitação */}
-          {formRespostas.length > 0 && (
-            <>
-              <Separator />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {formRespostas.map((fr, i) => {
-                  const formatted = fr.valor === true ? "Sim" : fr.valor === false ? "Não" : Array.isArray(fr.valor) ? fr.valor.join(", ") : typeof fr.valor === "object" ? JSON.stringify(fr.valor) : String(fr.valor);
-                  return <InfoItem key={`fr-${i}`} icon={<FileText className="h-4 w-4" />} label={fr.rotulo} value={formatted} />;
-                })}
-              </div>
-            </>
-          )}
-
-          {/* Anexos da solicitação */}
-          {formArquivos.length > 0 && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                {formArquivos.map((arq, i) => (
-                  <div key={i} className="border rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{arq.file_name}</span>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={arq.file_url} download target="_blank" rel="noopener noreferrer">
-                          <Download className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    </div>
-                    <div className="bg-muted/30 rounded overflow-hidden">
-                      {arq.file_url?.toLowerCase().endsWith('.pdf') ? (
-                        <iframe src={arq.file_url} className="w-full h-[200px]" title={arq.file_name} />
-                      ) : (
-                        <img src={arq.file_url} alt={arq.file_name} className="max-w-full max-h-[200px] mx-auto" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          {/* Respostas e anexos do formulário são exibidos apenas na página interna */}
 
           {/* Acompanhamento removido - uso interno apenas */}
 

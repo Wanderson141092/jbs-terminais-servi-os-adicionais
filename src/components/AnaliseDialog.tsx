@@ -94,12 +94,23 @@ const toDisplayValue = (valor: unknown) => {
   if (valor === undefined || valor === null || valor === "") return "—";
   if (typeof valor === "boolean") return valor ? "Sim" : "Não";
   const str = String(valor);
-  // Strip JSON artifacts from display
   if ((str.startsWith("[") && str.endsWith("]")) || (str.startsWith("{") && str.endsWith("}"))) {
     try {
       const parsed = JSON.parse(str);
-      if (Array.isArray(parsed)) return parsed.map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item))).join(", ");
-      if (typeof parsed === "object" && parsed !== null) return Object.values(parsed).filter(Boolean).map(String).join(", ");
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item)))
+          .join("\n");
+      }
+      if (typeof parsed === "object" && parsed !== null) {
+        return Object.entries(parsed)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => {
+            const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+            return `${k}:\n${vals}`;
+          })
+          .join("\n\n");
+      }
     } catch { /* noop */ }
   }
   return str.replace(/["\[\]{}]/g, "").trim() || "—";
@@ -2186,19 +2197,40 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 /**
  * Strip JSON artifacts (brackets, braces, double-quotes) from a displayed value
  * and return a clean human-readable string.
+ * For arrays: join items with newline (one per line).
+ * For objects: show "key: value" per line.
  */
 const stripJsonArtifacts = (val: string): string => {
   if (!val) return val;
-  // Remove surrounding brackets/braces
   let cleaned = val.trim();
   if ((cleaned.startsWith("[") && cleaned.endsWith("]")) || (cleaned.startsWith("{") && cleaned.endsWith("}"))) {
     try {
       const parsed = JSON.parse(cleaned);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => (typeof item === "object" ? JSON.stringify(item) : String(item))).join(", ");
+        return parsed
+          .map((item) => {
+            if (typeof item === "object" && item !== null) {
+              return Object.entries(item)
+                .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                .map(([k, v]) => {
+                  const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+                  return `${k}:\n${vals}`;
+                })
+                .join("\n\n");
+            }
+            return String(item);
+          })
+          .filter(Boolean)
+          .join("\n");
       }
       if (typeof parsed === "object" && parsed !== null) {
-        return Object.values(parsed).filter(Boolean).map(String).join(", ");
+        return Object.entries(parsed)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => {
+            const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+            return `${k}:\n${vals}`;
+          })
+          .join("\n\n");
       }
     } catch {
       // Not valid JSON, just strip characters
@@ -2214,16 +2246,29 @@ const formatFormValue = (val: any, tipo: string, config?: any): string => {
 
   // Handle object values (resposta_conjunta stored as object)
   if (val && typeof val === "object" && !Array.isArray(val)) {
-    const entries = Object.values(val).filter((v) => v !== null && v !== undefined && v !== "");
+    const entries = Object.entries(val).filter(([, v]) => v !== null && v !== undefined && v !== "");
     if (entries.length > 0) {
-      const joined = entries.map(String).join(" / ");
-      return stripJsonArtifacts(applyAffixSafely(joined, prefixo, sufixo) as string);
+      return entries.map(([k, v]) => {
+        const label = k.replace(/^campo/, "Campo ").replace(/_/g, " ");
+        const valStr = Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v);
+        return `${label}:\n${valStr}`;
+      }).join("\n\n");
     }
     return "—";
   }
 
+  // Handle arrays — join with newline for multi-value display
+  if (Array.isArray(val)) {
+    const items = val.filter((v) => v !== null && v !== undefined && v !== "");
+    if (items.length === 0) return "—";
+    return items.map((item) => {
+      const s = String(item);
+      return applyAffixSafely(s, prefixo, sufixo) as string;
+    }).join("\n");
+  }
+
   const rawValue = applyAffixSafely(val, prefixo, sufixo);
-  const result = normalizeFormValue(rawValue, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+  const result = normalizeFormValue(rawValue, { arraySeparator: "\n", nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
   return stripJsonArtifacts(result);
 };
 
@@ -2236,9 +2281,9 @@ const extractSubFields = (
   tipo: string,
   config?: any
 ): { label: string; value: string }[] | null => {
+  // resposta_conjunta: {campo1: ..., campo2: ...} with config.campos
   if (tipo === "resposta_conjunta" && config?.campos) {
     const campos = config.campos as { rotulo?: string; label?: string }[];
-    // valor can be an object {campo1, campo2, ...} or a JSON string
     let obj = valor;
     if (typeof valor === "string") {
       try { obj = JSON.parse(valor); } catch { return null; }
@@ -2247,48 +2292,60 @@ const extractSubFields = (
       return campos.map((campo, idx) => {
         const key = `campo${idx + 1}`;
         let rawVal = obj[key] ?? "";
-        // Flatten nested arrays (e.g. ["1.4 – Explosivos"] → "1.4 – Explosivos")
+        // Arrays → one value per line
         if (Array.isArray(rawVal)) {
-          rawVal = rawVal.filter((v: any) => v !== "" && v != null).join(", ");
+          rawVal = rawVal.filter((v: any) => v !== "" && v != null).join("\n");
         }
         return {
           label: campo.rotulo || campo.label || `Campo ${idx + 1}`,
-          value: stripJsonArtifacts(String(rawVal)),
+          value: String(rawVal).trim(),
         };
       }).filter((sf) => sf.value !== "");
     }
   }
 
-  // Handle pergunta_condicional with subperguntas that have conjunta data
+  // pergunta_condicional with composite sub-data
   if (tipo === "pergunta_condicional" && valor && typeof valor === "object" && !Array.isArray(valor)) {
-    // Check if it looks like a resposta_conjunta object
     const keys = Object.keys(valor);
     const isCampoPattern = keys.every((k) => /^campo\d+$/.test(k));
     if (isCampoPattern && keys.length > 1) {
-      return keys.map((key) => ({
-        label: key.replace("campo", "Campo "),
-        value: stripJsonArtifacts(String(valor[key] ?? "")),
+      return keys.map((key) => {
+        let rawVal = valor[key] ?? "";
+        if (Array.isArray(rawVal)) {
+          rawVal = rawVal.filter((v: any) => v !== "" && v != null).join("\n");
+        }
+        return {
+          label: key.replace("campo", "Campo "),
+          value: String(rawVal).trim(),
+        };
+      }).filter((sf) => sf.value !== "");
+    }
+  }
+
+  // Generic object value (not array) — show each key as a sub-field
+  if (valor && typeof valor === "object" && !Array.isArray(valor)) {
+    const entries = Object.entries(valor).filter(([, v]) => v !== null && v !== undefined && v !== "");
+    if (entries.length > 1) {
+      return entries.map(([k, v]) => ({
+        label: k.replace(/^campo/, "Campo ").replace(/_/g, " "),
+        value: Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v),
       })).filter((sf) => sf.value !== "");
     }
   }
 
-  // Handle multi-value arrays
+  // Multi-value arrays → one item per line (rendered via whitespace pre-line)
   if (Array.isArray(valor) && valor.length > 1) {
-    return valor.map((v, i) => ({
-      label: `Item ${i + 1}`,
-      value: stripJsonArtifacts(String(v)),
-    })).filter((sf) => sf.value !== "");
+    // Return null to let formatFormValue handle it with newlines
+    return null;
   }
 
-  // Handle JSON string arrays
+  // JSON string arrays
   if (typeof valor === "string" && valor.startsWith("[")) {
     try {
       const parsed = JSON.parse(valor);
       if (Array.isArray(parsed) && parsed.length > 1) {
-        return parsed.map((v: any, i: number) => ({
-          label: `Item ${i + 1}`,
-          value: stripJsonArtifacts(String(v)),
-        })).filter((sf: any) => sf.value !== "");
+        // Return null — formatFormValue will join with newlines
+        return null;
       }
     } catch { /* not JSON */ }
   }
@@ -2306,12 +2363,12 @@ const FormResponseItem = ({ rotulo, valor, tipo, config }: { rotulo: string; val
         <div className="flex items-start gap-2">
           <span className="text-muted-foreground mt-0.5"><FileText className="h-4 w-4" /></span>
           <div className="w-full">
-            <p className="text-xs text-muted-foreground mb-1">{rotulo}</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-1">
+            <p className="text-xs text-muted-foreground mb-2 font-semibold">{rotulo}</p>
+            <div className="space-y-2">
               {subFields.map((sf, i) => (
-                <div key={i} className="flex items-baseline gap-1">
-                  <span className="text-xs text-muted-foreground">{sf.label}:</span>
-                  <span className="font-medium text-sm">{sf.value}</span>
+                <div key={i}>
+                  <span className="text-xs text-muted-foreground font-medium">{sf.label}:</span>
+                  <p className="font-medium text-sm whitespace-pre-line">{sf.value}</p>
                 </div>
               ))}
             </div>

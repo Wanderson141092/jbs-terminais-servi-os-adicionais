@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import { normalizeFormValue } from "@/lib/normalizeFormValue";
 import AttachmentViewer from "./AttachmentViewer";
 import InlineAttachmentPreview from "./InlineAttachmentPreview";
+import GridAttachmentPreview from "./GridAttachmentPreview";
+import { useDataIntegrityAlert } from "@/hooks/useDataIntegrityAlert";
 
 interface AnaliseDialogProps {
   solicitacao: any;
@@ -71,6 +73,8 @@ interface CampoAnaliseConfig {
 interface CampoAnaliseValor {
   campo_id: string;
   valor: string | null;
+  prefixo?: string;
+  sufixo?: string;
 }
 
 interface PerguntaMapeamento {
@@ -109,8 +113,8 @@ const resolveCamposExibicao = ({
   camposAnaliseValores: CampoAnaliseValor[];
   mapeamentos: PerguntaMapeamento[];
 }): CampoResolvido[] => {
-  const campoAnaliseValorMap = new Map<string, string | null>(
-    camposAnaliseValores.map((cv) => [cv.campo_id, cv.valor])
+  const campoAnaliseValorMap = new Map<string, CampoAnaliseValor>(
+    camposAnaliseValores.map((cv) => [cv.campo_id, cv])
   );
   const camposAnaliseMapeados = new Set(
     mapeamentos.filter((m) => !!m.campo_analise_id).map((m) => m.campo_analise_id as string)
@@ -132,17 +136,34 @@ const resolveCamposExibicao = ({
       if (!isExternalForm) return true;
       return camposAnaliseMapeados.has(ca.id) || campoAnaliseValorMap.has(ca.id) || ca.visivel_externo;
     })
-    .map((ca) => ({
-      key: `dinamico:${ca.id}`,
-      label: ca.nome,
-      valor: toDisplayValue(campoAnaliseValorMap.get(ca.id)),
-      ordem: ca.ordem,
-    }));
+    .map((ca) => {
+      const campoValor = campoAnaliseValorMap.get(ca.id);
+      let displayVal = toDisplayValue(campoValor?.valor);
+      
+      // Apply prefixo/sufixo if present and value is not empty
+      if (displayVal !== "—" && campoValor) {
+        const prefixo = campoValor.prefixo || "";
+        const sufixo = campoValor.sufixo || "";
+        if (prefixo || sufixo) {
+          displayVal = applyAffixSafely(displayVal, prefixo, sufixo);
+        }
+      }
+      
+      return {
+        key: `dinamico:${ca.id}`,
+        label: ca.nome,
+        valor: displayVal,
+        ordem: ca.ordem,
+      };
+    });
 
-  return [...fixos, ...dinamicos].sort((a, b) => {
-    if (a.ordem !== b.ordem) return a.ordem - b.ordem;
-    return a.label.localeCompare(b.label);
-  });
+  // Filter out fields with "—" (empty) values - user wants only real data
+  return [...fixos, ...dinamicos]
+    .filter((c) => c.valor !== "—")
+    .sort((a, b) => {
+      if (a.ordem !== b.ordem) return a.ordem - b.ordem;
+      return a.label.localeCompare(b.label);
+    });
 };
 
 const resolveStoragePath = (rawUrl: string | null | undefined, bucket: "form-uploads" | "deferimento") => {
@@ -218,6 +239,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [attachmentInitialIndex, setAttachmentInitialIndex] = useState(0);
   const [isExternalForm, setIsExternalForm] = useState(false);
   const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
+
+  // Data integrity validation hook
+  useDataIntegrityAlert({
+    solicitacaoId: solicitacao.id,
+    userId,
+    camposResolvidos: camposExibicao,
+    anexos: [...formArquivos, ...deferimentoArquivos],
+    enabled: true,
+  });
 
   const getStructuredError = (fallback: string, payload: any) => {
     if (payload?.error?.message) return payload.error.message as string;
@@ -397,9 +427,35 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 
         const { data: mapeamentos } = await supabase
           .from("pergunta_mapeamento")
-          .select("pergunta_id, campo_solicitacao, campo_analise_id")
+          .select("pergunta_id, campo_solicitacao, campo_analise_id, banco_perguntas(config)")
           .eq("formulario_id", formularioId);
         mapeamentosFormulario = (mapeamentos || []) as PerguntaMapeamento[];
+
+        // Build affix map from mapeamentos: campo_analise_id → {prefixo, sufixo}
+        const affixMap = new Map<string, { prefixo: string; sufixo: string }>();
+        for (const m of mapeamentos || []) {
+          if (m.campo_analise_id && (m as any).banco_perguntas?.config) {
+            const cfg = (m as any).banco_perguntas.config;
+            const affixes = resolveMaskAffixes(cfg);
+            if (affixes.prefixo || affixes.sufixo) {
+              affixMap.set(m.campo_analise_id, affixes);
+            }
+          }
+        }
+
+        // Enrich campos_analise_valores with affixes
+        const enrichedCamposValores: CampoAnaliseValor[] = (camposValoresRes.data || []).map((cv: any) => {
+          const affixes = affixMap.get(cv.campo_id);
+          return {
+            campo_id: cv.campo_id,
+            valor: cv.valor,
+            prefixo: affixes?.prefixo || "",
+            sufixo: affixes?.sufixo || "",
+          };
+        });
+
+        // Store enriched values for later use
+        (camposValoresRes as any)._enriched = enrichedCamposValores;
 
         if (respostas && respostas.length > 0 && perguntasData) {
           // Find response closest to solicitacao creation time
@@ -489,13 +545,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         setFormArquivos([]);
       }
 
+      // Use enriched campos values if available, otherwise fallback to raw data
+      const camposValoresToUse = (camposValoresRes as any)._enriched || (camposValoresRes.data || []).map((cv: any) => ({
+        campo_id: cv.campo_id,
+        valor: cv.valor,
+        prefixo: "",
+        sufixo: "",
+      }));
+
       const camposResolvidos = resolveCamposExibicao({
         solicitacao,
         servicoId: currentServicoId,
         isExternalForm: externalForm,
         camposFixosConfig: (camposFixosRes.data || []) as CampoFixoConfig[],
         camposAnaliseConfig: (camposAnaliseRes.data || []) as CampoAnaliseConfig[],
-        camposAnaliseValores: (camposValoresRes.data || []) as CampoAnaliseValor[],
+        camposAnaliseValores: camposValoresToUse as CampoAnaliseValor[],
         mapeamentos: mapeamentosFormulario,
       });
       setCamposExibicao(camposResolvidos);
@@ -1251,9 +1315,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Anexos da Solicitação — preview inline */}
+            {/* Anexos da Solicitação — grid horizontal + preview abaixo */}
             {formArquivos.length > 0 && (
-              <InlineAttachmentPreview
+              <GridAttachmentPreview
                 arquivos={formArquivos}
                 title="Anexos da Solicitação"
                 icon={<Paperclip className="h-4 w-4" />}

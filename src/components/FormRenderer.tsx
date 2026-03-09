@@ -20,7 +20,8 @@ type SubperguntaCondicional = {
 };
 
 const evaluateConditionalOperator = (valorAtual: any, valorGatilho: string, operador?: string) => {
-  switch (operador) {
+  const op = operador || "igual";
+  switch (op) {
     case "igual":
       return String(valorAtual) === valorGatilho;
     case "diferente":
@@ -28,7 +29,7 @@ const evaluateConditionalOperator = (valorAtual: any, valorGatilho: string, oper
     case "contem":
       return String(valorAtual).toLowerCase().includes(valorGatilho.toLowerCase());
     default:
-      return true;
+      return String(valorAtual) === valorGatilho;
   }
 };
 

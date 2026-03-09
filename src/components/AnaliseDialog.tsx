@@ -240,7 +240,15 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   const [isExternalForm, setIsExternalForm] = useState(false);
   const [camposFixos, setCamposFixos] = useState<{ campo_chave: string; campo_label: string; ordem: number }[]>([]);
 
-  const getStructuredError = (fallback: string, payload: any) => {
+  // Data integrity validation hook
+  useDataIntegrityAlert({
+    solicitacaoId: solicitacao.id,
+    userId,
+    camposResolvidos: camposExibicao,
+    anexos: [...formArquivos, ...deferimentoArquivos],
+    enabled: true,
+  });
+
     if (payload?.error?.message) return payload.error.message as string;
     if (payload?.message) return payload.message as string;
     return fallback;

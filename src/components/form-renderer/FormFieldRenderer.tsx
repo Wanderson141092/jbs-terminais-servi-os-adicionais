@@ -820,11 +820,12 @@ const FormFieldRenderer = ({
           if (!parentPergunta) return false;
           const parentValue = allValues[parentPergunta.id];
           if (parentValue === undefined || parentValue === null || parentValue === "") return false;
-          switch (operador) {
+          const op = operador || "igual";
+          switch (op) {
             case "igual": return String(parentValue) === valor_gatilho;
             case "diferente": return String(parentValue) !== valor_gatilho;
             case "contem": return String(parentValue).toLowerCase().includes(valor_gatilho.toLowerCase());
-            default: return false;
+            default: return String(parentValue) === valor_gatilho;
           }
         });
 

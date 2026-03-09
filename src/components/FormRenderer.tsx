@@ -20,7 +20,8 @@ type SubperguntaCondicional = {
 };
 
 const evaluateConditionalOperator = (valorAtual: any, valorGatilho: string, operador?: string) => {
-  switch (operador) {
+  const op = operador || "igual";
+  switch (op) {
     case "igual":
       return String(valorAtual) === valorGatilho;
     case "diferente":
@@ -28,7 +29,7 @@ const evaluateConditionalOperator = (valorAtual: any, valorGatilho: string, oper
     case "contem":
       return String(valorAtual).toLowerCase().includes(valorGatilho.toLowerCase());
     default:
-      return true;
+      return String(valorAtual) === valorGatilho;
   }
 };
 
@@ -176,33 +177,9 @@ const FormRenderer = ({ formularioId, onSuccess }: FormRendererProps) => {
     return evaluateConditionalOperator(currentValue, valor_gatilho, operador);
   };
 
-  useEffect(() => {
-    const { visibleResponseIds, visibleFileIds } = getVisibilityState(values);
-
-    setValues((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const key of Object.keys(prev)) {
-        if (!visibleResponseIds.has(key)) {
-          delete next[key];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-
-    setFiles((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const key of Object.keys(prev)) {
-        if (!visibleFileIds.has(key)) {
-          delete next[key];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [values, perguntas]);
+  // Note: We intentionally do NOT delete values/files when fields become hidden.
+  // This preserves user input if they toggle a conditional back.
+  // Filtering happens at submission time via getVisibilityState().
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

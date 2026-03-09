@@ -73,6 +73,8 @@ interface CampoAnaliseConfig {
 interface CampoAnaliseValor {
   campo_id: string;
   valor: string | null;
+  prefixo?: string;
+  sufixo?: string;
 }
 
 interface PerguntaMapeamento {

@@ -536,13 +536,21 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         setFormArquivos([]);
       }
 
+      // Use enriched campos values if available, otherwise fallback to raw data
+      const camposValoresToUse = (camposValoresRes as any)._enriched || (camposValoresRes.data || []).map((cv: any) => ({
+        campo_id: cv.campo_id,
+        valor: cv.valor,
+        prefixo: "",
+        sufixo: "",
+      }));
+
       const camposResolvidos = resolveCamposExibicao({
         solicitacao,
         servicoId: currentServicoId,
         isExternalForm: externalForm,
         camposFixosConfig: (camposFixosRes.data || []) as CampoFixoConfig[],
         camposAnaliseConfig: (camposAnaliseRes.data || []) as CampoAnaliseConfig[],
-        camposAnaliseValores: (camposValoresRes.data || []) as CampoAnaliseValor[],
+        camposAnaliseValores: camposValoresToUse as CampoAnaliseValor[],
         mapeamentos: mapeamentosFormulario,
       });
       setCamposExibicao(camposResolvidos);

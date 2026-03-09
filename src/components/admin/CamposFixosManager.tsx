@@ -7,6 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
@@ -15,6 +18,25 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Edit, Save, Eye, EyeOff, Globe, Monitor, Plus, Trash2 } from "lucide-react";
+
+/** Known solicitacoes columns available for campo_fixo mapping */
+const SOLICITACOES_COLUMNS: { key: string; label: string; group: string }[] = [
+  { key: "protocolo", label: "Protocolo", group: "Identificação" },
+  { key: "numero_conteiner", label: "Número do Contêiner", group: "Identificação" },
+  { key: "lpco", label: "LPCO", group: "Identificação" },
+  { key: "chave_consulta", label: "Chave de Consulta", group: "Identificação" },
+  { key: "cnpj", label: "CNPJ", group: "Cliente" },
+  { key: "cliente_nome", label: "Nome do Cliente", group: "Cliente" },
+  { key: "cliente_email", label: "E-mail do Cliente", group: "Cliente" },
+  { key: "tipo_carga", label: "Tipo de Carga", group: "Operação" },
+  { key: "tipo_operacao", label: "Tipo de Operação", group: "Operação" },
+  { key: "categoria", label: "Categoria", group: "Operação" },
+  { key: "data_posicionamento", label: "Data de Posicionamento", group: "Datas" },
+  { key: "data_agendamento", label: "Data de Agendamento", group: "Datas" },
+  { key: "observacoes", label: "Observações", group: "Outros" },
+  { key: "status", label: "Status", group: "Outros" },
+  { key: "status_vistoria", label: "Status da Vistoria", group: "Outros" },
+];
 
 interface CampoFixo {
   id: string;
@@ -93,7 +115,7 @@ const CamposFixosManager = () => {
 
   const handleSave = async () => {
     if (!formData.campo_chave.trim()) {
-      toast.error("Informe a chave do campo");
+      toast.error("Selecione a chave do campo");
       return;
     }
     if (!formData.campo_label.trim()) {
@@ -101,14 +123,7 @@ const CamposFixosManager = () => {
       return;
     }
 
-    // Normalize key: lowercase, underscores, no accents
-    const normalizedKey = formData.campo_chave
-      .toLowerCase()
-      .replace(/ /g, "_")
-      .replace(/-/g, "_")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9_]/g, "");
+    const normalizedKey = formData.campo_chave;
 
     if (editingCampo) {
       const { error } = await supabase
@@ -338,16 +353,55 @@ const CamposFixosManager = () => {
           <div className="space-y-4 mt-2">
             <div>
               <Label>Chave do campo (identificador interno)</Label>
-              <Input
-                value={formData.campo_chave}
-                onChange={e => setFormData({ ...formData, campo_chave: e.target.value })}
-                placeholder="ex: numero_bl, peso_carga"
-                disabled={!!editingCampo}
-              />
+              {editingCampo ? (
+                <Input
+                  value={formData.campo_chave}
+                  disabled
+                />
+              ) : (
+                <Select
+                  value={formData.campo_chave}
+                  onValueChange={(value) => {
+                    const col = SOLICITACOES_COLUMNS.find(c => c.key === value);
+                    setFormData(prev => ({
+                      ...prev,
+                      campo_chave: value,
+                      campo_label: prev.campo_label || col?.label || "",
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a chave do campo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      const usedKeys = new Set(campos.map(c => c.campo_chave));
+                      const groups = [...new Set(SOLICITACOES_COLUMNS.map(c => c.group))];
+                      return groups.map(group => {
+                        const items = SOLICITACOES_COLUMNS.filter(c => c.group === group && !usedKeys.has(c.key));
+                        if (items.length === 0) return null;
+                        return (
+                          <div key={group}>
+                            <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group}</p>
+                            {items.map(col => (
+                              <SelectItem key={col.key} value={col.key}>
+                                <span className="flex items-center gap-2">
+                                  <span className="font-mono text-xs text-muted-foreground">{col.key}</span>
+                                  <span>{col.label}</span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </SelectContent>
+                </Select>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
                 {editingCampo 
                   ? "A chave não pode ser alterada após a criação." 
-                  : "Use letras minúsculas e underscores. Será normalizado automaticamente."}
+                  : "Selecione a coluna de destino na tabela de solicitações."}
               </p>
             </div>
             <div>

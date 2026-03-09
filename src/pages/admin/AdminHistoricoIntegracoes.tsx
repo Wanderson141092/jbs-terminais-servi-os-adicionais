@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { History, ArrowLeft, RefreshCw, Search, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface IntegrationHistory {
   id: string;

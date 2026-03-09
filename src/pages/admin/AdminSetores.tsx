@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2, ArrowLeft, Plus, Save, Edit, Trash2, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface Setor {
   id: string;
@@ -38,9 +39,21 @@ const PERFIS_DISPONIVEIS = [
 
 const AdminSetores = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin, loading: roleLoading } = useRoleCheck(currentUserId);
   const [setores, setSetores] = useState<Setor[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
+    });
+  }, [navigate]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAccessDialog, setShowAccessDialog] = useState(false);
   const [editingSetor, setEditingSetor] = useState<Setor | null>(null);
@@ -281,12 +294,17 @@ const AdminSetores = () => {
     });
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Carregando...</p>
       </div>
     );
+  }
+
+  if (!isCurrentUserAdmin) {
+    navigate("/interno/dashboard");
+    return null;
   }
 
   return (

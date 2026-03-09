@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Link2, ArrowLeft, Plus, Save, Edit, Trash2, Settings, BookOpen, Mail, Globe, Webhook } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ExcelImportMappings from "@/components/ExcelImportMappings";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface Integracao {
   id: string;
@@ -38,9 +39,21 @@ interface FieldMapping {
 
 const AdminIntegracoes = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin, loading: roleLoading } = useRoleCheck(currentUserId);
   const [integracoes, setIntegracoes] = useState<Integracao[]>([]);
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
+    });
+  }, [navigate]);
   const [showDialog, setShowDialog] = useState(false);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [editingIntegracao, setEditingIntegracao] = useState<Integracao | null>(null);
@@ -269,12 +282,17 @@ const AdminIntegracoes = () => {
     fetchData();
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Carregando...</p>
       </div>
     );
+  }
+
+  if (!isCurrentUserAdmin) {
+    navigate("/interno/dashboard");
+    return null;
   }
 
   return (

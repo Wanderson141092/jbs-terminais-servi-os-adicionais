@@ -46,9 +46,13 @@ const AdminServicos = () => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setCurrentUserId(session?.user?.id || null);
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
     });
-  }, []);
+  }, [navigate]);
 
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [statusProcesso, setStatusProcesso] = useState<StatusProcesso[]>([]);

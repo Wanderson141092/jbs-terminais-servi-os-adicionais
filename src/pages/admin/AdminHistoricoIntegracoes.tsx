@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { History, ArrowLeft, RefreshCw, Search, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface IntegrationHistory {
   id: string;
@@ -25,6 +26,8 @@ interface IntegrationHistory {
 
 const AdminHistoricoIntegracoes = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin, loading: roleLoading } = useRoleCheck(currentUserId);
   const [history, setHistory] = useState<IntegrationHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
@@ -32,6 +35,16 @@ const AdminHistoricoIntegracoes = () => {
   const [filterStatus, setFilterStatus] = useState<string>("todos");
   const [filterTipo, setFilterTipo] = useState<string>("todos");
   const [searchProtocolo, setSearchProtocolo] = useState("");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
+    });
+  }, [navigate]);
 
   useEffect(() => {
     fetchHistory();
@@ -97,12 +110,17 @@ const AdminHistoricoIntegracoes = () => {
 
   const tipos = [...new Set(history.map(h => h.tipo))];
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Carregando...</p>
       </div>
     );
+  }
+
+  if (!isCurrentUserAdmin) {
+    navigate("/interno/dashboard");
+    return null;
   }
 
   return (

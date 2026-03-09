@@ -11,6 +11,7 @@ import { FileText, ArrowLeft, Download, Search, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface AuditLog {
   id: string;
@@ -25,12 +26,24 @@ interface AuditLog {
 
 const AdminLogs = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin, loading: roleLoading } = useRoleCheck(currentUserId);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAcao, setFilterAcao] = useState("all");
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
+    });
+  }, [navigate]);
 
   useEffect(() => {
     fetchLogs();
@@ -115,12 +128,17 @@ const AdminLogs = () => {
     link.click();
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Carregando...</p>
       </div>
     );
+  }
+
+  if (!isCurrentUserAdmin) {
+    navigate("/interno/dashboard");
+    return null;
   }
 
   return (

@@ -16,7 +16,13 @@ export const useRoleCheck = (userId: string | null): RoleCheckResult => {
 
   useEffect(() => {
     const check = async () => {
-      if (!userId) {
+      // null = session not yet loaded → keep loading: true
+      if (userId === null) {
+        setLoading(true);
+        return;
+      }
+      // empty string = confirmed no session → resolve as no roles
+      if (userId === "") {
         setIsAdmin(false);
         setIsGestor(false);
         setGestorSetorEmail(null);

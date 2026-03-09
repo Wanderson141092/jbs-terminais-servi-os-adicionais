@@ -282,12 +282,17 @@ const AdminIntegracoes = () => {
     fetchData();
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Carregando...</p>
       </div>
     );
+  }
+
+  if (!isCurrentUserAdmin) {
+    navigate("/interno/dashboard");
+    return null;
   }
 
   return (

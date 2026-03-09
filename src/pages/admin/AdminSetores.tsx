@@ -39,9 +39,21 @@ const PERFIS_DISPONIVEIS = [
 
 const AdminSetores = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin, loading: roleLoading } = useRoleCheck(currentUserId);
   const [setores, setSetores] = useState<Setor[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
+    });
+  }, [navigate]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAccessDialog, setShowAccessDialog] = useState(false);
   const [editingSetor, setEditingSetor] = useState<Setor | null>(null);

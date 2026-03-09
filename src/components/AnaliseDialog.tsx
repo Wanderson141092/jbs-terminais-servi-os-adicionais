@@ -2186,19 +2186,40 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 /**
  * Strip JSON artifacts (brackets, braces, double-quotes) from a displayed value
  * and return a clean human-readable string.
+ * For arrays: join items with newline (one per line).
+ * For objects: show "key: value" per line.
  */
 const stripJsonArtifacts = (val: string): string => {
   if (!val) return val;
-  // Remove surrounding brackets/braces
   let cleaned = val.trim();
   if ((cleaned.startsWith("[") && cleaned.endsWith("]")) || (cleaned.startsWith("{") && cleaned.endsWith("}"))) {
     try {
       const parsed = JSON.parse(cleaned);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => (typeof item === "object" ? JSON.stringify(item) : String(item))).join(", ");
+        return parsed
+          .map((item) => {
+            if (typeof item === "object" && item !== null) {
+              return Object.entries(item)
+                .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                .map(([k, v]) => {
+                  const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+                  return `${k}:\n${vals}`;
+                })
+                .join("\n\n");
+            }
+            return String(item);
+          })
+          .filter(Boolean)
+          .join("\n");
       }
       if (typeof parsed === "object" && parsed !== null) {
-        return Object.values(parsed).filter(Boolean).map(String).join(", ");
+        return Object.entries(parsed)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => {
+            const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+            return `${k}:\n${vals}`;
+          })
+          .join("\n\n");
       }
     } catch {
       // Not valid JSON, just strip characters

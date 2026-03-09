@@ -414,8 +414,8 @@ Deno.serve(async (req) => {
           periodo_tarde_ativo: lacreConfigMap["lacre_armador_periodo_tarde"] !== "false",
         },
         lacre_armador_dados: lacreArmadorDados,
-        form_respostas: formResponsesExternal,
-        form_arquivos: formAttachmentsExternal,
+        form_respostas: [],
+        form_arquivos: [],
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

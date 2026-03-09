@@ -2352,12 +2352,12 @@ const FormResponseItem = ({ rotulo, valor, tipo, config }: { rotulo: string; val
         <div className="flex items-start gap-2">
           <span className="text-muted-foreground mt-0.5"><FileText className="h-4 w-4" /></span>
           <div className="w-full">
-            <p className="text-xs text-muted-foreground mb-1">{rotulo}</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-1">
+            <p className="text-xs text-muted-foreground mb-2 font-semibold">{rotulo}</p>
+            <div className="space-y-2">
               {subFields.map((sf, i) => (
-                <div key={i} className="flex items-baseline gap-1">
-                  <span className="text-xs text-muted-foreground">{sf.label}:</span>
-                  <span className="font-medium text-sm">{sf.value}</span>
+                <div key={i}>
+                  <span className="text-xs text-muted-foreground font-medium">{sf.label}:</span>
+                  <p className="font-medium text-sm whitespace-pre-line">{sf.value}</p>
                 </div>
               ))}
             </div>

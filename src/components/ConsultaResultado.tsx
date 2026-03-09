@@ -372,8 +372,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
   };
 
   const infoItems = [
-    solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
+    solicitacao.categoria ? { icon: <FileText className="h-4 w-4" />, label: "Categoria", value: solicitacao.categoria } : null,
     solicitacao.numero_conteiner ? { icon: <Package className="h-4 w-4" />, label: "Contêiner", value: solicitacao.numero_conteiner } : null,
+    solicitacao.lpco ? { icon: <FileText className="h-4 w-4" />, label: "LPCO", value: solicitacao.lpco } : null,
     { icon: <Calendar className="h-4 w-4" />, label: getDateLabel(), value: getDateValue() !== "—" ? getDateValue() : null },
     solicitacao.tipo_carga ? { icon: <Package className="h-4 w-4" />, label: "Tipo de Carga", value: formattedTipoCarga } : null,
     solicitacao.tipo_operacao ? { icon: <FileText className="h-4 w-4" />, label: "Serviço solicitado", value: solicitacao.tipo_operacao } : null,

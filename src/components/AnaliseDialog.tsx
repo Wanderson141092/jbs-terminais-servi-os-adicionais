@@ -94,12 +94,23 @@ const toDisplayValue = (valor: unknown) => {
   if (valor === undefined || valor === null || valor === "") return "—";
   if (typeof valor === "boolean") return valor ? "Sim" : "Não";
   const str = String(valor);
-  // Strip JSON artifacts from display
   if ((str.startsWith("[") && str.endsWith("]")) || (str.startsWith("{") && str.endsWith("}"))) {
     try {
       const parsed = JSON.parse(str);
-      if (Array.isArray(parsed)) return parsed.map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item))).join(", ");
-      if (typeof parsed === "object" && parsed !== null) return Object.values(parsed).filter(Boolean).map(String).join(", ");
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item)))
+          .join("\n");
+      }
+      if (typeof parsed === "object" && parsed !== null) {
+        return Object.entries(parsed)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => {
+            const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+            return `${k}:\n${vals}`;
+          })
+          .join("\n\n");
+      }
     } catch { /* noop */ }
   }
   return str.replace(/["\[\]{}]/g, "").trim() || "—";

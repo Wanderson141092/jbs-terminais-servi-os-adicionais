@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Link2, ArrowLeft, Plus, Save, Edit, Trash2, Settings, BookOpen, Mail, Globe, Webhook } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ExcelImportMappings from "@/components/ExcelImportMappings";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface Integracao {
   id: string;

@@ -2235,16 +2235,29 @@ const formatFormValue = (val: any, tipo: string, config?: any): string => {
 
   // Handle object values (resposta_conjunta stored as object)
   if (val && typeof val === "object" && !Array.isArray(val)) {
-    const entries = Object.values(val).filter((v) => v !== null && v !== undefined && v !== "");
+    const entries = Object.entries(val).filter(([, v]) => v !== null && v !== undefined && v !== "");
     if (entries.length > 0) {
-      const joined = entries.map(String).join(" / ");
-      return stripJsonArtifacts(applyAffixSafely(joined, prefixo, sufixo) as string);
+      return entries.map(([k, v]) => {
+        const label = k.replace(/^campo/, "Campo ").replace(/_/g, " ");
+        const valStr = Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v);
+        return `${label}:\n${valStr}`;
+      }).join("\n\n");
     }
     return "—";
   }
 
+  // Handle arrays — join with newline for multi-value display
+  if (Array.isArray(val)) {
+    const items = val.filter((v) => v !== null && v !== undefined && v !== "");
+    if (items.length === 0) return "—";
+    return items.map((item) => {
+      const s = String(item);
+      return applyAffixSafely(s, prefixo, sufixo) as string;
+    }).join("\n");
+  }
+
   const rawValue = applyAffixSafely(val, prefixo, sufixo);
-  const result = normalizeFormValue(rawValue, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+  const result = normalizeFormValue(rawValue, { arraySeparator: "\n", nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
   return stripJsonArtifacts(result);
 };
 

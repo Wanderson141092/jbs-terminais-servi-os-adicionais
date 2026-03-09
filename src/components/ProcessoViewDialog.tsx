@@ -439,12 +439,30 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
                     Respostas do Formulário
                   </Label>
                   <div className="grid grid-cols-2 gap-4">
-                    {formRespostas.map((fr, i) => (
-                      <div key={i}>
-                        <Label className="text-xs text-muted-foreground">{fr.rotulo}</Label>
-                        <p className="text-sm whitespace-pre-line">{formatResponseValue(fr.valor, fr.tipo, fr.config)}</p>
-                      </div>
-                    ))}
+                    {formRespostas.map((fr, i) => {
+                      const subFields = extractSubFields(fr.valor, fr.tipo, fr.config);
+                      if (subFields && subFields.length > 0) {
+                        return (
+                          <div key={i} className="col-span-2">
+                            <Label className="text-xs text-muted-foreground">{fr.rotulo}</Label>
+                            <div className="flex flex-wrap gap-x-6 gap-y-1 mt-0.5">
+                              {subFields.map((sf, si) => (
+                                <div key={si} className="flex items-baseline gap-1">
+                                  <span className="text-xs text-muted-foreground">{sf.label}:</span>
+                                  <span className="text-sm font-medium">{sf.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={i}>
+                          <Label className="text-xs text-muted-foreground">{fr.rotulo}</Label>
+                          <p className="text-sm whitespace-pre-line">{formatResponseValue(fr.valor, fr.tipo, fr.config)}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </>

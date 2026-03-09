@@ -11,6 +11,7 @@ import { FileText, ArrowLeft, Download, Search, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface AuditLog {
   id: string;

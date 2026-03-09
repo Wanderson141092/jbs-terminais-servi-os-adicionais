@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import { normalizeFormValue } from "@/lib/normalizeFormValue";
 import AttachmentViewer from "./AttachmentViewer";
 import InlineAttachmentPreview from "./InlineAttachmentPreview";
+import GridAttachmentPreview from "./GridAttachmentPreview";
+import { useDataIntegrityAlert } from "@/hooks/useDataIntegrityAlert";
 
 interface AnaliseDialogProps {
   solicitacao: any;

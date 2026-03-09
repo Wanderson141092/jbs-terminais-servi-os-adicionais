@@ -452,8 +452,45 @@ const AdminFormularios = () => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Respostas");
 
+      // Build column definitions — expand resposta_conjunta into sub-columns
+      const columnDefs: { header: string; getValue: (respostasObj: Record<string, unknown>) => string }[] = [];
+      columnDefs.push({ header: "Data", getValue: () => "" }); // placeholder, handled separately
+
+      for (const p of perguntasExportacao) {
+        const pAny = p as any;
+        if (pAny.tipo === "resposta_conjunta" && pAny.config?.campos) {
+          const campos = pAny.config.campos as { rotulo?: string; label?: string }[];
+          campos.forEach((campo: any, idx: number) => {
+            const subLabel = campo.rotulo || campo.label || `Campo ${idx + 1}`;
+            columnDefs.push({
+              header: `${p.rotulo} > ${subLabel}`,
+              getValue: (respostasObj) => {
+                const val = respostasObj[p.id];
+                let obj = val;
+                if (typeof val === "string") { try { obj = JSON.parse(val); } catch { return String(val || ""); } }
+                if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+                  let subVal = (obj as any)[`campo${idx + 1}`] ?? "";
+                  if (Array.isArray(subVal)) subVal = subVal.filter((v: any) => v !== "" && v != null).join(", ");
+                  return String(subVal).replace(/["\[\]{}]/g, "").trim();
+                }
+                return "";
+              },
+            });
+          });
+        } else {
+          columnDefs.push({
+            header: p.rotulo,
+            getValue: (respostasObj) => {
+              const val = respostasObj[p.id];
+              const result = normalizeFormValue(val, { nullishFallback: "", preserveObjects: false });
+              return result.replace(/["\[\]{}]/g, "").trim();
+            },
+          });
+        }
+      }
+
       // Headers
-      const headers = ["Data", ...perguntasExportacao.map((p) => p.rotulo)];
+      const headers = columnDefs.map((c) => c.header);
       const headerRow = sheet.addRow(headers);
       headerRow.eachCell((cell) => {
         cell.font = { bold: true };
@@ -463,13 +500,10 @@ const AdminFormularios = () => {
       // Data rows
       for (const r of respostas) {
         const respostasObj = (r.respostas || {}) as Record<string, unknown>;
-        const row = [
-          new Date(r.created_at).toLocaleString("pt-BR"),
-          ...perguntasExportacao.map((p) => {
-            const val = respostasObj[p.id];
-            return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
-          }),
-        ];
+        const row = columnDefs.map((col, i) => {
+          if (i === 0) return new Date(r.created_at).toLocaleString("pt-BR");
+          return col.getValue(respostasObj);
+        });
         sheet.addRow(row);
       }
 

@@ -407,9 +407,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               </Button>
             </div>
             <Separator className="my-1" />
-            <div className={`inline-flex items-center px-3 py-1 rounded-md border text-sm font-medium ${getStatusColor(solicitacao.status)}`}>
+            <div className={`inline-flex items-center px-3 py-1.5 rounded-md border text-sm font-medium ${getStatusColor(solicitacao.status)}`}>
               {solicitacao.status === "vistoria_finalizada" && isPositionamento
-                ? <span className="status-badge">Serviço Concluído</span>
+                ? <span>Serviço Concluído</span>
                 : <StatusBadge status={solicitacao.status} />
               }
             </div>

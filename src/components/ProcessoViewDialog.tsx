@@ -247,15 +247,65 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
     setPreviewUrl(url);
   };
 
+  const stripJsonArtifacts = (val: string): string => {
+    if (!val) return val;
+    let cleaned = val.trim();
+    if ((cleaned.startsWith("[") && cleaned.endsWith("]")) || (cleaned.startsWith("{") && cleaned.endsWith("}"))) {
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed)) return parsed.map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item))).join(", ");
+        if (typeof parsed === "object" && parsed !== null) return Object.values(parsed).filter(Boolean).map(String).join(", ");
+      } catch { /* noop */ }
+    }
+    return cleaned.replace(/["\[\]{}]/g, "").trim();
+  };
+
   const formatResponseValue = (val: any, tipo: string, config?: any): string => {
     const prefixo = config?.prefixo || "";
     const sufixo = config?.sufixo || "";
 
     if (val && typeof val === "object" && !Array.isArray(val)) {
-      if (val.campo1 && val.campo2) return `${prefixo}${val.campo1} / ${val.campo2}${sufixo ? " " + sufixo : ""}`;
-      return normalizeFormValue(val, { nullishFallback: "—", preserveObjects: true, itemPrefix: prefixo, itemSuffix: sufixo });
+      const entries = Object.values(val).filter((v) => v !== null && v !== undefined && v !== "");
+      if (entries.length > 0) {
+        const joined = entries.map(String).join(" / ");
+        return stripJsonArtifacts(applyAffixSafely(joined, prefixo, sufixo));
+      }
+      return "—";
     }
-    return normalizeFormValue(val, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+    const result = normalizeFormValue(val, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+    return stripJsonArtifacts(result);
+  };
+
+  const applyAffixSafely = (value: any, prefixo: string, sufixo: string): string => {
+    const str = String(value ?? "");
+    let next = str;
+    if (prefixo && !next.trimStart().startsWith(prefixo)) next = `${prefixo}${next}`;
+    if (sufixo && !next.trimEnd().endsWith(sufixo)) next = `${next} ${sufixo}`.trim();
+    return next;
+  };
+
+  const extractSubFields = (valor: any, tipo: string, config?: any): { label: string; value: string }[] | null => {
+    if (tipo === "resposta_conjunta" && config?.campos) {
+      const campos = config.campos as { rotulo?: string; label?: string }[];
+      let obj = valor;
+      if (typeof valor === "string") { try { obj = JSON.parse(valor); } catch { return null; } }
+      if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+        return campos.map((campo, idx) => ({
+          label: campo.rotulo || campo.label || `Campo ${idx + 1}`,
+          value: stripJsonArtifacts(String(obj[`campo${idx + 1}`] ?? "")),
+        })).filter((sf) => sf.value !== "");
+      }
+    }
+    if (tipo === "pergunta_condicional" && valor && typeof valor === "object" && !Array.isArray(valor)) {
+      const keys = Object.keys(valor);
+      if (keys.every((k) => /^campo\d+$/.test(k)) && keys.length > 1) {
+        return keys.map((key) => ({
+          label: key.replace("campo", "Campo "),
+          value: stripJsonArtifacts(String(valor[key] ?? "")),
+        })).filter((sf) => sf.value !== "");
+      }
+    }
+    return null;
   };
 
   if (!solicitacao) return null;

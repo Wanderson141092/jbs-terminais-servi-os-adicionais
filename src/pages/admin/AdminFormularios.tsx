@@ -337,7 +337,7 @@ const AdminFormularios = () => {
   const fetchPerguntasExportacao = async (formularioId: string) => {
     const { data } = await supabase
       .from("formulario_perguntas")
-      .select("ordem, pergunta_id, banco_perguntas(id, rotulo)")
+      .select("ordem, pergunta_id, banco_perguntas(id, rotulo, tipo, config)")
       .eq("formulario_id", formularioId)
       .order("ordem");
 
@@ -346,6 +346,8 @@ const AdminFormularios = () => {
         id: fp.pergunta_id || fp.banco_perguntas?.id,
         rotulo: fp.banco_perguntas?.rotulo || fp.pergunta_id || "Pergunta sem rótulo",
         ordem: fp.ordem || 0,
+        tipo: fp.banco_perguntas?.tipo || "texto",
+        config: fp.banco_perguntas?.config || null,
       }))
       .filter((p: any) => !!p.id);
 

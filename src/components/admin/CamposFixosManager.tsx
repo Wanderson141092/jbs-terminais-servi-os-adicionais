@@ -115,7 +115,7 @@ const CamposFixosManager = () => {
 
   const handleSave = async () => {
     if (!formData.campo_chave.trim()) {
-      toast.error("Informe a chave do campo");
+      toast.error("Selecione a chave do campo");
       return;
     }
     if (!formData.campo_label.trim()) {
@@ -123,14 +123,7 @@ const CamposFixosManager = () => {
       return;
     }
 
-    // Normalize key: lowercase, underscores, no accents
-    const normalizedKey = formData.campo_chave
-      .toLowerCase()
-      .replace(/ /g, "_")
-      .replace(/-/g, "_")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9_]/g, "");
+    const normalizedKey = formData.campo_chave;
 
     if (editingCampo) {
       const { error } = await supabase

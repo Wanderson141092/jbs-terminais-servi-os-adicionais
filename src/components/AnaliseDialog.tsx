@@ -99,7 +99,12 @@ const toDisplayValue = (valor: unknown) => {
       const parsed = JSON.parse(str);
       if (Array.isArray(parsed)) {
         return parsed
-          .map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item)))
+          .map((item) => {
+            if (typeof item === "object" && item !== null) {
+              return Object.values(item).filter(Boolean).join(", ");
+            }
+            return String(item);
+          })
           .join("\n");
       }
       if (typeof parsed === "object" && parsed !== null) {
@@ -113,6 +118,7 @@ const toDisplayValue = (valor: unknown) => {
       }
     } catch { /* noop */ }
   }
+  // Strip remaining JSON artifacts
   return str.replace(/["\[\]{}]/g, "").trim() || "—";
 };
 
@@ -2246,10 +2252,13 @@ const formatFormValue = (val: any, tipo: string, config?: any): string => {
 
   // Handle object values (resposta_conjunta stored as object)
   if (val && typeof val === "object" && !Array.isArray(val)) {
+    const campos = (config?.campos || []) as { rotulo?: string; label?: string }[];
     const entries = Object.entries(val).filter(([, v]) => v !== null && v !== undefined && v !== "");
     if (entries.length > 0) {
-      return entries.map(([k, v]) => {
-        const label = k.replace(/^campo/, "Campo ").replace(/_/g, " ");
+      return entries.map(([k, v], idx) => {
+        // Use configured label from campos, fallback to key
+        const campoConfig = campos[idx];
+        const label = campoConfig?.rotulo || campoConfig?.label || k;
         const valStr = Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v);
         return `${label}:\n${valStr}`;
       }).join("\n\n");
@@ -2306,16 +2315,18 @@ const extractSubFields = (
 
   // pergunta_condicional with composite sub-data
   if (tipo === "pergunta_condicional" && valor && typeof valor === "object" && !Array.isArray(valor)) {
+    const campos = (config?.campos || []) as { rotulo?: string; label?: string }[];
     const keys = Object.keys(valor);
     const isCampoPattern = keys.every((k) => /^campo\d+$/.test(k));
     if (isCampoPattern && keys.length > 1) {
-      return keys.map((key) => {
+      return keys.map((key, idx) => {
         let rawVal = valor[key] ?? "";
         if (Array.isArray(rawVal)) {
           rawVal = rawVal.filter((v: any) => v !== "" && v != null).join("\n");
         }
+        const campoConfig = campos[idx];
         return {
-          label: key.replace("campo", "Campo "),
+          label: campoConfig?.rotulo || campoConfig?.label || key.replace("campo", "Campo "),
           value: String(rawVal).trim(),
         };
       }).filter((sf) => sf.value !== "");
@@ -2324,12 +2335,16 @@ const extractSubFields = (
 
   // Generic object value (not array) — show each key as a sub-field
   if (valor && typeof valor === "object" && !Array.isArray(valor)) {
+    const campos = (config?.campos || []) as { rotulo?: string; label?: string }[];
     const entries = Object.entries(valor).filter(([, v]) => v !== null && v !== undefined && v !== "");
     if (entries.length > 1) {
-      return entries.map(([k, v]) => ({
-        label: k.replace(/^campo/, "Campo ").replace(/_/g, " "),
-        value: Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v),
-      })).filter((sf) => sf.value !== "");
+      return entries.map(([k, v], idx) => {
+        const campoConfig = campos[idx];
+        return {
+          label: campoConfig?.rotulo || campoConfig?.label || k,
+          value: Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v),
+        };
+      }).filter((sf) => sf.value !== "");
     }
   }
 

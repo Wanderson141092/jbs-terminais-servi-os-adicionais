@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const selectFields = "id, protocolo, tipo_operacao, numero_conteiner, lpco, chave_consulta, formulario_id";
+    const selectFields = "id, protocolo, tipo_operacao, numero_conteiner, lpco, chave_consulta, formulario_id, categoria, data_posicionamento, data_agendamento, status, created_at";
 
     let solicitacaoRef = null;
 
@@ -280,18 +280,25 @@ Deno.serve(async (req) => {
         };
       });
 
-    // Sanitize: remove client name for privacy, and filter fields based on config
+    // Essential fields that MUST always be visible externally
+    const essentialFields = new Set([
+      "id", "protocolo", "status", "created_at", "updated_at",
+      "categoria", "numero_conteiner", "data_posicionamento", "data_agendamento",
+      "tipo_operacao", "status_vistoria",
+      "comex_aprovado", "armazem_aprovado",
+      "solicitar_deferimento", "solicitar_lacre_armador",
+      "lacre_armador_possui", "lacre_armador_aceite_custo",
+      "pendencias_selecionadas", "cancelamento_solicitado",
+    ]);
+
     const sanitizedSolicitacao: Record<string, any> = {};
     const allFields = { ...solicitacao };
     delete allFields.cliente_nome; // Always hidden externally
+    delete allFields.cliente_email;
+    delete allFields.cnpj;
     
     for (const [key, value] of Object.entries(allFields)) {
-      if (key === "id" || key === "status" || key === "created_at" || key === "updated_at" || 
-          key === "comex_aprovado" || key === "armazem_aprovado" || key === "solicitar_deferimento" ||
-          key === "solicitar_lacre_armador" || key === "lacre_armador_possui" || key === "lacre_armador_aceite_custo" ||
-          key === "pendencias_selecionadas" || key === "status_vistoria" || key === "categoria" ||
-          key === "tipo_operacao" ||
-          visibleFixedFields.includes(key)) {
+      if (essentialFields.has(key) || visibleFixedFields.includes(key)) {
         sanitizedSolicitacao[key] = value;
       }
     }

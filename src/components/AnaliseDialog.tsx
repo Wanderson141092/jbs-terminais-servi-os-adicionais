@@ -1306,9 +1306,9 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               </div>
             )}
 
-            {/* Anexos da Solicitação — preview inline */}
+            {/* Anexos da Solicitação — grid horizontal + preview abaixo */}
             {formArquivos.length > 0 && (
-              <InlineAttachmentPreview
+              <GridAttachmentPreview
                 arquivos={formArquivos}
                 title="Anexos da Solicitação"
                 icon={<Paperclip className="h-4 w-4" />}

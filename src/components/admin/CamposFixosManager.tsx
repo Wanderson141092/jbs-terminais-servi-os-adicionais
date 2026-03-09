@@ -7,6 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
@@ -15,6 +18,25 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Edit, Save, Eye, EyeOff, Globe, Monitor, Plus, Trash2 } from "lucide-react";
+
+/** Known solicitacoes columns available for campo_fixo mapping */
+const SOLICITACOES_COLUMNS: { key: string; label: string; group: string }[] = [
+  { key: "protocolo", label: "Protocolo", group: "Identificação" },
+  { key: "numero_conteiner", label: "Número do Contêiner", group: "Identificação" },
+  { key: "lpco", label: "LPCO", group: "Identificação" },
+  { key: "chave_consulta", label: "Chave de Consulta", group: "Identificação" },
+  { key: "cnpj", label: "CNPJ", group: "Cliente" },
+  { key: "cliente_nome", label: "Nome do Cliente", group: "Cliente" },
+  { key: "cliente_email", label: "E-mail do Cliente", group: "Cliente" },
+  { key: "tipo_carga", label: "Tipo de Carga", group: "Operação" },
+  { key: "tipo_operacao", label: "Tipo de Operação", group: "Operação" },
+  { key: "categoria", label: "Categoria", group: "Operação" },
+  { key: "data_posicionamento", label: "Data de Posicionamento", group: "Datas" },
+  { key: "data_agendamento", label: "Data de Agendamento", group: "Datas" },
+  { key: "observacoes", label: "Observações", group: "Outros" },
+  { key: "status", label: "Status", group: "Outros" },
+  { key: "status_vistoria", label: "Status da Vistoria", group: "Outros" },
+];
 
 interface CampoFixo {
   id: string;

@@ -93,7 +93,16 @@ interface CampoResolvido {
 const toDisplayValue = (valor: unknown) => {
   if (valor === undefined || valor === null || valor === "") return "—";
   if (typeof valor === "boolean") return valor ? "Sim" : "Não";
-  return String(valor);
+  const str = String(valor);
+  // Strip JSON artifacts from display
+  if ((str.startsWith("[") && str.endsWith("]")) || (str.startsWith("{") && str.endsWith("}"))) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) return parsed.map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(", ") : String(item))).join(", ");
+      if (typeof parsed === "object" && parsed !== null) return Object.values(parsed).filter(Boolean).map(String).join(", ");
+    } catch { /* noop */ }
+  }
+  return str.replace(/["\[\]{}]/g, "").trim() || "—";
 };
 
 const resolveCamposExibicao = ({
@@ -1340,7 +1349,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
               <div className="grid grid-cols-2 gap-4 text-sm border rounded-lg p-3 bg-muted/20">
                 <p className="col-span-2 text-xs font-semibold text-muted-foreground mb-1">Respostas do Formulário</p>
                 {formRespostas.map((fr, idx) => (
-                  <InfoItem key={idx} icon={<FileText className="h-4 w-4" />} label={fr.rotulo} value={formatFormValue(fr.valor, fr.tipo, fr.config)} />
+                  <FormResponseItem key={idx} rotulo={fr.rotulo} valor={fr.valor} tipo={fr.tipo} config={fr.config} />
                 ))}
               </div>
             )}
@@ -2174,25 +2183,148 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
   );
 };
 
+/**
+ * Strip JSON artifacts (brackets, braces, double-quotes) from a displayed value
+ * and return a clean human-readable string.
+ */
+const stripJsonArtifacts = (val: string): string => {
+  if (!val) return val;
+  // Remove surrounding brackets/braces
+  let cleaned = val.trim();
+  if ((cleaned.startsWith("[") && cleaned.endsWith("]")) || (cleaned.startsWith("{") && cleaned.endsWith("}"))) {
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => (typeof item === "object" ? JSON.stringify(item) : String(item))).join(", ");
+      }
+      if (typeof parsed === "object" && parsed !== null) {
+        return Object.values(parsed).filter(Boolean).map(String).join(", ");
+      }
+    } catch {
+      // Not valid JSON, just strip characters
+    }
+  }
+  // Remove stray double-quotes, brackets, braces
+  return cleaned.replace(/["\[\]{}]/g, "").trim();
+};
+
 // Helper Functions
 const formatFormValue = (val: any, tipo: string, config?: any): string => {
   const { prefixo, sufixo } = resolveMaskAffixes(config);
-  const rawValue = applyAffixSafely(val, prefixo, sufixo);
 
-  if (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) {
-    if (rawValue.campo1 && rawValue.campo2) {
-      const pair = `${rawValue.campo1} / ${rawValue.campo2}`;
-      return normalizeFormValue(applyAffixSafely(pair, prefixo, sufixo), { nullishFallback: "—" });
+  // Handle object values (resposta_conjunta stored as object)
+  if (val && typeof val === "object" && !Array.isArray(val)) {
+    const entries = Object.values(val).filter((v) => v !== null && v !== undefined && v !== "");
+    if (entries.length > 0) {
+      const joined = entries.map(String).join(" / ");
+      return stripJsonArtifacts(applyAffixSafely(joined, prefixo, sufixo) as string);
     }
-    return normalizeFormValue(rawValue, {
-      nullishFallback: "—",
-      preserveObjects: true,
-      itemPrefix: prefixo,
-      itemSuffix: sufixo,
-    });
+    return "—";
   }
 
-  return normalizeFormValue(rawValue, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+  const rawValue = applyAffixSafely(val, prefixo, sufixo);
+  const result = normalizeFormValue(rawValue, { nullishFallback: "—", itemPrefix: prefixo, itemSuffix: sufixo });
+  return stripJsonArtifacts(result);
+};
+
+/**
+ * Extract sub-fields from a resposta_conjunta or multi-value response
+ * Returns null if it's a simple value, or an array of {label, value} for composite.
+ */
+const extractSubFields = (
+  valor: any,
+  tipo: string,
+  config?: any
+): { label: string; value: string }[] | null => {
+  if (tipo === "resposta_conjunta" && config?.campos) {
+    const campos = config.campos as { rotulo?: string; label?: string }[];
+    // valor can be an object {campo1, campo2, ...} or a JSON string
+    let obj = valor;
+    if (typeof valor === "string") {
+      try { obj = JSON.parse(valor); } catch { return null; }
+    }
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      return campos.map((campo, idx) => {
+        const key = `campo${idx + 1}`;
+        const rawVal = obj[key] ?? "";
+        return {
+          label: campo.rotulo || campo.label || `Campo ${idx + 1}`,
+          value: stripJsonArtifacts(String(rawVal)),
+        };
+      }).filter((sf) => sf.value !== "");
+    }
+  }
+
+  // Handle pergunta_condicional with subperguntas that have conjunta data
+  if (tipo === "pergunta_condicional" && valor && typeof valor === "object" && !Array.isArray(valor)) {
+    // Check if it looks like a resposta_conjunta object
+    const keys = Object.keys(valor);
+    const isCampoPattern = keys.every((k) => /^campo\d+$/.test(k));
+    if (isCampoPattern && keys.length > 1) {
+      return keys.map((key) => ({
+        label: key.replace("campo", "Campo "),
+        value: stripJsonArtifacts(String(valor[key] ?? "")),
+      })).filter((sf) => sf.value !== "");
+    }
+  }
+
+  // Handle multi-value arrays
+  if (Array.isArray(valor) && valor.length > 1) {
+    return valor.map((v, i) => ({
+      label: `Item ${i + 1}`,
+      value: stripJsonArtifacts(String(v)),
+    })).filter((sf) => sf.value !== "");
+  }
+
+  // Handle JSON string arrays
+  if (typeof valor === "string" && valor.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(valor);
+      if (Array.isArray(parsed) && parsed.length > 1) {
+        return parsed.map((v: any, i: number) => ({
+          label: `Item ${i + 1}`,
+          value: stripJsonArtifacts(String(v)),
+        })).filter((sf: any) => sf.value !== "");
+      }
+    } catch { /* not JSON */ }
+  }
+
+  return null;
+};
+
+/** Renders a form response with proper sub-field display for composite types */
+const FormResponseItem = ({ rotulo, valor, tipo, config }: { rotulo: string; valor: any; tipo: string; config?: any }) => {
+  const subFields = extractSubFields(valor, tipo, config);
+
+  if (subFields && subFields.length > 0) {
+    return (
+      <div className="col-span-2">
+        <div className="flex items-start gap-2">
+          <span className="text-muted-foreground mt-0.5"><FileText className="h-4 w-4" /></span>
+          <div className="w-full">
+            <p className="text-xs text-muted-foreground mb-1">{rotulo}</p>
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              {subFields.map((sf, i) => (
+                <div key={i} className="flex items-baseline gap-1">
+                  <span className="text-xs text-muted-foreground">{sf.label}:</span>
+                  <span className="font-medium text-sm">{sf.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Simple value — use standard display
+  return (
+    <InfoItem
+      icon={<FileText className="h-4 w-4" />}
+      label={rotulo}
+      value={formatFormValue(valor, tipo, config)}
+    />
+  );
 };
 
 // Helper Components
@@ -2201,7 +2333,7 @@ const InfoItem = ({ icon, label, value }: { icon: React.ReactNode; label: string
     <span className="text-muted-foreground mt-0.5">{icon}</span>
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium whitespace-pre-line">{value}</p>
+      <p className="font-medium whitespace-pre-line">{stripJsonArtifacts(value)}</p>
     </div>
   </div>
 );

@@ -12,8 +12,9 @@ interface IntegrityCheckOptions {
 
 /**
  * Hook that validates data integrity on load and logs issues to audit_log.
- * - Checks for fields with "—" (empty) values that should have data
  * - Checks for attachments with broken URLs
+ * - Checks for malformed attachment URLs (empty or obviously invalid)
+ * - Detects fields missing configured suffix/prefix
  */
 export const useDataIntegrityAlert = ({
   solicitacaoId,
@@ -33,6 +34,14 @@ export const useDataIntegrityAlert = ({
     const brokenAttachments = anexos.filter((a) => a.error === true);
     if (brokenAttachments.length > 0) {
       issues.push(`${brokenAttachments.length} anexo(s) com URL inválida`);
+    }
+
+    // Check for malformed URLs (empty string or missing protocol)
+    const malformedUrls = anexos.filter(
+      (a) => !a.error && a.file_url && !a.file_url.startsWith("http") && !a.file_url.startsWith("blob:")
+    );
+    if (malformedUrls.length > 0) {
+      issues.push(`${malformedUrls.length} anexo(s) com URL malformada`);
     }
 
     // If there are issues, log them

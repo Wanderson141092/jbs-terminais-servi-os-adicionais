@@ -2246,7 +2246,11 @@ const extractSubFields = (
     if (obj && typeof obj === "object" && !Array.isArray(obj)) {
       return campos.map((campo, idx) => {
         const key = `campo${idx + 1}`;
-        const rawVal = obj[key] ?? "";
+        let rawVal = obj[key] ?? "";
+        // Flatten nested arrays (e.g. ["1.4 – Explosivos"] → "1.4 – Explosivos")
+        if (Array.isArray(rawVal)) {
+          rawVal = rawVal.filter((v: any) => v !== "" && v != null).join(", ");
+        }
         return {
           label: campo.rotulo || campo.label || `Campo ${idx + 1}`,
           value: stripJsonArtifacts(String(rawVal)),

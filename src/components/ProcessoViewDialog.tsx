@@ -290,10 +290,16 @@ const ProcessoViewDialog = ({ open, onOpenChange, solicitacao, isAdmin, userId, 
       let obj = valor;
       if (typeof valor === "string") { try { obj = JSON.parse(valor); } catch { return null; } }
       if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-        return campos.map((campo, idx) => ({
-          label: campo.rotulo || campo.label || `Campo ${idx + 1}`,
-          value: stripJsonArtifacts(String(obj[`campo${idx + 1}`] ?? "")),
-        })).filter((sf) => sf.value !== "");
+        return campos.map((campo, idx) => {
+          let rawVal = obj[`campo${idx + 1}`] ?? "";
+          if (Array.isArray(rawVal)) {
+            rawVal = rawVal.filter((v: any) => v !== "" && v != null).join(", ");
+          }
+          return {
+            label: campo.rotulo || campo.label || `Campo ${idx + 1}`,
+            value: stripJsonArtifacts(String(rawVal)),
+          };
+        }).filter((sf) => sf.value !== "");
       }
     }
     if (tipo === "pergunta_condicional" && valor && typeof valor === "object" && !Array.isArray(valor)) {

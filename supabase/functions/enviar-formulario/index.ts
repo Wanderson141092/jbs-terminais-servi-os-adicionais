@@ -73,27 +73,6 @@ Deno.serve(async (req) => {
 
     const formularioServicoId = formularioData.servico_id;
 
-    // 2. Save form response
-    const { error: respError } = await supabase.from("formulario_respostas").insert({
-      formulario_id,
-      respostas: normalizedRespostas,
-      arquivos: arquivos && arquivos.length > 0 ? arquivos : null,
-    });
-
-    if (respError) throw respError;
-
-    // 3. Build solicitacao data from mapeamentos + collect dynamic field mappings
-    const solicitacaoData: Record<string, any> = {};
-    const dynamicFieldValues: { campo_id: string; valor: string }[] = [];
-
-    const { data: camposFixosRows } = await supabase
-      .from("campos_fixos_config")
-      .select("id, campo_chave");
-
-    const campoChaveById = new Map<string, string>(
-      (camposFixosRows || []).map((campo: any) => [campo.id, campo.campo_chave])
-    );
-
     // Helper: normalize a single response value
     const normalizeVal = (rawVal: unknown): string => {
       if (rawVal === true || String(rawVal).toLowerCase() === "true") return "Sim";
@@ -117,6 +96,27 @@ Deno.serve(async (req) => {
       if (typeof val === "object" && !Array.isArray(val)) { normalizedRespostas[key] = val; continue; }
       normalizedRespostas[key] = normalizeVal(val);
     }
+
+    // 2. Save form response
+    const { error: respError } = await supabase.from("formulario_respostas").insert({
+      formulario_id,
+      respostas: normalizedRespostas,
+      arquivos: arquivos && arquivos.length > 0 ? arquivos : null,
+    });
+
+    if (respError) throw respError;
+
+    // 3. Build solicitacao data from mapeamentos + collect dynamic field mappings
+    const solicitacaoData: Record<string, any> = {};
+    const dynamicFieldValues: { campo_id: string; valor: string }[] = [];
+
+    const { data: camposFixosRows } = await supabase
+      .from("campos_fixos_config")
+      .select("id, campo_chave");
+
+    const campoChaveById = new Map<string, string>(
+      (camposFixosRows || []).map((campo: any) => [campo.id, campo.campo_chave])
+    );
 
     if (mapeamentos && Array.isArray(mapeamentos)) {
       for (const map of mapeamentos) {

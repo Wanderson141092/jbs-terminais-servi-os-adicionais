@@ -165,6 +165,8 @@ const resolveCamposExibicao = ({
       return a.label.localeCompare(b.label);
     });
 };
+
+const resolveStoragePath = (rawUrl: string | null | undefined, bucket: "form-uploads" | "deferimento") => {
   if (!rawUrl) return null;
   if (!rawUrl.startsWith("http")) return rawUrl;
 

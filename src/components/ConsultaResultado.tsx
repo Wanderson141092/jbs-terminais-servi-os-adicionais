@@ -371,12 +371,13 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
     return "text-yellow-700 bg-yellow-50 border-yellow-200";
   };
 
+  // Mandatory field order: Protocolo (in header), Status (in header), Categoria, Contêiner, Posicionar Dia, Data do protocolo
   const infoItems = [
-    solicitacao.categoria ? { icon: <FileText className="h-4 w-4" />, label: "Categoria", value: solicitacao.categoria } : null,
-    solicitacao.numero_conteiner ? { icon: <Package className="h-4 w-4" />, label: "Contêiner", value: solicitacao.numero_conteiner } : null,
-    { icon: <Calendar className="h-4 w-4" />, label: getDateLabel(), value: getDateValue() !== "—" ? getDateValue() : null },
-    { icon: <Clock className="h-4 w-4" />, label: "Data do protocolo", value: solicitacao.created_at ? new Date(solicitacao.created_at).toLocaleDateString("pt-BR") : null },
-  ].filter(Boolean) as { icon: React.ReactNode; label: string; value: string }[];
+    { icon: <FileText className="h-4 w-4" />, label: "Categoria", value: solicitacao.categoria || "—" },
+    { icon: <Package className="h-4 w-4" />, label: "Contêiner", value: solicitacao.numero_conteiner || "—" },
+    { icon: <Calendar className="h-4 w-4" />, label: getDateLabel(), value: getDateValue() },
+    { icon: <Clock className="h-4 w-4" />, label: "Data do protocolo", value: solicitacao.created_at ? new Date(solicitacao.created_at).toLocaleDateString("pt-BR") : "—" },
+  ];
 
   return (
     <>
@@ -406,9 +407,9 @@ const ConsultaResultado = ({ solicitacao, deferimentoDocs = [], servicoConfig = 
               </Button>
             </div>
             <Separator className="my-1" />
-            <div className={`inline-flex items-center px-3 py-1 rounded-md border text-sm font-medium ${getStatusColor(solicitacao.status)}`}>
+            <div className={`inline-flex items-center px-3 py-1.5 rounded-md border text-sm font-medium ${getStatusColor(solicitacao.status)}`}>
               {solicitacao.status === "vistoria_finalizada" && isPositionamento
-                ? <span className="status-badge">Serviço Concluído</span>
+                ? <span>Serviço Concluído</span>
                 : <StatusBadge status={solicitacao.status} />
               }
             </div>

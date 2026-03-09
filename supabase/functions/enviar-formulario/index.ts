@@ -312,14 +312,16 @@ Deno.serve(async (req) => {
     }
 
     if (autoRecusado && solData) {
+      const mensagemCorte = "Solicitação enviada após o prazo de recebimento. Por gentileza seguir para a próxima data.";
       await supabase.from("observacao_historico").insert({
         solicitacao_id: solData.id,
-        observacao: "Pedido recusado automaticamente por envio após o horário de corte.",
+        observacao: mensagemCorte,
         status_no_momento: initialStatus,
         autor_id: "00000000-0000-0000-0000-000000000000",
         autor_nome: "Sistema",
-        tipo_observacao: "sistema_auto_recusa_corte",
+        tipo_observacao: "externa",
       });
+      await supabase.from("solicitacoes").update({ observacoes: mensagemCorte }).eq("id", solData.id);
     }
 
     // 10. Trigger notifications

@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2, ArrowLeft, Plus, Save, Edit, Trash2, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface Setor {
   id: string;

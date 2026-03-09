@@ -26,6 +26,8 @@ interface IntegrationHistory {
 
 const AdminHistoricoIntegracoes = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin, loading: roleLoading } = useRoleCheck(currentUserId);
   const [history, setHistory] = useState<IntegrationHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
@@ -33,6 +35,16 @@ const AdminHistoricoIntegracoes = () => {
   const [filterStatus, setFilterStatus] = useState<string>("todos");
   const [filterTipo, setFilterTipo] = useState<string>("todos");
   const [searchProtocolo, setSearchProtocolo] = useState("");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
+    });
+  }, [navigate]);
 
   useEffect(() => {
     fetchHistory();

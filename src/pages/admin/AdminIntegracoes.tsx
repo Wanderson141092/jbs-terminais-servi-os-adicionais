@@ -39,9 +39,21 @@ interface FieldMapping {
 
 const AdminIntegracoes = () => {
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isAdmin: isCurrentUserAdmin, loading: roleLoading } = useRoleCheck(currentUserId);
   const [integracoes, setIntegracoes] = useState<Integracao[]>([]);
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
+    });
+  }, [navigate]);
   const [showDialog, setShowDialog] = useState(false);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [editingIntegracao, setEditingIntegracao] = useState<Integracao | null>(null);

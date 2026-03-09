@@ -285,9 +285,13 @@ const AdminFormularios = () => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setCurrentUserId(session?.user?.id || null);
+      if (!session?.user) {
+        navigate("/interno");
+        return;
+      }
+      setCurrentUserId(session.user.id);
     });
-  }, []);
+  }, [navigate]);
 
   const [loading, setLoading] = useState(true);
   const [formularios, setFormularios] = useState<Formulario[]>([]);

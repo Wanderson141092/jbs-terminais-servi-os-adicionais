@@ -238,6 +238,24 @@ Deno.serve(async (req) => {
 
     // Build visible fields config
     const visibleFixedFields = (camposFixosRes.data || []).map((c: any) => c.campo_chave);
+
+    // Fetch affix mappings for dynamic fields
+    const { data: mappingsForAffixes } = await supabaseAdmin
+      .from("pergunta_mapeamento")
+      .select("campo_analise_id, banco_perguntas(config)")
+      .not("campo_analise_id", "is", null);
+
+    const affixMap = new Map<string, { prefixo: string; sufixo: string }>();
+    for (const m of (mappingsForAffixes || []) as any[]) {
+      if (m.campo_analise_id && !affixMap.has(m.campo_analise_id)) {
+        const cfg = m.banco_perguntas?.config;
+        if (cfg) {
+          const pre = String(cfg.prefixo || cfg.mascara?.prefixo || cfg.mask?.prefix || "").trim();
+          const suf = String(cfg.sufixo || cfg.mascara?.sufixo || cfg.mask?.suffix || "").trim();
+          if (pre || suf) affixMap.set(m.campo_analise_id, { prefixo: pre, sufixo: suf });
+        }
+      }
+    }
     
     const snapshotCamposDinamicos = Array.isArray(snapshot.campos_dinamicos)
       ? snapshot.campos_dinamicos
@@ -246,13 +264,21 @@ Deno.serve(async (req) => {
       ? snapshotCamposDinamicos
       : (camposValoresRes.data || []);
 
-    // Build visible dynamic field values
+    // Build visible dynamic field values with affixes applied
     const dynamicFieldsForExternal = dynamicFieldsSource
       .filter((cv: any) => (cv.campos_analise?.visivel_externo === true || cv.visivel_externo === true) && cv.valor)
-      .map((cv: any) => ({
-        campo_nome: cv.campos_analise?.nome || cv.nome || "Campo",
-        valor: cv.valor,
-      }));
+      .map((cv: any) => {
+        let valor = cv.valor;
+        const aff = affixMap.get(cv.campo_id);
+        if (aff && valor) {
+          if (aff.prefixo && !valor.startsWith(aff.prefixo)) valor = aff.prefixo + valor;
+          if (aff.sufixo && !valor.trimEnd().endsWith(aff.sufixo)) valor = (valor + " " + aff.sufixo).trim();
+        }
+        return {
+          campo_nome: cv.campos_analise?.nome || cv.nome || "Campo",
+          valor,
+        };
+      });
 
     // Sanitize: remove client name for privacy, and filter fields based on config
     const sanitizedSolicitacao: Record<string, any> = {};

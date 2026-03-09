@@ -2246,10 +2246,13 @@ const formatFormValue = (val: any, tipo: string, config?: any): string => {
 
   // Handle object values (resposta_conjunta stored as object)
   if (val && typeof val === "object" && !Array.isArray(val)) {
+    const campos = (config?.campos || []) as { rotulo?: string; label?: string }[];
     const entries = Object.entries(val).filter(([, v]) => v !== null && v !== undefined && v !== "");
     if (entries.length > 0) {
-      return entries.map(([k, v]) => {
-        const label = k.replace(/^campo/, "Campo ").replace(/_/g, " ");
+      return entries.map(([k, v], idx) => {
+        // Use configured label from campos, fallback to key
+        const campoConfig = campos[idx];
+        const label = campoConfig?.rotulo || campoConfig?.label || k;
         const valStr = Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v);
         return `${label}:\n${valStr}`;
       }).join("\n\n");

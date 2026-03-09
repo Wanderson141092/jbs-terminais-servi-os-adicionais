@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -19,24 +19,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Edit, Save, Eye, EyeOff, Globe, Monitor, Plus, Trash2 } from "lucide-react";
 
-/** Known solicitacoes columns available for campo_fixo mapping */
-const SOLICITACOES_COLUMNS: { key: string; label: string; group: string }[] = [
-  { key: "protocolo", label: "Protocolo", group: "Identificação" },
-  { key: "numero_conteiner", label: "Número do Contêiner", group: "Identificação" },
-  { key: "lpco", label: "LPCO", group: "Identificação" },
-  { key: "chave_consulta", label: "Chave de Consulta", group: "Identificação" },
-  { key: "cnpj", label: "CNPJ", group: "Cliente" },
-  { key: "cliente_nome", label: "Nome do Cliente", group: "Cliente" },
-  { key: "cliente_email", label: "E-mail do Cliente", group: "Cliente" },
-  { key: "tipo_carga", label: "Tipo de Carga", group: "Operação" },
-  { key: "tipo_operacao", label: "Tipo de Operação", group: "Operação" },
-  { key: "categoria", label: "Categoria", group: "Operação" },
-  { key: "data_posicionamento", label: "Data de Posicionamento", group: "Datas" },
-  { key: "data_agendamento", label: "Data de Agendamento", group: "Datas" },
-  { key: "observacoes", label: "Observações", group: "Outros" },
-  { key: "status", label: "Status", group: "Outros" },
-  { key: "status_vistoria", label: "Status da Vistoria", group: "Outros" },
+/** Legacy solicitacoes columns still available for mapping */
+const SOLICITACOES_COLUMNS: { key: string; label: string }[] = [
+  { key: "protocolo", label: "Protocolo" },
+  { key: "numero_conteiner", label: "Número do Contêiner" },
+  { key: "lpco", label: "LPCO" },
+  { key: "chave_consulta", label: "Chave de Consulta" },
+  { key: "cnpj", label: "CNPJ" },
+  { key: "cliente_nome", label: "Nome do Cliente" },
+  { key: "cliente_email", label: "E-mail do Cliente" },
+  { key: "tipo_carga", label: "Tipo de Carga" },
+  { key: "tipo_operacao", label: "Tipo de Operação" },
+  { key: "categoria", label: "Categoria" },
+  { key: "data_posicionamento", label: "Data de Posicionamento" },
+  { key: "data_agendamento", label: "Data de Agendamento" },
+  { key: "observacoes", label: "Observações" },
+  { key: "status", label: "Status" },
+  { key: "status_vistoria", label: "Status da Vistoria" },
 ];
+
+const SYSTEM_SOURCE = "__sistema__";
 
 interface CampoFixo {
   id: string;
@@ -50,17 +52,28 @@ interface CampoFixo {
   ativo: boolean;
 }
 
-interface Servico {
-  id: string;
-  nome: string;
+interface Servico { id: string; nome: string; }
+
+interface Formulario { id: string; titulo: string; }
+
+interface PerguntaFormulario {
+  pergunta_id: string;
+  formulario_id: string;
+  rotulo: string;
 }
 
 const CamposFixosManager = () => {
   const [campos, setCampos] = useState<CampoFixo[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
+  const [formularios, setFormularios] = useState<Formulario[]>([]);
+  const [perguntas, setPerguntas] = useState<PerguntaFormulario[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingCampo, setEditingCampo] = useState<CampoFixo | null>(null);
+
+  // Source selector: "__sistema__" or a formulario id
+  const [selectedSource, setSelectedSource] = useState<string>("");
+
   const [formData, setFormData] = useState({
     campo_chave: "",
     campo_label: "",
@@ -71,23 +84,62 @@ const CamposFixosManager = () => {
     ordem: 0,
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
-    const [camposRes, servicosRes] = await Promise.all([
+    const [camposRes, servicosRes, formsRes, perguntasRes] = await Promise.all([
       supabase.from("campos_fixos_config").select("*").order("ordem"),
       supabase.from("servicos").select("id, nome").eq("ativo", true).order("nome"),
+      supabase.from("formularios").select("id, titulo").eq("ativo", true).order("titulo"),
+      supabase
+        .from("formulario_perguntas")
+        .select("pergunta_id, formulario_id, banco_perguntas!inner(rotulo)")
+        .order("ordem"),
     ]);
+
     setCampos((camposRes.data as CampoFixo[]) || []);
     setServicos(servicosRes.data || []);
+    setFormularios((formsRes.data as Formulario[]) || []);
+
+    // Flatten the joined data
+    const mapped: PerguntaFormulario[] = (perguntasRes.data || []).map((row: any) => ({
+      pergunta_id: row.pergunta_id,
+      formulario_id: row.formulario_id,
+      rotulo: row.banco_perguntas?.rotulo || row.pergunta_id,
+    }));
+    setPerguntas(mapped);
     setLoading(false);
   };
+
+  /** Build a lookup: campo_chave → display label */
+  const chaveDisplayMap = useMemo(() => {
+    const map: Record<string, { label: string; source: string }> = {};
+    // system columns
+    for (const col of SOLICITACOES_COLUMNS) {
+      map[col.key] = { label: col.label, source: "Sistema" };
+    }
+    // form questions
+    for (const p of perguntas) {
+      const form = formularios.find(f => f.id === p.formulario_id);
+      map[p.pergunta_id] = {
+        label: p.rotulo,
+        source: form?.titulo || "Formulário",
+      };
+    }
+    return map;
+  }, [perguntas, formularios]);
 
   const openDialog = (campo?: CampoFixo) => {
     if (campo) {
       setEditingCampo(campo);
+      // Determine which source this campo_chave belongs to
+      const isSystem = SOLICITACOES_COLUMNS.some(c => c.key === campo.campo_chave);
+      if (isSystem) {
+        setSelectedSource(SYSTEM_SOURCE);
+      } else {
+        const match = perguntas.find(p => p.pergunta_id === campo.campo_chave);
+        setSelectedSource(match?.formulario_id || "");
+      }
       setFormData({
         campo_chave: campo.campo_chave,
         campo_label: campo.campo_label,
@@ -99,6 +151,7 @@ const CamposFixosManager = () => {
       });
     } else {
       setEditingCampo(null);
+      setSelectedSource("");
       const maxOrdem = campos.length > 0 ? Math.max(...campos.map(c => c.ordem)) + 1 : 0;
       setFormData({
         campo_chave: "",
@@ -141,7 +194,6 @@ const CamposFixosManager = () => {
       if (error) { toast.error("Erro ao salvar"); return; }
       toast.success("Campo atualizado!");
     } else {
-      // Check duplicate key
       if (campos.some(c => c.campo_chave === normalizedKey)) {
         toast.error("Já existe um campo com esta chave");
         return;
@@ -169,52 +221,32 @@ const CamposFixosManager = () => {
   const handleDelete = async (campo: CampoFixo) => {
     if (!confirm(`Tem certeza que deseja excluir o campo "${campo.campo_label}"?`)) return;
 
-    const probe = await supabase.from("solicitacoes").select(`id,${campo.campo_chave}`).limit(1);
-    const hasColumn = !probe.error;
+    // Only probe solicitacoes column for system keys
+    const isSystemKey = SOLICITACOES_COLUMNS.some(c => c.key === campo.campo_chave);
+    if (isSystemKey) {
+      const probe = await supabase.from("solicitacoes").select(`id,${campo.campo_chave}`).limit(1);
+      if (!probe.error) {
+        const { count } = await supabase
+          .from("solicitacoes")
+          .select("id", { count: "exact", head: true })
+          .not(campo.campo_chave, "is", null);
 
-    if (hasColumn) {
-      const { count, error: countError } = await supabase
-        .from("solicitacoes")
-        .select("id", { count: "exact", head: true })
-        .not(campo.campo_chave, "is", null);
-
-      if (countError) {
-        toast.error("Erro ao validar uso do campo nos processos.");
-        return;
-      }
-
-      if ((count || 0) > 0) {
-        const { error: disableError } = await supabase
-          .from("campos_fixos_config")
-          .update({ ativo: false, visivel_analise: false, visivel_externo: false, updated_at: new Date().toISOString() })
-          .eq("id", campo.id);
-
-        if (disableError) {
-          toast.error("Campo possui dados e não pôde ser desativado automaticamente.");
+        if ((count || 0) > 0) {
+          await supabase
+            .from("campos_fixos_config")
+            .update({ ativo: false, visivel_analise: false, visivel_externo: false, updated_at: new Date().toISOString() })
+            .eq("id", campo.id);
+          toast.warning(`Campo possui ${count} processo(s) com valor e foi desativado para preservar histórico.`);
+          fetchData();
           return;
         }
-
-        toast.warning(`Campo possui ${count} processo(s) com valor e foi desativado para preservar histórico.`);
-        fetchData();
-        return;
       }
     }
 
-    const [{ error: mappingError }, { error: deleteError }] = await Promise.all([
+    await Promise.all([
       supabase.from("pergunta_mapeamento").delete().eq("campo_solicitacao", campo.campo_chave),
       supabase.from("campos_fixos_config").delete().eq("id", campo.id),
     ]);
-
-    if (mappingError) {
-      toast.error("Erro ao limpar vínculos do campo.");
-      return;
-    }
-
-    if (deleteError) {
-      toast.error("Erro ao excluir campo.");
-      return;
-    }
-
     toast.success("Campo excluído!");
     fetchData();
   };
@@ -238,13 +270,29 @@ const CamposFixosManager = () => {
     }));
   };
 
+  /** Available questions for the selected form, excluding already-used keys */
+  const availableQuestions = useMemo(() => {
+    if (selectedSource === SYSTEM_SOURCE || !selectedSource) return [];
+    const usedKeys = new Set(campos.map(c => c.campo_chave));
+    if (editingCampo) usedKeys.delete(editingCampo.campo_chave);
+    return perguntas
+      .filter(p => p.formulario_id === selectedSource && !usedKeys.has(p.pergunta_id));
+  }, [selectedSource, perguntas, campos, editingCampo]);
+
+  /** Available system columns excluding already-used keys */
+  const availableSystemCols = useMemo(() => {
+    const usedKeys = new Set(campos.map(c => c.campo_chave));
+    if (editingCampo) usedKeys.delete(editingCampo.campo_chave);
+    return SOLICITACOES_COLUMNS.filter(c => !usedKeys.has(c.key));
+  }, [campos, editingCampo]);
+
   if (loading) return <p className="text-muted-foreground text-center py-8">Carregando...</p>;
 
   return (
     <div className="space-y-4">
       <div className="bg-muted/30 border rounded-lg p-4 text-sm text-muted-foreground">
         <p className="font-medium text-foreground mb-1">Campos Fixos da Análise</p>
-        <p>Configure quais campos fixos da solicitação devem aparecer na tela de análise interna e na consulta externa do cliente. Crie novos campos para serviços futuros ou personalizações específicas.</p>
+        <p>Configure quais campos devem aparecer na análise interna e consulta externa. Você pode vincular a uma <strong>pergunta de formulário</strong> (para trazer a resposta automaticamente) ou a um <strong>campo do sistema</strong>.</p>
       </div>
 
       <Card>
@@ -278,62 +326,64 @@ const CamposFixosManager = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                campos.map(campo => (
-                  <TableRow key={campo.id} className={!campo.ativo ? "opacity-50" : ""}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-sm">{campo.campo_label}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{campo.campo_chave}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => toggleQuick(campo, "visivel_analise")}
-                      >
-                        {campo.visivel_analise ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => toggleQuick(campo, "visivel_externo")}
-                      >
-                        {campo.visivel_externo ? <Globe className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {campo.servico_ids.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {campo.servico_ids.map(id => (
-                            <Badge key={id} variant="outline" className="text-[10px]">
-                              {servicos.find(s => s.id === id)?.nome || id.slice(0, 8)}
-                            </Badge>
-                          ))}
+                campos.map(campo => {
+                  const info = chaveDisplayMap[campo.campo_chave];
+                  return (
+                    <TableRow key={campo.id} className={!campo.ativo ? "opacity-50" : ""}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-sm">{campo.campo_label}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {info ? (
+                              <>
+                                <Badge variant="outline" className="text-[10px] font-normal">{info.source}</Badge>
+                                <span className="text-[11px] text-muted-foreground">{info.label}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted-foreground font-mono">{campo.campo_chave}</span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">Todos</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Switch checked={campo.ativo} onCheckedChange={() => toggleAtivo(campo)} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openDialog(campo)}>
-                          <Edit className="h-4 w-4" />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleQuick(campo, "visivel_analise")}>
+                          {campo.visivel_analise ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(campo)}>
-                          <Trash2 className="h-4 w-4" />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleQuick(campo, "visivel_externo")}>
+                          {campo.visivel_externo ? <Globe className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
                         </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {campo.servico_ids.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {campo.servico_ids.map(id => (
+                              <Badge key={id} variant="outline" className="text-[10px]">
+                                {servicos.find(s => s.id === id)?.nome || id.slice(0, 8)}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Todos</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Switch checked={campo.ativo} onCheckedChange={() => toggleAtivo(campo)} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openDialog(campo)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(campo)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -343,67 +393,112 @@ const CamposFixosManager = () => {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingCampo ? `Editar Campo: ${editingCampo.campo_chave}` : "Novo Campo Fixo"}</DialogTitle>
+            <DialogTitle>{editingCampo ? `Editar Campo: ${editingCampo.campo_label}` : "Novo Campo Fixo"}</DialogTitle>
             <DialogDescription>
-              {editingCampo 
-                ? "Configure a visibilidade e comportamento deste campo" 
-                : "Crie um novo campo fixo. A chave será o identificador interno usado no sistema."}
+              {editingCampo
+                ? "Configure a visibilidade e comportamento deste campo."
+                : "Escolha a origem do dado: uma pergunta de formulário ou um campo do sistema."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            {/* Source picker */}
             <div>
-              <Label>Chave do campo (identificador interno)</Label>
+              <Label>Origem do dado</Label>
               {editingCampo ? (
-                <Input
-                  value={formData.campo_chave}
-                  disabled
-                />
+                <Input value={
+                  chaveDisplayMap[formData.campo_chave]
+                    ? `${chaveDisplayMap[formData.campo_chave].source} → ${chaveDisplayMap[formData.campo_chave].label}`
+                    : formData.campo_chave
+                } disabled />
               ) : (
+                <Select
+                  value={selectedSource}
+                  onValueChange={(v) => {
+                    setSelectedSource(v);
+                    setFormData(prev => ({ ...prev, campo_chave: "", campo_label: "" }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione formulário ou sistema" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SYSTEM_SOURCE}>
+                      <span className="font-medium">Campos do Sistema (Solicitação)</span>
+                    </SelectItem>
+                    {formularios.map(f => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.titulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Key picker — only for new fields */}
+            {!editingCampo && selectedSource && (
+              <div>
+                <Label>
+                  {selectedSource === SYSTEM_SOURCE ? "Campo do sistema" : "Pergunta do formulário"}
+                </Label>
                 <Select
                   value={formData.campo_chave}
                   onValueChange={(value) => {
-                    const col = SOLICITACOES_COLUMNS.find(c => c.key === value);
+                    let label = "";
+                    if (selectedSource === SYSTEM_SOURCE) {
+                      label = SOLICITACOES_COLUMNS.find(c => c.key === value)?.label || "";
+                    } else {
+                      label = perguntas.find(p => p.pergunta_id === value)?.rotulo || "";
+                    }
                     setFormData(prev => ({
                       ...prev,
                       campo_chave: value,
-                      campo_label: prev.campo_label || col?.label || "",
+                      campo_label: prev.campo_label || label,
                     }));
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione a chave do campo" />
+                    <SelectValue placeholder={
+                      selectedSource === SYSTEM_SOURCE
+                        ? "Selecione o campo"
+                        : "Selecione a pergunta"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {(() => {
-                      const usedKeys = new Set(campos.map(c => c.campo_chave));
-                      const groups = [...new Set(SOLICITACOES_COLUMNS.map(c => c.group))];
-                      return groups.map(group => {
-                        const items = SOLICITACOES_COLUMNS.filter(c => c.group === group && !usedKeys.has(c.key));
-                        if (items.length === 0) return null;
-                        return (
-                          <div key={group}>
-                            <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group}</p>
-                            {items.map(col => (
-                              <SelectItem key={col.key} value={col.key}>
-                                <span className="flex items-center gap-2">
-                                  <span className="font-mono text-xs text-muted-foreground">{col.key}</span>
-                                  <span>{col.label}</span>
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </div>
-                        );
-                      });
-                    })()}
+                    {selectedSource === SYSTEM_SOURCE ? (
+                      availableSystemCols.length === 0 ? (
+                        <p className="text-xs text-muted-foreground p-2">Todos os campos do sistema já foram adicionados.</p>
+                      ) : (
+                        availableSystemCols.map(col => (
+                          <SelectItem key={col.key} value={col.key}>
+                            <span className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-muted-foreground">{col.key}</span>
+                              <span>{col.label}</span>
+                            </span>
+                          </SelectItem>
+                        ))
+                      )
+                    ) : (
+                      availableQuestions.length === 0 ? (
+                        <p className="text-xs text-muted-foreground p-2">Nenhuma pergunta disponível neste formulário.</p>
+                      ) : (
+                        availableQuestions.map(q => (
+                          <SelectItem key={q.pergunta_id} value={q.pergunta_id}>
+                            {q.rotulo}
+                          </SelectItem>
+                        ))
+                      )
+                    )}
                   </SelectContent>
                 </Select>
-              )}
-              <p className="text-xs text-muted-foreground mt-1">
-                {editingCampo 
-                  ? "A chave não pode ser alterada após a criação." 
-                  : "Selecione a coluna de destino na tabela de solicitações."}
-              </p>
-            </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {selectedSource === SYSTEM_SOURCE
+                    ? "Mapeia diretamente para uma coluna da tabela de solicitações."
+                    : "A resposta do cliente a esta pergunta será exibida como valor do campo."}
+                </p>
+              </div>
+            )}
+
             <div>
               <Label>Rótulo exibido</Label>
               <Input

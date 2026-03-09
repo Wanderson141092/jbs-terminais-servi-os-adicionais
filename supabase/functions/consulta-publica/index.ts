@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const selectFields = "id, protocolo, tipo_operacao, numero_conteiner, lpco, chave_consulta, formulario_id";
+    const selectFields = "id, protocolo, tipo_operacao, numero_conteiner, lpco, chave_consulta, formulario_id, categoria, data_posicionamento, data_agendamento, status, created_at";
 
     let solicitacaoRef = null;
 

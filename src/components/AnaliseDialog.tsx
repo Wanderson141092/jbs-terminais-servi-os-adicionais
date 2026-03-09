@@ -2257,9 +2257,9 @@ const extractSubFields = (
   tipo: string,
   config?: any
 ): { label: string; value: string }[] | null => {
+  // resposta_conjunta: {campo1: ..., campo2: ...} with config.campos
   if (tipo === "resposta_conjunta" && config?.campos) {
     const campos = config.campos as { rotulo?: string; label?: string }[];
-    // valor can be an object {campo1, campo2, ...} or a JSON string
     let obj = valor;
     if (typeof valor === "string") {
       try { obj = JSON.parse(valor); } catch { return null; }
@@ -2268,48 +2268,60 @@ const extractSubFields = (
       return campos.map((campo, idx) => {
         const key = `campo${idx + 1}`;
         let rawVal = obj[key] ?? "";
-        // Flatten nested arrays (e.g. ["1.4 – Explosivos"] → "1.4 – Explosivos")
+        // Arrays → one value per line
         if (Array.isArray(rawVal)) {
-          rawVal = rawVal.filter((v: any) => v !== "" && v != null).join(", ");
+          rawVal = rawVal.filter((v: any) => v !== "" && v != null).join("\n");
         }
         return {
           label: campo.rotulo || campo.label || `Campo ${idx + 1}`,
-          value: stripJsonArtifacts(String(rawVal)),
+          value: String(rawVal).trim(),
         };
       }).filter((sf) => sf.value !== "");
     }
   }
 
-  // Handle pergunta_condicional with subperguntas that have conjunta data
+  // pergunta_condicional with composite sub-data
   if (tipo === "pergunta_condicional" && valor && typeof valor === "object" && !Array.isArray(valor)) {
-    // Check if it looks like a resposta_conjunta object
     const keys = Object.keys(valor);
     const isCampoPattern = keys.every((k) => /^campo\d+$/.test(k));
     if (isCampoPattern && keys.length > 1) {
-      return keys.map((key) => ({
-        label: key.replace("campo", "Campo "),
-        value: stripJsonArtifacts(String(valor[key] ?? "")),
+      return keys.map((key) => {
+        let rawVal = valor[key] ?? "";
+        if (Array.isArray(rawVal)) {
+          rawVal = rawVal.filter((v: any) => v !== "" && v != null).join("\n");
+        }
+        return {
+          label: key.replace("campo", "Campo "),
+          value: String(rawVal).trim(),
+        };
+      }).filter((sf) => sf.value !== "");
+    }
+  }
+
+  // Generic object value (not array) — show each key as a sub-field
+  if (valor && typeof valor === "object" && !Array.isArray(valor)) {
+    const entries = Object.entries(valor).filter(([, v]) => v !== null && v !== undefined && v !== "");
+    if (entries.length > 1) {
+      return entries.map(([k, v]) => ({
+        label: k.replace(/^campo/, "Campo ").replace(/_/g, " "),
+        value: Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v),
       })).filter((sf) => sf.value !== "");
     }
   }
 
-  // Handle multi-value arrays
+  // Multi-value arrays → one item per line (rendered via whitespace pre-line)
   if (Array.isArray(valor) && valor.length > 1) {
-    return valor.map((v, i) => ({
-      label: `Item ${i + 1}`,
-      value: stripJsonArtifacts(String(v)),
-    })).filter((sf) => sf.value !== "");
+    // Return null to let formatFormValue handle it with newlines
+    return null;
   }
 
-  // Handle JSON string arrays
+  // JSON string arrays
   if (typeof valor === "string" && valor.startsWith("[")) {
     try {
       const parsed = JSON.parse(valor);
       if (Array.isArray(parsed) && parsed.length > 1) {
-        return parsed.map((v: any, i: number) => ({
-          label: `Item ${i + 1}`,
-          value: stripJsonArtifacts(String(v)),
-        })).filter((sf: any) => sf.value !== "");
+        // Return null — formatFormValue will join with newlines
+        return null;
       }
     } catch { /* not JSON */ }
   }

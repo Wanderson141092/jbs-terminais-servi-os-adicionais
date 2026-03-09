@@ -113,8 +113,8 @@ const resolveCamposExibicao = ({
   camposAnaliseValores: CampoAnaliseValor[];
   mapeamentos: PerguntaMapeamento[];
 }): CampoResolvido[] => {
-  const campoAnaliseValorMap = new Map<string, string | null>(
-    camposAnaliseValores.map((cv) => [cv.campo_id, cv.valor])
+  const campoAnaliseValorMap = new Map<string, CampoAnaliseValor>(
+    camposAnaliseValores.map((cv) => [cv.campo_id, cv])
   );
   const camposAnaliseMapeados = new Set(
     mapeamentos.filter((m) => !!m.campo_analise_id).map((m) => m.campo_analise_id as string)
@@ -136,20 +136,35 @@ const resolveCamposExibicao = ({
       if (!isExternalForm) return true;
       return camposAnaliseMapeados.has(ca.id) || campoAnaliseValorMap.has(ca.id) || ca.visivel_externo;
     })
-    .map((ca) => ({
-      key: `dinamico:${ca.id}`,
-      label: ca.nome,
-      valor: toDisplayValue(campoAnaliseValorMap.get(ca.id)),
-      ordem: ca.ordem,
-    }));
+    .map((ca) => {
+      const campoValor = campoAnaliseValorMap.get(ca.id);
+      let displayVal = toDisplayValue(campoValor?.valor);
+      
+      // Apply prefixo/sufixo if present and value is not empty
+      if (displayVal !== "—" && campoValor) {
+        const prefixo = campoValor.prefixo || "";
+        const sufixo = campoValor.sufixo || "";
+        if (prefixo || sufixo) {
+          displayVal = applyAffixSafely(displayVal, prefixo, sufixo);
+        }
+      }
+      
+      return {
+        key: `dinamico:${ca.id}`,
+        label: ca.nome,
+        valor: displayVal,
+        ordem: ca.ordem,
+      };
+    });
 
-  return [...fixos, ...dinamicos].sort((a, b) => {
-    if (a.ordem !== b.ordem) return a.ordem - b.ordem;
-    return a.label.localeCompare(b.label);
-  });
+  // Filter out fields with "—" (empty) values - user wants only real data
+  return [...fixos, ...dinamicos]
+    .filter((c) => c.valor !== "—")
+    .sort((a, b) => {
+      if (a.ordem !== b.ordem) return a.ordem - b.ordem;
+      return a.label.localeCompare(b.label);
+    });
 };
-
-const resolveStoragePath = (rawUrl: string | null | undefined, bucket: "form-uploads" | "deferimento") => {
   if (!rawUrl) return null;
   if (!rawUrl.startsWith("http")) return rawUrl;
 

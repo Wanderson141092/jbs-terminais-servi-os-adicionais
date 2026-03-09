@@ -432,50 +432,66 @@ const AdminFormularios = () => {
   };
 
   const exportXLSX = async () => {
-    if (perguntasExportacao.length === 0 || respostas.length === 0) return;
-    const ExcelJS = await import("exceljs");
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Respostas");
-
-    // Headers
-    const headers = ["Data", ...perguntasExportacao.map((p) => p.rotulo)];
-    const headerRow = sheet.addRow(headers);
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
-    });
-
-    // Data rows
-    for (const r of respostas) {
-      const respostasObj = r.respostas as Record<string, unknown>;
-      const row = [
-        new Date(r.created_at).toLocaleString("pt-BR"),
-        ...perguntasExportacao.map((p) => {
-          const val = respostasObj[p.id];
-          return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
-        }),
-      ];
-      sheet.addRow(row);
+    if (perguntasExportacao.length === 0) {
+      toast.error("Nenhuma pergunta encontrada para este formulário.");
+      return;
+    }
+    if (respostas.length === 0) {
+      toast.error("Nenhuma resposta para exportar.");
+      return;
     }
 
-    // Auto-width columns
-    sheet.columns.forEach((col) => {
-      let maxLen = 10;
-      col.eachCell?.({ includeEmpty: true }, (cell) => {
-        const len = String(cell.value || "").length;
-        if (len > maxLen) maxLen = len;
-      });
-      col.width = Math.min(maxLen + 2, 50);
-    });
+    try {
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Respostas");
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `respostas_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+      // Headers
+      const headers = ["Data", ...perguntasExportacao.map((p) => p.rotulo)];
+      const headerRow = sheet.addRow(headers);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+      });
+
+      // Data rows
+      for (const r of respostas) {
+        const respostasObj = (r.respostas || {}) as Record<string, unknown>;
+        const row = [
+          new Date(r.created_at).toLocaleString("pt-BR"),
+          ...perguntasExportacao.map((p) => {
+            const val = respostasObj[p.id];
+            return normalizeFormValue(val, { nullishFallback: "", preserveObjects: true });
+          }),
+        ];
+        sheet.addRow(row);
+      }
+
+      // Auto-width columns
+      sheet.columns.forEach((col) => {
+        let maxLen = 10;
+        col.eachCell?.({ includeEmpty: true }, (cell) => {
+          const len = String(cell.value || "").length;
+          if (len > maxLen) maxLen = len;
+        });
+        col.width = Math.min(maxLen + 2, 50);
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `respostas_${Date.now()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`${respostas.length} respostas exportadas com sucesso!`);
+    } catch (err: any) {
+      console.error("Erro ao exportar XLSX:", err);
+      toast.error("Erro ao gerar o arquivo Excel: " + (err.message || "erro desconhecido"));
+    }
   };
 
   if (loading) {

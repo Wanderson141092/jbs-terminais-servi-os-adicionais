@@ -543,6 +543,36 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
         setIsExternalForm(false);
         setFormRespostas([]);
         setFormArquivos([]);
+
+        // No formulario_id — build affixMap from ALL pergunta_mapeamento globally
+        const { data: globalMappings } = await supabase
+          .from("pergunta_mapeamento")
+          .select("campo_analise_id, banco_perguntas(config)")
+          .not("campo_analise_id", "is", null);
+
+        const globalAffixMap = new Map<string, { prefixo: string; sufixo: string }>();
+        for (const m of globalMappings || []) {
+          if (m.campo_analise_id && !globalAffixMap.has(m.campo_analise_id)) {
+            const cfg = (m as any).banco_perguntas?.config;
+            if (cfg) {
+              const affixes = resolveMaskAffixes(cfg);
+              if (affixes.prefixo || affixes.sufixo) {
+                globalAffixMap.set(m.campo_analise_id, affixes);
+              }
+            }
+          }
+        }
+
+        const enrichedFallback: CampoAnaliseValor[] = (camposValoresRes.data || []).map((cv: any) => {
+          const affixes = globalAffixMap.get(cv.campo_id);
+          return {
+            campo_id: cv.campo_id,
+            valor: cv.valor,
+            prefixo: affixes?.prefixo || "",
+            sufixo: affixes?.sufixo || "",
+          };
+        });
+        (camposValoresRes as any)._enriched = enrichedFallback;
       }
 
       // Use enriched campos values if available, otherwise fallback to raw data

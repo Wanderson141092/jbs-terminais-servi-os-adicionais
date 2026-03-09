@@ -249,6 +249,7 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
     enabled: true,
   });
 
+  const getStructuredError = (fallback: string, payload: any) => {
     if (payload?.error?.message) return payload.error.message as string;
     if (payload?.message) return payload.message as string;
     return fallback;

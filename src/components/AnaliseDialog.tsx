@@ -2232,6 +2232,8 @@ const AnaliseDialog = ({ solicitacao, profile, userId, isAdmin = false, onClose 
 const stripJsonArtifacts = (val: string): string => {
   if (!val) return val;
   let cleaned = val.trim();
+  
+  // Try to parse as JSON first for proper formatting
   if ((cleaned.startsWith("[") && cleaned.endsWith("]")) || (cleaned.startsWith("{") && cleaned.endsWith("}"))) {
     try {
       const parsed = JSON.parse(cleaned);
@@ -2242,7 +2244,7 @@ const stripJsonArtifacts = (val: string): string => {
               return Object.entries(item)
                 .filter(([, v]) => v !== null && v !== undefined && v !== "")
                 .map(([k, v]) => {
-                  const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+                  const vals = Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v);
                   return `${k}:\n${vals}`;
                 })
                 .join("\n\n");
@@ -2256,7 +2258,7 @@ const stripJsonArtifacts = (val: string): string => {
         return Object.entries(parsed)
           .filter(([, v]) => v !== null && v !== undefined && v !== "")
           .map(([k, v]) => {
-            const vals = Array.isArray(v) ? (v as any[]).join("\n") : String(v);
+            const vals = Array.isArray(v) ? (v as any[]).filter(Boolean).join("\n") : String(v);
             return `${k}:\n${vals}`;
           })
           .join("\n\n");
